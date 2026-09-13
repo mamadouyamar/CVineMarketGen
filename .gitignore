@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.ipynb_checkpoints/
+build/
+dist/
+.DS_Store
+data/factors_cache.csv
