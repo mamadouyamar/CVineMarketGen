@@ -105,3 +105,9 @@ proxies with durations 8, 8, 10; Yahoo Finance DBC minus RF), cached in
 correlation matrix (`factor_targets`); skewness, kurtosis and family selection
 from the same sample. Sample April 2006 to the latest month, 244 months at the
 time of writing. `data/macro_factors_targets.csv` was removed.
+
+## Addendum 3 (2026-09-13): one notebook per example
+
+`examples.ipynb` was split into `example_ltcma.ipynb` (Example 1) and
+`example_factors.ipynb` (Example 2), each with its own Colab badge; the README
+links to both.

@@ -1,6 +1,6 @@
 # CVineMarketGen — C-vine copula financial market generator with moment and tail dependence targeting
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples.ipynb)
+[![Example 1 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_ltcma.ipynb) Example 1, LTCMA targeting &nbsp;&nbsp; [![Example 2 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_factors.ipynb) Example 2, macro factors
 
 CVineMarketGen simulates multivariate asset returns whose first four moments,
 pairwise correlations and tail dependence match prescribed targets, such as
@@ -16,14 +16,19 @@ Simulation with Moment and Tail Dependence Targeting*:
   the exceedance-correlation curve of each pair, including two-component mixture
   copulas for non-monotone dependence.
 
-> ### 📓 Start with the worked examples: [`examples.ipynb`](examples.ipynb) and [**▶ Run it in Colab**](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples.ipynb)
-> Two examples. **LTCMA targeting**: 4 asset classes, a synthetic history
-> **simulated from a C-vine with known families**, the families **selected back**, the
-> vine **calibrated to J.P. Morgan's 2024 targets** and a scenario matrix **simulated**.
-> **Macro factors**: 6 factor excess returns built at run time from point-in-time
-> market data (Fama-French, FRED, Yahoo Finance), with **no target other than the
-> history**. In both, the Fleishman generator is run on the same targets and the
-> exceedance-correlation curves of the three series are compared. Seeded and reproducible.
+> ### 📓 Start with the worked examples
+> **[`example_ltcma.ipynb`](example_ltcma.ipynb)** ([▶ Colab](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_ltcma.ipynb)): 4 asset classes,
+> a synthetic history **simulated from a C-vine with known families**, the families
+> **selected back**, the vine **calibrated to J.P. Morgan's 2024 targets** and a scenario
+> matrix **simulated**; the Fleishman generator on the same targets; exceedance-correlation
+> curves compared. About 3 to 4 minutes.
+>
+> **[`example_factors.ipynb`](example_factors.ipynb)** ([▶ Colab](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_factors.ipynb)): 6 factor excess
+> returns built at run time from point-in-time market data (Fama-French, FRED, Yahoo
+> Finance), with **no target other than the history**; same pipeline, curves compared with
+> the actual factor history. About 3 minutes.
+>
+> Both are seeded and reproducible.
 
 ## Model classes
 
@@ -129,12 +134,12 @@ Selected families and calibrated parameters (true families in `edges` above; the
     3 Gold , Commodities | U.S. Large Cap, U.S. Long Treasuries               gaussian 0°                  theta=0.514
 ```
 
-The exceedance-correlation figure of the notebook shows what the correlation
+The exceedance-correlation figures of the notebooks show what the correlation
 table cannot: the C-vine generator reproduces the sign change of the conditional
 correlation on the mixture edge, the Fleishman generator does not.
 
-Runtime of the notebook on a laptop: 3 to 4 minutes for Example 1 and
-about 3 minutes for Example 2, dominated by the correlation-targeting optimizer
+Runtime on a laptop: 3 to 4 minutes for `example_ltcma.ipynb` and
+about 3 minutes for `example_factors.ipynb`, dominated by the correlation-targeting optimizer
 (`n_samples` draws per objective evaluation; the paper used 20000 and a
 tolerance of 2e-2, the notebook 10000 and 5e-2).
 
@@ -144,10 +149,10 @@ tolerance of 2e-2, the notebook 10000 and 5e-2).
 matrix of 59 asset classes from J.P. Morgan's 2024 Long-Term Capital Market
 Assumptions (USD), as published in the public report. No historical return
 series is shipped: the paper's skewness, kurtosis and copula-family selection
-used licensed Finaeon/GFD data, which is why Example 1 simulates its own
+used licensed Finaeon/GFD data, which is why `example_ltcma.ipynb` simulates its own
 history.
 
-Example 2 downloads its six factors at run time with `load_factor_data` and
+`example_factors.ipynb` downloads its six factors at run time with `load_factor_data` and
 caches them in `data/factors_cache.csv` (ignored by git). All are monthly excess
 returns from point-in-time market series:
 
