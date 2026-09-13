@@ -17,7 +17,19 @@ from .moment_match import bicop_params, bicop_bounds
 
 
 class CopulaTools:
-    """Bivariate building blocks of the C-vine (article 3, Section 4 and Appendix C)."""
+    """
+    Bivariate building blocks of the C-vine (Section 4.4 and Appendix C of the paper).
+
+    Exceedance-correlation classification of a pair, the catalogs of candidate
+    families and mixtures with their tail signatures, BIC selection among the
+    admissible families, two-component mixture copulas (density, ``h``-function,
+    inverse ``h``-function, maximum likelihood), and the non-central squared (NCS)
+    copulas of Nasri (2020).
+
+    Single-family copulas are :class:`pyvinecopulib.Bicop` objects; a mixture is a
+    list of two ``Bicop`` components with a parameter vector
+    ``[w, theta_1, theta_2]`` where ``w`` is the weight on the first component.
+    """
 
     def exceedance_correlation(self, x, y, z_grid, min_obs=10):
         """
@@ -39,6 +51,27 @@ class CopulaTools:
     def draw_cond_corr(self, x, y, thetas_lb=-2, thetas_ub=2, figsize=(5, 5), names=['Asset1', 'Asset2'],
                        LTCMA_corr=np.nan, return_values=False, inputs_are_obs=True, show_plot=True):
 
+        """
+        Exceedance-correlation curve of a pair on a grid of thresholds (equation C.1), optionally plotted.
+
+        Parameters
+        ----------
+        x, y : array_like
+            Raw returns when ``inputs_are_obs`` is True; conditional pseudo-observations
+            (``h``-function values) otherwise, in which case ``Phi^{-1}`` is applied first.
+        thetas_lb, thetas_ub : float, default -2, 2
+            Threshold range in standard deviations; the grid step is 0.02.
+        figsize, names, LTCMA_corr, show_plot
+            Plot options.
+        return_values : bool, default False
+            If True, return the curve instead of only plotting it.
+        inputs_are_obs : bool, default True
+
+        Returns
+        -------
+        pandas.Series
+            Exceedance correlation indexed by threshold (only when ``return_values`` is True).
+        """
         if inputs_are_obs == False:
             x = norm.ppf(x)
             y = norm.ppf(y)
@@ -619,10 +652,7 @@ class CopulaTools:
                 "message": best.message}
 
     def haU(self, u, a):
-        """
-        h_a(u) = sign(u) * G_a^{-1}(|u|) - a
-        Works for u as a 1-D array.
-        """
+        """NCS helper ``h_a(u) = sign(u) * G_a^{-1}(abs(u)) - a`` for a 1-D array ``u``."""
         u = np.asarray(u)
         x = stats.ncx2.ppf(np.abs(u), 1, a ** 2) ** 0.5
         return np.sign(u) * x - a
@@ -978,37 +1008,20 @@ class CopulaTools:
         return out
 
     def get_condcorrelation_metrics(self, condcorr):
-        """
-        Extract summary statistics from the exceedance correlation curve ρ̂(θ).
-
-        The curve is indexed by threshold θ: negative θ values correspond to the
-        left tail (conditioning on x < θ), positive θ values to the right tail
-        (conditioning on x ≥ θ). These summary statistics are used to classify
-        each pair into lower/upper tail dependence categories.
+        r"""
+        Summary statistics of an exceedance-correlation curve (equations C.2 to C.5).
 
         Parameters
         ----------
-        condcorr : pd.Series
-            Exceedance correlation curve, indexed by threshold θ.
-            Negative indices = left tail, positive indices = right tail.
+        condcorr : pandas.Series
+            Curve from :meth:`draw_cond_corr`, indexed by threshold.
 
         Returns
         -------
-        pd.Series with 8 metrics:
-            mean_leftside      : average exceedance correlation across all θ < 0
-            mean_rightside     : average exceedance correlation across all θ > 0
-            max_leftside       : maximum exceedance correlation for θ < 0
-            min_leftside       : minimum exceedance correlation for θ < 0
-            max_rightside      : maximum exceedance correlation for θ > 0
-            min_rightside      : minimum exceedance correlation for θ > 0
-            jump_at0_size      : |ρ̂(0⁻) - ρ̂(0⁺)|, the discontinuity at zero
-            halfway_from_jump  : max(ρ̂(0⁻), ρ̂(0⁺)) - |ρ̂(0⁻) - ρ̂(0⁺)| / 2,
-                                 i.e. the midpoint between the two sides of the
-                                 jump. This serves as the reference level for
-                                 classifying lower vs upper tail dependence:
-                                 if the left side is above this level and the
-                                 right side is below → lower tail dependence,
-                                 and vice versa.
+        pandas.Series
+            ``mean_leftside``, ``mean_rightside``, ``max_leftside``, ``min_leftside``,
+            ``max_rightside``, ``min_rightside``, ``jump_at0_size`` and
+            ``halfway_from_jump`` (the reference level :math:`\hat\rho_{mid}`).
         """
 
         ret = pd.Series([condcorr.loc[condcorr.index < 0].mean(),  ## average corr lower tail
@@ -1037,6 +1050,17 @@ class CopulaTools:
 
     def get_copulas_specifications(self):
 
+        r"""
+        Catalog :math:`\mathcal{C}` of single-family candidates with their tail signature.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by ``(copula, rotation, ncs_status)``: Clayton and Gumbel at 0, 90,
+            180 and 270 degrees, and Gaussian; columns ``lower_tail_dependence``,
+            ``upper_tail_dependence``, ``target_correlation_sign`` (+1, -1, or -11 for
+            either sign) and ``monotone_dependence``. This is the table of Appendix C.
+        """
         copulas_specifications = pd.DataFrame(index=range(5),
                                               columns=['copula', 'rotation', 'ncs_status',
                                                        'lower_tail_dependence', 'upper_tail_dependence',
@@ -1095,6 +1119,15 @@ class CopulaTools:
 
     def get_copulas_mixture_specifications(self):
 
+        r"""
+        Catalog :math:`\mathcal{M}` of two-component mixtures with their tail signature.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by the list of two ``Bicop`` components, with columns
+            ``lower_tail_dependence`` and ``upper_tail_dependence``.
+        """
         copulas_specs_mixture = pd.DataFrame(index=range(5),
                                              columns=['list_copula', 'lower_tail_dependence',
                                                       'upper_tail_dependence'],
@@ -1136,13 +1169,20 @@ class CopulaTools:
 
     def select_best_bivariate_copula(self, data, families=None, rotations=None):
         """
-        Selects the best bivariate copula based on BIC using pyvinecopulib
+        Unrestricted BIC selection among Gaussian, Gumbel, Clayton and Joe copulas with all rotations.
 
-        Parameters:
-        - data: numpy.ndarray of shape (n_samples, 2), with values in [0, 1]
+        Parameters
+        ----------
+        data : array_like of shape (n, 2)
+            Pseudo-observations.
+        families, rotations : lists, optional
+            Restrict the search.
 
-        Returns:
-        - dict with best copula family name, BIC value, and fitted copula object
+        Returns
+        -------
+        dict
+            ``best_family`` (name), ``best_bic`` (BIC per observation), ``copula``
+            (fitted :class:`pyvinecopulib.Bicop`).
         """
         if families == None:
             families = [
@@ -1246,14 +1286,20 @@ class CopulaTools:
                 }
 
     def select_best_preselected_bivariate_copula(self, data, families_and_rotations):
-        """
-        Selects the best bivariate copula based on BIC using pyvinecopulib
+        r"""
+        BIC selection restricted to the admissible families of a pair (Step 3 of Algorithm 3).
 
-        Parameters:
-        - data: numpy.ndarray of shape (n_samples, 2), with values in [0, 1]
+        Parameters
+        ----------
+        data : array_like of shape (n, 2)
+            Pseudo-observations.
+        families_and_rotations : list of (BicopFamily, rotation) tuples
+            The admissible set :math:`\mathcal{C}_{ik|1:k-1}`.
 
-        Returns:
-        - dict with best copula family name, BIC value, and fitted copula object
+        Returns
+        -------
+        dict
+            ``best_family``, ``best_bic``, ``copula``.
         """
 
         best_bic = float('inf')
@@ -1279,6 +1325,20 @@ class CopulaTools:
 
     def select_best_preselected_mixture_copula(self, data, list_of_copulas_families):
         """
+        Maximum-likelihood fit of each candidate mixture and BIC selection (non-monotone pairs of Algorithm 3).
+
+        Parameters
+        ----------
+        data : array_like of shape (n, 2)
+            Pseudo-observations.
+        list_of_copulas_families : list
+            Candidate mixtures, each a list of two ``Bicop`` components.
+
+        Returns
+        -------
+        dict
+            ``best_copula`` (the two components), ``best_bic``, ``best_params``
+            (``[w, theta_1, theta_2]``).
         """
         best_bic = float('inf')
         best_copula = None
@@ -1482,7 +1542,22 @@ class CopulaTools:
 
     def hfunc1_mixture(self, u1, u2, params, families_w_rotations, eps=1e-10):
         """
-        Optimized version with better memory usage and fewer function calls.
+        ``h``-function of a mixture copula, conditional on the first argument.
+
+        ``h(u2 | u1) = w h_1(u2 | u1) + (1 - w) h_2(u2 | u1)``.
+
+        Parameters
+        ----------
+        u1, u2 : array_like
+        params : sequence
+            ``[w, theta_1, theta_2]``.
+        families_w_rotations : list of two :class:`pyvinecopulib.Bicop`
+        eps : float, default 1e-10
+            Clipping of the arguments away from 0 and 1.
+
+        Returns
+        -------
+        numpy.ndarray
         """
 
         (w, par_fam1, par_fam2) = params
@@ -1514,23 +1589,23 @@ class CopulaTools:
 
     def hinv1_mixture(self, u1, p, params, families_w_rotations, eps=1e-10, tol=1e-9, n_iter=80):
         """
-        Invert u2 from p = hfunc1_mixture(u1, u2, ...), using bisection.
+        Inverse ``h``-function of a mixture copula by vectorized bisection.
 
-        Keeps YOUR hfunc1_mixture unchanged and calls it repeatedly.
+        Solves ``hfunc1_mixture(u1, u2) = p`` for ``u2``, which has no closed form for
+        a mixture; used by the C-vine sampler and the calibration.
 
         Parameters
         ----------
-        u1 : array-like or scalar
-        p : array-like or scalar
-        params : tuple/list (w, par_fam1, par_fam2)
-        families_w_rotations : [bicop1, bicop2] (whatever your hfunc expects)
-        eps : float
-        tol : float
-        n_iter : int
+        u1, p : array_like
+        params : sequence
+            ``[w, theta_1, theta_2]``.
+        families_w_rotations : list of two :class:`pyvinecopulib.Bicop`
+        eps, tol, n_iter
+            Clipping, bisection tolerance and maximum number of bisection steps.
 
         Returns
         -------
-        u2 : np.ndarray
+        numpy.ndarray
         """
         u1 = np.asarray(u1, dtype=float).ravel()
         p = np.asarray(p, dtype=float).ravel()
@@ -1591,6 +1666,22 @@ class CopulaTools:
 
     def simulate_mixture(self, w, mix_components, n=1000, seed=None):
 
+        """
+        Sample from a two-component mixture copula.
+
+        Parameters
+        ----------
+        w : float
+            Weight on the first component.
+        mix_components : list of two :class:`pyvinecopulib.Bicop`
+            Components with their parameters set.
+        n : int, default 1000
+        seed : int, optional
+
+        Returns
+        -------
+        numpy.ndarray of shape (n, 2)
+        """
         bern = bernoulli.rvs(1 - w, size=n)
 
         comp1_sim = mix_components[0].simulate(n=n).copy()
@@ -1635,6 +1726,22 @@ class CopulaTools:
         #                                                 pv.Bicop(pv.BicopFamily.gumbel, 0)]
         #                              )
 
+        """
+        Maximum-likelihood estimation of a two-component mixture copula.
+
+        Parameters
+        ----------
+        pseudo_obs : array_like of shape (n, 2)
+        copulas_families : list of two :class:`pyvinecopulib.Bicop`
+            Components (family and rotation); their parameters are the unknowns.
+        constraint_corr : bool, default False
+            Unused in the pipeline.
+
+        Returns
+        -------
+        scipy.optimize.OptimizeResult
+            ``x`` is ``[w, theta_1, theta_2]``; the result also carries ``BIC``.
+        """
         mixture_bounds = [(0, 1)] + [(bicop_bounds(val, 'lower')[0, 0] + 1e-5,
                                       bicop_bounds(val, 'upper')[0, 0] - 1e-5) for val in copulas_families]
 

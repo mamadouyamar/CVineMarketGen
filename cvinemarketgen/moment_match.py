@@ -35,7 +35,16 @@ def bicop_params(*values):
 
 
 class MomentMatch:
-    """Fleishman, Vale-Maurelli and Johnson SU moment matching (article 3, Sections 3 and 4.3)."""
+    """
+    Moment matching tools of the paper's Sections 3 and 4.3.
+
+    Fleishman's cubic transformation and its moment equations (Section 3.1), the
+    Vale-Maurelli helpers used by :class:`~cvinemarketgen.fleishman.FleishmanGenerator`
+    (Section 3.2), Johnson SU moment fitting (Section 4.3), correlation-matrix
+    projection, and the conditional (exceedance) correlation used throughout.
+
+    The class holds no state; every method is a pure function of its arguments.
+    """
 
 
     def __init__(self):
@@ -139,6 +148,9 @@ class MomentMatch:
         return self.correlation_rho(family, theta, rotation) - corr_target
 
     def corr2cov_biv(self, corr, std):
+        """
+        Bivariate covariance matrix from a correlation and two standard deviations.
+        """
         cov = np.array([[1, corr], [corr, 1]]) * np.outer(std, std)
         return cov
 
@@ -159,6 +171,29 @@ class MomentMatch:
         ## kind : param
         ### 1: conditional to x only
         ### 2: conditional to x and y
+        """
+        Exceedance correlation of Longin and Solnik (2001) at one threshold, empirical and Gaussian-theoretical.
+
+        Parameters
+        ----------
+        x, y : array_like
+            Two series; both are standardized internally.
+        Sigma : (2, 2) array_like
+            Covariance of ``(x, y)``; only its implied correlation is used for the
+            theoretical value.
+        theta : float, default 0
+            Threshold in standard deviations: the conditioning event is ``x < theta``
+            for ``theta < 0`` and ``x >= theta`` for ``theta >= 0``.
+        kind : {1, 2}, default 1
+            1 conditions on ``x`` only; 2 conditions on both ``x`` and ``y``.
+
+        Returns
+        -------
+        cc_empirical : float
+            Pearson correlation on the conditioning subsample.
+        cc_theoretical : float
+            Value under a bivariate normal with the same correlation.
+        """
         x = (x - np.mean(x)) / np.std(x)
         y = (y - np.mean(y)) / np.std(y)
         if kind == 1:  ## conditional to x only
@@ -265,40 +300,42 @@ class MomentMatch:
 
     def cubic_transform(self, x, params):
         """
-        Apply Fleishman cubic transformation.
+        Fleishman cubic transformation ``Y = a + b Z + c Z^2 + d Z^3`` (equation 3.1 of the paper).
 
-        Parameters:
-        -----------
-        x : array-like
-            Input variables
-        params : array-like
-            Transformation parameters [a, b, c, d]
+        Parameters
+        ----------
+        x : array_like
+            Standard normal draws ``Z``.
+        params : sequence of 4 floats
+            Coefficients ``(a, b, c, d)``.
 
-        Returns:
-        --------
+        Returns
+        -------
         numpy.ndarray
-            Transformed variables
+            Transformed values, same shape as ``x``.
         """
         a, b, c, d = params
         return a + b * x + c * x ** 2 + d * x ** 3
 
     def moments_cubic_transform(self, params, distr='gauss', x=0):
         """
-        Calculate theoretical moments for cubic transformation.
+        Moments implied by Fleishman coefficients (the left-hand sides of equations 3.2 to 3.5).
 
-        Parameters:
-        -----------
-        params : array-like
-            Transformation parameters [a, b, c, d]
-        distr : str, default='gauss'
-            Distribution type ('gauss', 'gaussian', 'empirical')
-        x : array-like, default=0
-            Empirical data (for empirical distribution)
+        Parameters
+        ----------
+        params : sequence of 4 floats
+            Coefficients ``(a, b, c, d)``.
+        distr : {'gauss', 'gaussian'}, default 'gauss'
+            ``'gauss'`` returns the four expressions of the paper, which equal
+            ``(mean, variance, skewness, excess kurtosis)`` when ``a + c = 0`` and the
+            variance is 1; ``'gaussian'`` returns the general central moments.
+        x : unused
+            Kept for signature compatibility.
 
-        Returns:
-        --------
-        numpy.ndarray
-            Array of moments [mean, variance, skewness, excess_kurtosis]
+        Returns
+        -------
+        numpy.ndarray of shape (4,)
+            ``[mean, variance, skewness, excess kurtosis]``.
         """
         a, b, c, d = params[0], params[1], params[2], params[3]
 
@@ -354,25 +391,36 @@ class MomentMatch:
 
     def find_params_for_moments_matching(self, targeted_moments, x0, method='CG', distr='gauss', x=0):
         """
-        Find parameters for Fleishman moment matching.
+        Solve the Fleishman system for ``(a, b, c, d)`` by minimizing the moment distance.
 
-        Parameters:
-        -----------
-        targeted_moments : array-like
-            Target statistical moments
-        x0 : array-like
-            Initial parameter guess
-        method : str, default='CG'
-            Optimization method
-        distr : str, default='gauss'
-            Distribution type
-        x : array-like, default=0
-            Empirical data
+        Parameters
+        ----------
+        targeted_moments : sequence of 4 floats
+            ``[0, 1, skewness, excess kurtosis]`` (standardized targets; mean and
+            volatility are applied afterwards by the affine rescaling of equation 3.6).
+        x0 : sequence of 4 floats
+            Starting point, for instance ``[0, 1, 0, 0]``.
+        method : str, default 'CG'
+            ``scipy.optimize.minimize`` method; ``'Nelder-Mead'`` is robust here.
+        distr, x
+            Passed to :meth:`moments_cubic_transform`.
 
-        Returns:
-        --------
-        tuple
-            (optimal_parameters, optimization_result)
+        Returns
+        -------
+        params : numpy.ndarray of shape (4,)
+            Coefficients ``(a, b, c, d)``.
+        result : scipy.optimize.OptimizeResult
+            ``result.fun`` is the residual norm.
+
+        Raises
+        ------
+        Exception
+            If ``excess kurtosis < skewness**2 - 2``, outside the feasible region.
+
+        Notes
+        -----
+        :class:`~cvinemarketgen.fleishman.FleishmanGenerator.fit` polishes this
+        solution with a root solve, reaching residuals below ``1e-10``.
         """
         if targeted_moments[3] < (targeted_moments[2] ** 2 - 2):
             raise Exception("kurt must be greater or equal than (skew**2 - 2)")
@@ -552,8 +600,8 @@ class MomentMatch:
 
         Parameters:
         -----------
-        t_famcode_ : int or float
-            Family code
+        t_famcode : int or float
+            Family code (see ``fam_rot_to_code``)
 
         Returns:
         --------
@@ -848,17 +896,17 @@ class MomentMatch:
 
     def moments_JSU(self, params):
         """
-        Calculate theoretical moments for Johnson SU distribution.
+        Closed-form moments of the Johnson SU distribution (equations 4.7 and 4.8 and their higher-order analogues).
 
-        Parameters:
-        -----------
-        params : array-like
-            Distribution parameters [gamma, chi, delta, lambda]
+        Parameters
+        ----------
+        params : sequence of 4 floats
+            ``(gamma, xi, delta, lambda)`` with ``delta > 0`` and ``lambda > 0``.
 
-        Returns:
-        --------
-        numpy.ndarray
-            Array containing [mean, variance, skewness, excess_kurtosis]
+        Returns
+        -------
+        numpy.ndarray of shape (4,)
+            ``[mean, variance, skewness, excess kurtosis]``.
         """
         gamma, chi, delta, lambda_ = params[0], params[1], params[2], params[3]
 
@@ -910,21 +958,23 @@ class MomentMatch:
 
     def find_params_for_moments_matching_JSU(self, targeted_moments, x0, method='CG'):
         """
-        Find JSU distribution parameters that match target statistical moments.
+        Fit Johnson SU parameters to four target moments (equation 4.9 of the paper, Step 1 of the C-vine calibration).
 
-        Parameters:
-        -----------
-        targeted_moments : array-like
-            Target moments [mean, variance, skewness, excess_kurtosis]
-        x0 : array-like
-            Initial parameter guess [gamma, chi, delta, lambda]
-        method : str, default='CG'
-            Optimization method for scipy.optimize.minimize
+        Parameters
+        ----------
+        targeted_moments : sequence of 4 floats
+            ``[mean, variance, skewness, excess kurtosis]``; the package fits the
+            standardized targets ``[0, 1, skew, exkurt]`` and rescales afterwards.
+        x0 : sequence of 4 floats
+            Starting point, for instance ``[0, 1, 1.5, 1]``.
+        method : str, default 'CG'
+            ``scipy.optimize.minimize`` method; ``'Nelder-Mead'`` is used in the pipeline.
 
-        Returns:
-        --------
-        tuple
-            (optimal_parameters, optimization_result)
+        Returns
+        -------
+        params : numpy.ndarray of shape (4,)
+            ``(gamma, xi, delta, lambda)``.
+        result : scipy.optimize.OptimizeResult
         """
         res = minimize(fun=self.univariate_moments_matching_func_JSU,
                        x0=x0,
@@ -935,19 +985,20 @@ class MomentMatch:
 
     def sim_JSU_with_U(self, U, params):
         """
-        Simulate JSU distribution using uniform random variables.
+        Johnson SU quantile transform ``X = xi + lambda * sinh((Phi^{-1}(U) - gamma) / delta)`` (equation 4.6).
 
-        Parameters:
-        -----------
-        U : array-like
-            Uniform random variables in [0,1]
-        params : array-like
-            JSU parameters [gamma, chi, delta, lambda]
+        Parameters
+        ----------
+        U : array_like
+            Uniform(0, 1) values.
+        params : sequence of 4 floats
+            ``(gamma, xi, delta, lambda)``.
 
-        Returns:
-        --------
+        Returns
+        -------
         numpy.ndarray
-            JSU-distributed random variables
+            Johnson SU values, same shape as ``U``. The transform is strictly
+            increasing, so the copula of ``U`` is preserved (Section 4.3).
         """
         gamma, chi, delta, lambda_ = params[0], params[1], params[2], params[3]
         return lambda_ * np.sinh((norm.ppf(U) - gamma) / delta) + chi
@@ -995,25 +1046,27 @@ class MomentMatch:
 
     def find_params_for_moments_matching_JSU_with_U(self, targeted_moments, x0, U, method='CG', maxiter=100):
         """
-        Find JSU parameters that match target moments for specific uniform inputs.
+        Re-fit Johnson SU parameters on a *specific* uniform draw (Step 2 of Algorithm 5).
 
-        Parameters:
-        -----------
-        targeted_moments : array-like
-            Target statistical moments
-        x0 : array-like
-            Initial parameter guess
-        U : array-like
-            Specific uniform random variables to use
-        method : str, default='CG'
-            Optimization method
-        maxiter : int, default=100
-            Maximum optimization iterations
+        The objective uses the empirical moments of ``sim_JSU_with_U(U, params)``
+        rather than the closed-form moments, so that the accepted scenario matrix
+        matches the targets exactly rather than in expectation.
 
-        Returns:
-        --------
-        tuple
-            (optimal_parameters, optimization_result)
+        Parameters
+        ----------
+        targeted_moments : sequence of 4 floats
+            ``[0, 1, skewness, excess kurtosis]``.
+        x0 : sequence of 4 floats
+            Starting point, usually the closed-form fit.
+        U : array_like
+            The uniform draws of one asset.
+        method : str, default 'CG'
+        maxiter : int, default 100
+
+        Returns
+        -------
+        params : numpy.ndarray of shape (4,)
+        result : scipy.optimize.OptimizeResult
         """
         res = minimize(fun=self.univariate_moments_matching_func_JSU_with_U,
                        x0=x0,

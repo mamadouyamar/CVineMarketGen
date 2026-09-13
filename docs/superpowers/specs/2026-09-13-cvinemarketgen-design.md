@@ -130,3 +130,10 @@ property in 0.7); DataFrames converted to arrays before pyvinecopulib calls;
 periods instead of `resample('M')`; statsmodels' `mvnormcdf` replaced by
 SciPy's `multivariate_normal.cdf` (identical values) and statsmodels dropped
 from the dependencies.
+
+## Addendum 6 (2026-09-13): documentation site
+
+Sphinx site under `docs/` (furo theme, myst-nb for the executed notebooks,
+autodoc/napoleon for the API), built by Read the Docs from
+`.readthedocs.yaml`; numpydoc docstrings written for the public entry points
+of the four classes; `CHANGELOG.md` added; `doc` extra in `pyproject.toml`.

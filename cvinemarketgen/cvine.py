@@ -21,7 +21,45 @@ class _EarlyStopSLSQP(Exception):
 
 
 class CVineGenerator(MomentMatch, CopulaTools):
-    """C-vine generator (article 3, Sections 4.5 and 5)."""
+    r"""
+    C-vine copula financial market generator (Sections 4.5 and 5, Algorithms 1 to 6 of the paper).
+
+    The pipeline, with the method implementing each step:
+
+    1. :meth:`load_data_and_setup` — targets and Johnson SU marginals (Algorithm 1).
+    2. :meth:`fit_and_structure_CVine` — copula family selection and vine fit on the
+       historical returns (Algorithm 3, via :meth:`estimate_CVine_preselected_V2`).
+    3. :meth:`run_vine_optimization` — correlation-targeting calibration, variable
+       by variable (Algorithm 4).
+    4. :meth:`run_multi_year_simulation` — scenario generation with accept-reject
+       (Algorithm 5).
+
+    :meth:`run_complete_simulation` chains the four. :meth:`make_vine_spec` and
+    :meth:`simulate_known_vine` build synthetic markets from chosen families, for
+    examples and tests.
+
+    Parameter matrices follow the paper's indexing :math:`\theta_{ik|1:k-1}`,
+    :math:`1 \le k < i \le N`: entry ``[k-1, i-2]`` of each ``(N-1, N-1)`` matrix
+    is the copula of tree ``k`` linking variable ``i`` to variable ``k``. Column
+    ``i-2`` therefore holds the vector :math:`\boldsymbol{\theta}_i`.
+
+    Parameters
+    ----------
+    tol_opt : float
+        Tolerance passed to the SLSQP optimizer of Algorithm 4 (paper: 1e-10).
+    n_samples : int
+        Number of uniform draws used inside the calibration objective (paper: 20000;
+        the examples use 10000).
+    use_ncs_on_firsttree, use_ncs_on_deepertrees : bool
+        Try NCS copulas on non-monotone pairs (slow; off in the paper's run).
+    use_mixture_on_firsttree, use_mixture_on_deepertrees : bool
+        Try mixture copulas on non-monotone pairs.
+    force_try_ncscopula : bool
+        Fit an NCS copula on every edge regardless of the classification.
+    tol_for_optimization_func : float, default 5e-8
+        Objective value below which the calibration of a variable is accepted
+        without trying the fallback families (paper value). The examples use 1e-6.
+    """
     _EarlyStopSLSQP = _EarlyStopSLSQP
     _FAMILY = {'gaussian': pv.BicopFamily.gaussian, 'clayton': pv.BicopFamily.clayton,
                'gumbel': pv.BicopFamily.gumbel, 'joe': pv.BicopFamily.joe, 'frank': pv.BicopFamily.frank}
@@ -42,6 +80,36 @@ class CVineGenerator(MomentMatch, CopulaTools):
         ## Convert historical returns to pseudo-observations (empirical CDF rank transform)
         ## so that all dependence information is captured by the copula, free of marginals.
         ## ==================================================================================
+        r"""
+        Copula family selection and estimation on historical data (Algorithm 3).
+
+        For each tree ``k`` and variable ``i > k``: compute the exceedance correlation
+        of the pair, classify it into ``(l, u, s, m)``, keep the admissible families of
+        the catalog (or mixtures / NCS copulas when the pair is non-monotone), fit them
+        by maximum likelihood, keep the best BIC, and propagate the ``h``-function
+        values to the next tree. Also stores the fallback lists used by Algorithm 4.
+
+        Parameters
+        ----------
+        input_data : pandas.DataFrame of shape (T, N)
+            Historical returns; column 0 is the central node.
+        target_corr : pandas.DataFrame of shape (N, N)
+            Target correlations, used only for the sign characteristic ``s``.
+        use_mixture_on_firsttree, use_ncs_on_firsttree, use_mixture_on_deepertrees, use_ncs_on_deepertrees, force_try_ncscopula : bool
+
+        Returns
+        -------
+        dict
+            ``thetas_final_1p`` (object matrix: float, or ``[w, theta_1, theta_2]`` for
+            a mixture, or ``[theta, a1, a2]`` for NCS), ``thetas_final_2p``,
+            ``a1_final``, ``a2_final``, ``fams_cops`` (``BicopFamily`` or list of two
+            ``Bicop``), ``fams_rots``, ``fams_status`` (``'ordinary'``, ``'mixture'``,
+            ``'ncscopula'``), ``fams_ncscops_status``, ``fams_mixture_status``,
+            ``trees_copulas``, ``trees_hfunc`` (the ``H^(k)`` matrices),
+            ``trees_prespecification`` (the ``(l, u, s, m)`` per edge), the catalogs,
+            and the fallback lists ``testable_copulas`` (:math:`\mathcal{A}`) and
+            ``testable_copulas_only_tail`` (:math:`\mathcal{B}`).
+        """
         data = pd.DataFrame(pv.to_pseudo_obs(np.asarray(input_data, dtype=float)),
                             columns=[str(val + 1) for val in range(input_data.shape[1])])
 
@@ -608,6 +676,22 @@ class CVineGenerator(MomentMatch, CopulaTools):
     def simulate_CVine(self, thetas_1p, thetas_2p, a1_s, a2_s, fams, rotations, ncsstatus, mixturestatus, familystatus,
                        n=1000):
 
+        """
+        Sample uniform vectors from a C-vine (the general sampling algorithm of Appendix C).
+
+        Parameters
+        ----------
+        thetas_1p, thetas_2p, a1_s, a2_s, fams, rotations, ncsstatus, mixturestatus, familystatus : arrays of shape (N-1, N-1)
+            Parameter matrices in the layout described in the class docstring, as
+            returned by :meth:`estimate_CVine_preselected_V2`, :meth:`run_vine_optimization`
+            or :meth:`make_vine_spec`.
+        n : int, default 1000
+
+        Returns
+        -------
+        numpy.ndarray of shape (n, N)
+            Copula-scale observations ``u``.
+        """
         W = np.random.uniform(0, 1, size=[n, thetas_1p.shape[0] + 1])
 
         U = W.copy() * 0
@@ -646,6 +730,12 @@ class CVineGenerator(MomentMatch, CopulaTools):
                # , temp_a1_final, temp_a2_final, temp_ncsstatus, temp_mixturestatus
               , temp_familystatus):
 
+        """
+        Nested inverse ``h``-functions building the last variable of a C-vine column (equation 4.10).
+
+        Given independent uniforms ``temp_W`` for variables ``1..i`` and the copulas
+        of column ``i`` (from the deepest tree up), returns ``u_i``.
+        """
         ind_u = temp_W.shape[1]
         temp_U = temp_W[:, (ind_u - 1)]
 
@@ -693,6 +783,13 @@ class CVineGenerator(MomentMatch, CopulaTools):
                                      temp_theta_final_1p_,
                                      args):
 
+        r"""
+        Objective of Algorithm 4 for one variable: norm of the gap between simulated and target correlations.
+
+        ``temp_theta_final_1p_`` is the flattened parameter vector :math:`\boldsymbol{\theta}_i`
+        (mixtures and NCS copulas contribute three entries each); ``args`` bundles the
+        draws, families, marginal parameters and targets. Returns a float.
+        """
         temp_W_ = args[0].copy()
         temp_rots_ = args[1].copy()
         temp_fams_ = args[2].copy()
@@ -746,7 +843,9 @@ class CVineGenerator(MomentMatch, CopulaTools):
     def __init__(self, tol_opt, n_samples, use_ncs_on_deepertrees, use_ncs_on_firsttree,
                  use_mixture_on_firsttree, use_mixture_on_deepertrees, force_try_ncscopula,
                  tol_for_optimization_func=5e-8):
-        """Initialize the complete simulation system."""
+        """
+        See the class docstring for the parameters.
+        """
 
         # Global variables for compatibility with original code
         self.tol_ = tol_opt
@@ -759,7 +858,12 @@ class CVineGenerator(MomentMatch, CopulaTools):
         self.force_try_ncscopula = force_try_ncscopula
 
     def _fit_jsu_parameters(self, targeted_mom3, targeted_mom4):
-        """Fit JSU distribution parameters for each asset."""
+        """
+        Johnson SU parameters of every asset from its target skewness and kurtosis, standardized targets ``(0, 1, skew, exkurt)``.
+
+        Returns a DataFrame with columns ``a, b, c, d`` (``gamma, xi, delta, lambda``),
+        ``fun`` (fit residual) and ``Distr`` (``'JSU'``).
+        """
         print("Fitting JSU distribution parameters...")
 
         optimal_params = pd.DataFrame(np.zeros([len(targeted_mom3), 6]),
@@ -792,6 +896,21 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
     def fit_and_structure_CVine(self, setup_data):
 
+        """
+        Step 2 of the calibration: family selection and vine fit on the historical returns (Algorithm 3).
+
+        Parameters
+        ----------
+        setup_data : dict
+            Output of :meth:`load_data_and_setup`.
+
+        Returns
+        -------
+        dict
+            The output of :meth:`estimate_CVine_preselected_V2` plus ``fams_cops_name``
+            (readable family names) and ``LTCMAs_corr``. Feed it to
+            :meth:`run_vine_optimization`; read it with :meth:`selected_edge_table`.
+        """
         historical_data = setup_data['historical_data'].copy()
         asset_order = setup_data['asset_order'].copy()
         LTCMAs_corr = setup_data['ltcma_corr'].copy()
@@ -859,20 +978,29 @@ class CVineGenerator(MomentMatch, CopulaTools):
         return cb, state
 
     def run_vine_optimization(self, setup_data, CVinefitresults):
-        """
-        Run the complete vine copula parameter optimization.
+        r"""
+        Step 3 of the calibration: correlation targeting, variable by variable (Algorithm 4).
 
-        This implements the first code block from the original notebook.
+        For ``i = 2, ..., N`` the parameters :math:`\boldsymbol{\theta}_i` of the copulas
+        building variable ``i`` are optimized jointly (SLSQP, bounds by family) so that
+        the correlations of the simulated asset ``i`` with assets ``1..i-1`` match the
+        targets, the families of Step 2 being kept. If the objective stays above
+        ``tol_for_optimization_func``, alternative families from the fallback lists are
+        tried, deepest tree first.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         setup_data : dict
-            Data and parameters from setup phase
+            Output of :meth:`load_data_and_setup`.
+        CVinefitresults : dict
+            Output of :meth:`fit_and_structure_CVine`.
 
-        Returns:
-        --------
+        Returns
+        -------
         dict
-            Optimization results
+            Calibrated parameter matrices (same keys as the fit), the uniform draws
+            ``U`` and ``W`` used by the optimizer, the simulated returns ``Y_sim``,
+            and the targets. Feed it to :meth:`run_multi_year_simulation`.
         """
         print("\n" + "=" * 80)
         print("VINE COPULA PARAMETER OPTIMIZATION")
@@ -1323,23 +1451,32 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
     def run_multi_year_simulation(self, vine_results, n_year=10, n_per_year=5000, corr_tol=5e-2):
         """
-        Run the multi-year simulation with quality controls.
+        Scenario generation with accept-reject (Algorithm 5).
 
-        This implements the second code block from the original notebook.
+        For each period: sample ``n_per_year`` uniform vectors from the calibrated
+        vine, re-fit the Johnson SU parameters on that draw, transform to returns, and
+        accept the draw only if the maximum errors satisfy 2e-4 on mean and volatility,
+        5e-2 on skewness and kurtosis, and ``corr_tol`` on all pairwise correlations.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         vine_results : dict
-            Results from vine optimization
-        n_year : int, default=10
-            Number of years to simulate
-        n_per_year : int, default=5000
-            Number of scenarios per year
+            Output of :meth:`run_vine_optimization`.
+        n_year : int, default 10
+            Number of independent periods.
+        n_per_year : int, default 5000
+            Scenarios per period.
+        corr_tol : float, default 5e-2
+            Correlation tolerance (paper: 2e-2 with 20000 optimizer draws).
 
-        Returns:
-        --------
-        list
-            List of DataFrames containing simulated data for each year
+        Returns
+        -------
+        simulated : list of pandas.DataFrame
+            One ``(n_per_year, N)`` matrix per period.
+        calibration : list of pandas.DataFrame
+            For the first period: target and simulated moments with their differences,
+            followed by the correlation-difference matrix.
+        targets : pandas.DataFrame
         """
         print("\n" + "=" * 80)
         print("MULTI-YEAR SCENARIO GENERATION")
@@ -1653,14 +1790,24 @@ class CVineGenerator(MomentMatch, CopulaTools):
     # ------------------------------------------------------------------
     def make_vine_spec(self, asset_order, edges):
         """
-        Build the matrices consumed by simulate_CVine from a dict of edges
-        {(i, k): spec}, with 1-based variable indices and k < i, i.e. the
-        copula C_{ik|1:k-1} of the paper (tree k, variable i).
+        Build the parameter matrices of a C-vine from a dict of edges, for synthetic markets.
 
-        spec = (family, rotation, theta)                                  single family
-        spec = ('mixture', [(fam1, rot1, th1), (fam2, rot2, th2)], w)    two-component mixture,
-                                                                          w = weight on the first component
-        Families: 'gaussian', 'clayton', 'gumbel', 'joe', 'frank'.
+        Parameters
+        ----------
+        asset_order : list of str
+            Variables in vine order; the first is the central node.
+        edges : dict
+            ``{(i, k): spec}`` with 1-based indices and ``k < i``, i.e. the copula
+            :math:`C_{ik|1:k-1}` of the paper (tree ``k``, variable ``i``). Every pair
+            must be present. ``spec`` is ``(family, rotation, theta)`` for a single
+            family, or ``('mixture', [(fam1, rot1, th1), (fam2, rot2, th2)], w)`` for a
+            two-component mixture with weight ``w`` on the first component. Families:
+            ``'gaussian'``, ``'clayton'``, ``'gumbel'``, ``'joe'``, ``'frank'``.
+
+        Returns
+        -------
+        dict
+            Keyword arguments for :meth:`simulate_CVine`.
         """
         d = len(asset_order)
         shape = (d - 1, d - 1)
@@ -1697,10 +1844,23 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
     def simulate_known_vine(self, spec, jsu_params, mu, sigma, asset_order, n, seed=None):
         """
-        Simulate n returns from a known C-vine (spec from make_vine_spec) with
-        Johnson SU marginals jsu_params[asset] = (gamma, xi, delta, lambda), then
-        rescale to mean mu[asset] and volatility sigma[asset].
-        Returns a DataFrame with one column per asset.
+        Simulate returns from a known C-vine with Johnson SU marginals.
+
+        Parameters
+        ----------
+        spec : dict
+            Output of :meth:`make_vine_spec`.
+        jsu_params : dict
+            ``asset -> (gamma, xi, delta, lambda)`` for the standardized marginal.
+        mu, sigma : pandas.Series
+            Mean and volatility applied by the affine rescaling.
+        asset_order : list of str
+        n : int
+        seed : int, optional
+
+        Returns
+        -------
+        pandas.DataFrame of shape (n, N)
         """
         if seed is not None:
             np.random.seed(seed)
@@ -1711,7 +1871,9 @@ class CVineGenerator(MomentMatch, CopulaTools):
         return out
 
     def true_edge_table(self, asset_order, edges):
-        """Readable table of the true families of a synthetic market (for the examples)."""
+        """
+        Readable table of the true families of a synthetic market built with :meth:`make_vine_spec`.
+        """
         rows = []
         for (i, k), spec in sorted(edges.items(), key=lambda kv: (kv[0][1], kv[0][0])):
             if spec[0] == 'mixture':
@@ -1726,8 +1888,20 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
     def selected_edge_table(self, asset_order, CVinefitresults, vine_results=None):
         """
-        Readable table of the selected family per edge after Algorithm 3, and of
-        the calibrated parameters after Algorithm 4 when vine_results is given.
+        Readable table of the selected family per edge (after Algorithm 3) and, when ``vine_results`` is given, of the calibrated parameters (after Algorithm 4).
+
+        Parameters
+        ----------
+        asset_order : list of str
+        CVinefitresults : dict
+            Output of :meth:`fit_and_structure_CVine`.
+        vine_results : dict, optional
+            Output of :meth:`run_vine_optimization`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Columns ``tree``, ``edge``, ``selected family``, ``parameters``.
         """
         fams = CVinefitresults['fams_cops']
         rots = CVinefitresults['fams_rots']
