@@ -17,12 +17,13 @@ Simulation with Moment and Tail Dependence Targeting*:
   copulas for non-monotone dependence.
 
 > ### 📓 Start with the worked examples: [`examples.ipynb`](examples.ipynb) and [**▶ Run it in Colab**](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/master/examples.ipynb)
-> Two examples, **LTCMA targeting** (4 asset classes, J.P. Morgan 2024 targets) and
-> **macro factors** (6 factors, illustrative targets). In each, a synthetic history is
-> **simulated from a C-vine with known families**, the families are **selected back**,
-> the vine is **calibrated to the targets** and a scenario matrix is **simulated**; the
-> Fleishman generator is run on the same targets, and the exceedance-correlation
-> curves of the three series are compared. Seeded and reproducible.
+> Two examples. **LTCMA targeting**: 4 asset classes, a synthetic history
+> **simulated from a C-vine with known families**, the families **selected back**, the
+> vine **calibrated to J.P. Morgan's 2024 targets** and a scenario matrix **simulated**.
+> **Macro factors**: 6 factor excess returns built at run time from point-in-time
+> market data (Fama-French, FRED, Yahoo Finance), with **no target other than the
+> history**. In both, the Fleishman generator is run on the same targets and the
+> exceedance-correlation curves of the three series are compared. Seeded and reproducible.
 
 ## Model classes
 
@@ -32,6 +33,7 @@ Simulation with Moment and Tail Dependence Targeting*:
 | Johnson SU marginals fitted to four moments (Section 4.3) | `MomentMatch.sim_JSU_with_U` | `MomentMatch.find_params_for_moments_matching_JSU` | `cvinemarketgen.moment_match` |
 | Bivariate building blocks: mixtures, NCS copulas, h-functions, tail-dependence catalogs, BIC selection (Appendix C) | `CopulaTools.simulate_mixture` | `CopulaTools.est_mixture_MLE`, `CopulaTools.select_best_preselected_bivariate_copula` | `cvinemarketgen.copulas` |
 | C-vine generator: family selection (Algorithm 3), correlation-targeting calibration (Algorithm 4), scenario generation (Algorithm 5) | `CVineGenerator.simulate_known_vine`, `CVineGenerator.run_multi_year_simulation` | `CVineGenerator.fit_and_structure_CVine`, `CVineGenerator.run_vine_optimization` | `cvinemarketgen.cvine` |
+| Point-in-time market factor data (6 monthly factor excess returns, downloaded and cached) | — | `load_factor_data`, `factor_targets` | `cvinemarketgen.data` |
 
 `CVineGenerator` inherits from `MomentMatch` and `CopulaTools`, so one object
 gives access to everything. Method names follow the paper's algorithms.
@@ -42,7 +44,7 @@ gives access to everything. Method names follow the paper's algorithms.
 pip install git+https://github.com/mamadouyamar/CVineMarketGen.git
 ```
 
-Requires Python ≥ 3.8 with numpy, scipy, pandas, matplotlib, statsmodels and
+Requires Python ≥ 3.8 with numpy, scipy, pandas, matplotlib, statsmodels, requests and
 [pyvinecopulib](https://github.com/vinecopulib/pyvinecopulib) (0.6.x).
 
 ## Quick start
@@ -132,7 +134,7 @@ table cannot: the C-vine generator reproduces the sign change of the conditional
 correlation on the mixture edge, the Fleishman generator does not.
 
 Runtime of the notebook on a laptop: 3 to 4 minutes for Example 1 and
-8 to 10 minutes for Example 2, dominated by the correlation-targeting optimizer
+about 3 minutes for Example 2, dominated by the correlation-targeting optimizer
 (`n_samples` draws per objective evaluation; the paper used 20000 and a
 tolerance of 2e-2, the notebook 10000 and 5e-2).
 
@@ -142,9 +144,29 @@ tolerance of 2e-2, the notebook 10000 and 5e-2).
 matrix of 59 asset classes from J.P. Morgan's 2024 Long-Term Capital Market
 Assumptions (USD), as published in the public report. No historical return
 series is shipped: the paper's skewness, kurtosis and copula-family selection
-used licensed Finaeon/GFD data, which is why the examples simulate their own
-history. `data/macro_factors_targets.csv` holds the illustrative targets of the
-macro-factor example.
+used licensed Finaeon/GFD data, which is why Example 1 simulates its own
+history.
+
+Example 2 downloads its six factors at run time with `load_factor_data` and
+caches them in `data/factors_cache.csv` (ignored by git). All are monthly excess
+returns from point-in-time market series:
+
+| Factor | Construction | Source |
+|---|---|---|
+| Equity DM | developed-market excess return, Mkt-RF | Fama-French, Developed 3 factors |
+| Equity EM | emerging minus developed excess return | Fama-French, Emerging 5 factors minus Developed |
+| Real premia | long TIPS / short cash: carry − 8 × change of the 10y TIPS real yield (DFII10) | FRED |
+| Inflation | long TIPS / short nominal: carry + 8 × change of the 10y breakeven (T10YIE) | FRED |
+| Credit | long Baa corporates / short Treasuries: carry − 10 × change of the Baa − 10y spread (BAA10Y) | FRED |
+| Commodity | DBC commodity ETF total return minus the risk-free rate | Yahoo Finance |
+
+The yield-based factors are duration-scaled proxies (Duration-Times-Spread
+decomposition of Ben Dor et al., 2007, for the credit leg); the durations are
+constants in `cvinemarketgen.data.DURATIONS`. Terms of use: the Fama-French
+library is free for research (cite it); the Treasury-derived FRED series are
+public domain; Moody's series is a third-party series on FRED, fine to download
+for research, not to redistribute as a file; Yahoo Finance data is downloaded
+for research use. This is why the cache file is not committed.
 
 ## References
 
@@ -162,6 +184,9 @@ macro-factor example.
   Letters*, 162.
 - Pan, Y., Nieto-Barajas, L. E., & Craiu, R. V. (2024). Four-corner tail
   dependence of copulas.
+- Ben Dor, A., Dynkin, L., Hyman, J., Houweling, P., van Leeuwen, E., & Penninga, O.
+  (2007). DTS (Duration Times Spread). *Journal of Portfolio Management*, 33(2), 77–100.
+- Fama, E. F., & French, K. R. Data Library, Dartmouth College.
 - Longin, F., & Solnik, B. (2001). Extreme correlation of international equity
   markets. *Journal of Finance*, 56, 649–676.
 

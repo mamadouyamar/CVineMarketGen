@@ -19,6 +19,6 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     packages=['cvinemarketgen'],
-    install_requires=['numpy', 'scipy', 'pandas', 'matplotlib', 'pyvinecopulib', 'statsmodels'],
+    install_requires=['numpy', 'scipy', 'pandas', 'matplotlib', 'pyvinecopulib', 'statsmodels', 'requests'],
     python_requires='>=3.8',
 )
