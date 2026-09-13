@@ -22,7 +22,6 @@ dependencies = [
     "scipy",
     "pandas",
     "matplotlib",
-    "statsmodels",
     "requests",
     "pyvinecopulib>=0.6",
 ]

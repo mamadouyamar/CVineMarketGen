@@ -51,8 +51,8 @@ gives access to everything. Method names follow the paper's algorithms.
 pip install git+https://github.com/mamadouyamar/CVineMarketGen.git
 ```
 
-Requires Python ≥ 3.8 with numpy, scipy, pandas, matplotlib, statsmodels, requests and
-[pyvinecopulib](https://github.com/vinecopulib/pyvinecopulib) (developed with 0.6.1).
+Requires Python ≥ 3.8 with numpy, scipy, pandas, matplotlib, requests and
+[pyvinecopulib](https://github.com/vinecopulib/pyvinecopulib) (tested with 0.6.1 and 0.7.6, pandas 1.4 and 3.0, SciPy 1.7 and 1.17).
 To run the smoke tests from a clone: `pip install -e ".[test]"` then `pytest -q`.
 
 ## Quick start
