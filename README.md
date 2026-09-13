@@ -1,6 +1,6 @@
 # CVineMarketGen — C-vine copula financial market generator with moment and tail dependence targeting
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/master/examples.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples.ipynb)
 
 CVineMarketGen simulates multivariate asset returns whose first four moments,
 pairwise correlations and tail dependence match prescribed targets, such as
@@ -16,7 +16,7 @@ Simulation with Moment and Tail Dependence Targeting*:
   the exceedance-correlation curve of each pair, including two-component mixture
   copulas for non-monotone dependence.
 
-> ### 📓 Start with the worked examples: [`examples.ipynb`](examples.ipynb) and [**▶ Run it in Colab**](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/master/examples.ipynb)
+> ### 📓 Start with the worked examples: [`examples.ipynb`](examples.ipynb) and [**▶ Run it in Colab**](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples.ipynb)
 > Two examples. **LTCMA targeting**: 4 asset classes, a synthetic history
 > **simulated from a C-vine with known families**, the families **selected back**, the
 > vine **calibrated to J.P. Morgan's 2024 targets** and a scenario matrix **simulated**.
