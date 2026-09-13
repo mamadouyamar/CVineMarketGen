@@ -47,11 +47,23 @@ intersphinx_mapping = {
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store', 'superpowers']
 
-html_theme = 'furo'
+html_theme = 'sphinx_rtd_theme'
 html_title = 'CVineMarketGen'
 html_static_path = ['_static']
+html_copy_source = False
+html_show_copyright = False
+html_show_sphinx = False
+add_module_names = False
+pygments_style = 'sphinx'
 html_theme_options = {
-    'source_repository': 'https://github.com/mamadouyamar/CVineMarketGen/',
-    'source_branch': 'main',
-    'source_directory': 'docs/',
+    'navigation_depth': 3,
+    'collapse_navigation': False,
+    'sticky_navigation': True,
+}
+html_context = {
+    'display_github': True,
+    'github_user': 'mamadouyamar',
+    'github_repo': 'CVineMarketGen',
+    'github_version': 'main',
+    'conf_py_path': '/docs/',
 }
