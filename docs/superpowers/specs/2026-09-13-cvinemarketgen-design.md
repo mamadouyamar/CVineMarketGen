@@ -111,3 +111,10 @@ time of writing. `data/macro_factors_targets.csv` was removed.
 `examples.ipynb` was split into `example_ltcma.ipynb` (Example 1) and
 `example_factors.ipynb` (Example 2), each with its own Colab badge; the README
 links to both.
+
+## Addendum 4 (2026-09-13): packaging hygiene borrowed from pyvinecopulib
+
+`pyproject.toml` replaces `setup.py`; `CITATION.cff` added (Zenodo DOI to be
+minted by the author from a GitHub release); `tests/test_smoke.py` (8 tests, no
+network) with a GitHub Actions workflow on Python 3.10 and 3.12; notebooks moved
+to `examples/` with badges and paths updated and re-executed from there.

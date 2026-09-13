@@ -1,6 +1,8 @@
 # CVineMarketGen — C-vine copula financial market generator with moment and tail dependence targeting
 
-[![Example 1 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_ltcma.ipynb) Example 1, LTCMA targeting &nbsp;&nbsp; [![Example 2 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_factors.ipynb) Example 2, macro factors
+[![tests](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml/badge.svg)](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+
+[![Example 1 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/example_ltcma.ipynb) Example 1, LTCMA targeting &nbsp;&nbsp; [![Example 2 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/example_factors.ipynb) Example 2, macro factors
 
 CVineMarketGen simulates multivariate asset returns whose first four moments,
 pairwise correlations and tail dependence match prescribed targets, such as
@@ -17,13 +19,13 @@ Simulation with Moment and Tail Dependence Targeting*:
   copulas for non-monotone dependence.
 
 > ### 📓 Start with the worked examples
-> **[`example_ltcma.ipynb`](example_ltcma.ipynb)** ([▶ Colab](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_ltcma.ipynb)): 4 asset classes,
+> **[`examples/example_ltcma.ipynb`](examples/example_ltcma.ipynb)** ([▶ Colab](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/example_ltcma.ipynb)): 4 asset classes,
 > a synthetic history **simulated from a C-vine with known families**, the families
 > **selected back**, the vine **calibrated to J.P. Morgan's 2024 targets** and a scenario
 > matrix **simulated**; the Fleishman generator on the same targets; exceedance-correlation
 > curves compared. About 3 to 4 minutes.
 >
-> **[`example_factors.ipynb`](example_factors.ipynb)** ([▶ Colab](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/example_factors.ipynb)): 6 factor excess
+> **[`examples/example_factors.ipynb`](examples/example_factors.ipynb)** ([▶ Colab](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/example_factors.ipynb)): 6 factor excess
 > returns built at run time from point-in-time market data (Fama-French, FRED, Yahoo
 > Finance), with **no target other than the history**; same pipeline, curves compared with
 > the actual factor history. About 3 minutes.
@@ -50,7 +52,8 @@ pip install git+https://github.com/mamadouyamar/CVineMarketGen.git
 ```
 
 Requires Python ≥ 3.8 with numpy, scipy, pandas, matplotlib, statsmodels, requests and
-[pyvinecopulib](https://github.com/vinecopulib/pyvinecopulib) (0.6.x).
+[pyvinecopulib](https://github.com/vinecopulib/pyvinecopulib) (developed with 0.6.1).
+To run the smoke tests from a clone: `pip install -e ".[test]"` then `pytest -q`.
 
 ## Quick start
 
@@ -141,7 +144,7 @@ correlation on the mixture edge, the Fleishman generator does not.
 Runtime on a laptop: 3 to 4 minutes for `example_ltcma.ipynb` and
 about 3 minutes for `example_factors.ipynb`, dominated by the correlation-targeting optimizer
 (`n_samples` draws per objective evaluation; the paper used 20000 and a
-tolerance of 2e-2, the notebook 10000 and 5e-2).
+tolerance of 2e-2, the notebooks 10000 and 5e-2).
 
 ## Data
 
@@ -172,6 +175,18 @@ library is free for research (cite it); the Treasury-derived FRED series are
 public domain; Moody's series is a third-party series on FRED, fine to download
 for research, not to redistribute as a file; Yahoo Finance data is downloaded
 for research use. This is why the cache file is not committed.
+
+## Citation
+
+If you use this package, please cite the thesis chapter and the software
+(`CITATION.cff` holds the metadata; GitHub's "Cite this repository" button
+formats it):
+
+```
+Thioub, M. Y. (2026). CVineMarketGen: C-vine copula financial market generator with
+moment and tail dependence targeting (Version 0.1.0) [Computer software].
+https://github.com/mamadouyamar/CVineMarketGen
+```
 
 ## References
 
