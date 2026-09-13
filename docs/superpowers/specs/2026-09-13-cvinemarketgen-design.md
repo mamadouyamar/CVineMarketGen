@@ -118,3 +118,15 @@ links to both.
 minted by the author from a GitHub release); `tests/test_smoke.py` (8 tests, no
 network) with a GitHub Actions workflow on Python 3.10 and 3.12; notebooks moved
 to `examples/` with badges and paths updated and re-executed from there.
+
+## Addendum 5 (2026-09-13): compatibility with the current scientific stack
+
+The first CI run failed on pyvinecopulib 0.7.6 / pandas 3.0 / SciPy 1.17.
+Fixes, all behaviour-preserving (both notebooks give identical numbers on the
+old and new stacks): Bicop parameters passed as (k, 1) arrays via
+`bicop_params`; parameter-bound accessors via `bicop_bounds` (method in 0.6,
+property in 0.7); DataFrames converted to arrays before pyvinecopulib calls;
+`Distr` column created as object dtype; monthly aggregation via groupby on
+periods instead of `resample('M')`; statsmodels' `mvnormcdf` replaced by
+SciPy's `multivariate_normal.cdf` (identical values) and statsmodels dropped
+from the dependencies.

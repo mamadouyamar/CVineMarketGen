@@ -56,8 +56,8 @@ def test_mixture_hfunction_roundtrip():
     comps = [pv.Bicop(pv.BicopFamily.clayton, 270), pv.Bicop(pv.BicopFamily.gumbel, 0)]
     params = np.array([0.7, 0.66, 1.84])
     np.random.seed(1)
-    u = ct.simulate_mixture(params[0], [pv.Bicop(pv.BicopFamily.clayton, 270, [[0.66]]),
-                                        pv.Bicop(pv.BicopFamily.gumbel, 0, [[1.84]])], n=2000, seed=1)
+    u = ct.simulate_mixture(params[0], [pv.Bicop(pv.BicopFamily.clayton, 270, np.array([[0.66]])),
+                                        pv.Bicop(pv.BicopFamily.gumbel, 0, np.array([[1.84]]))], n=2000, seed=1)
     h = ct.hfunc1_mixture(u[:, 0], u[:, 1], params, comps)
     back = ct.hinv1_mixture(u[:, 0], h, params, comps)
     assert np.abs(back - u[:, 1]).max() < 1e-6

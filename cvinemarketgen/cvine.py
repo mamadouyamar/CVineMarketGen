@@ -12,7 +12,7 @@ from scipy.stats import norm, skew, kurtosis
 from scipy.optimize import minimize
 import pyvinecopulib as pv
 
-from .moment_match import MomentMatch
+from .moment_match import MomentMatch, bicop_params
 from .copulas import CopulaTools
 
 
@@ -42,7 +42,7 @@ class CVineGenerator(MomentMatch, CopulaTools):
         ## Convert historical returns to pseudo-observations (empirical CDF rank transform)
         ## so that all dependence information is captured by the copula, free of marginals.
         ## ==================================================================================
-        data = pd.DataFrame(pv.to_pseudo_obs(input_data),
+        data = pd.DataFrame(pv.to_pseudo_obs(np.asarray(input_data, dtype=float)),
                             columns=[str(val + 1) for val in range(input_data.shape[1])])
 
         n_tree = data.shape[1] - 1
@@ -478,20 +478,20 @@ class CVineGenerator(MomentMatch, CopulaTools):
                         trees_copulas[str(tree)][str(i + 1) + ',' + str(tree)] = t_copulas
 
                         trees_hfunc[str(tree)][str(i + 1) + '|1'] = \
-                            t_copulas.hfunc1(trees_hfunc[str(tree - 1)].iloc[:, [0, i]])
+                            t_copulas.hfunc1(trees_hfunc[str(tree - 1)].iloc[:, [0, i]].to_numpy(dtype=float))
 
                     elif tree == 2:
                         trees_copulas[str(tree)][str(ii) + ',' + str(tree) + '|1'] = t_copulas
 
                         trees_hfunc[str(tree)][str(ii) + '|12'] = \
-                            t_copulas.hfunc1(trees_hfunc[str(tree - 1)].iloc[:, [0, i]])
+                            t_copulas.hfunc1(trees_hfunc[str(tree - 1)].iloc[:, [0, i]].to_numpy(dtype=float))
 
                     elif tree >= 3:
                         trees_copulas[str(tree)][str(ii) + ',' + str(tree) + '|' + ''.join(
                             str(num) for num in np.arange(1, tree))] = t_copulas
 
                         trees_hfunc[str(tree)][str(ii) + '|' + ''.join(str(num) for num in np.arange(1, tree + 1))] = \
-                            t_copulas.hfunc1(trees_hfunc[str(tree - 1)].iloc[:, [0, i]])
+                            t_copulas.hfunc1(trees_hfunc[str(tree - 1)].iloc[:, [0, i]].to_numpy(dtype=float))
 
                 ## --- CASE 2: NCS copula wins ---
                 elif ((t_copulas_bic > t_copulas_ncs_bic) and (t_copula_mix_bic > t_copulas_ncs_bic)) and \
@@ -656,13 +656,13 @@ class CVineGenerator(MomentMatch, CopulaTools):
                 if temp_fams[kk - 1] != pv.BicopFamily.student:
                     temp_U = pv.Bicop(family=temp_fams[kk - 1],
                                       rotation=int(temp_rots[kk - 1]),
-                                      parameters=[temp_theta_final_1p[kk - 1]]
+                                      parameters=bicop_params(temp_theta_final_1p[kk - 1])
                                       ).hinv1(np.array([temp_W[:, kk - 1], temp_U]).T)
 
                 elif temp_fams[kk - 1] == pv.BicopFamily.student:
                     temp_U = pv.Bicop(family=temp_fams[kk - 1],
                                       rotation=int(temp_rots[kk - 1]),
-                                      parameters=[temp_theta_final_1p[kk - 1], temp_theta_final_2p[kk - 1]]
+                                      parameters=bicop_params(temp_theta_final_1p[kk - 1], temp_theta_final_2p[kk - 1])
                                       ).hinv1(np.array([temp_W[:, kk - 1], temp_U]).T)
 
             elif temp_familystatus[kk - 1] == 'ncscopula':
@@ -765,6 +765,7 @@ class CVineGenerator(MomentMatch, CopulaTools):
         optimal_params = pd.DataFrame(np.zeros([len(targeted_mom3), 6]),
                                       index=targeted_mom3.index,
                                       columns=['a', 'b', 'c', 'd', 'fun', 'Distr'])
+        optimal_params['Distr'] = 'JSU'     # object column (pandas >= 3 refuses a string in a float column)
 
         for i, asset in enumerate(targeted_mom3.index):
             try:
