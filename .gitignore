@@ -7,3 +7,5 @@ dist/
 .DS_Store
 data/factors_cache.csv
 examples/data/
+docs/_build/
+docs/examples/

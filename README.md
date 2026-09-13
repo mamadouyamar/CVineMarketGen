@@ -1,6 +1,6 @@
 # CVineMarketGen — C-vine copula financial market generator with moment and tail dependence targeting
 
-[![tests](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml/badge.svg)](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+[![docs](https://readthedocs.org/projects/cvinemarketgen/badge/?version=latest)](https://cvinemarketgen.readthedocs.io/en/latest/) [![tests](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml/badge.svg)](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 
 [![Example 1 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/example_ltcma.ipynb) Example 1, LTCMA targeting &nbsp;&nbsp; [![Example 2 in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/example_factors.ipynb) Example 2, macro factors
 
@@ -44,6 +44,8 @@ Simulation with Moment and Tail Dependence Targeting*:
 
 `CVineGenerator` inherits from `MomentMatch` and `CopulaTools`, so one object
 gives access to everything. Method names follow the paper's algorithms.
+
+Documentation: [cvinemarketgen.readthedocs.io](https://cvinemarketgen.readthedocs.io/en/latest/) (method, examples, API reference).
 
 ## Installation
 

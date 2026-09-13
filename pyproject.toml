@@ -28,6 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
+doc = ["sphinx", "furo", "myst-nb", "ipykernel"]
 
 [project.urls]
 Homepage = "https://github.com/mamadouyamar/CVineMarketGen"
