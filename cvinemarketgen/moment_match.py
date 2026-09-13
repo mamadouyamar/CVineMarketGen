@@ -11,8 +11,27 @@ import scipy.stats as stats
 from scipy.stats import norm, skew, kurtosis
 from scipy.optimize import minimize, fsolve, brentq
 from scipy.integrate import dblquad
-from statsmodels.sandbox.distributions.extras import mvnormcdf
+from scipy.stats import multivariate_normal
+
+
+def mvnormcdf(upper, mu, cov):
+    """P(X <= upper) for X ~ N(mu, cov). Replaces statsmodels' mvnormcdf, whose
+    SciPy backend (mvndst) was removed in SciPy 1.16; same value, SciPy only."""
+    return float(multivariate_normal(mean=np.asarray(mu, float), cov=np.asarray(cov, float)).cdf(np.asarray(upper, float)))
 import pyvinecopulib as pv
+
+
+def bicop_bounds(bicop, which):
+    """Lower ('lower') or upper ('upper') parameter bounds of a pyvinecopulib Bicop as a 2-D
+    array; the accessor is a method in pyvinecopulib 0.6 and a property in 0.7."""
+    attr = getattr(bicop, f'parameters_{which}_bounds')
+    return np.asarray(attr() if callable(attr) else attr, dtype=float)
+
+
+def bicop_params(*values):
+    """Column vector of copula parameters as pyvinecopulib expects (2-D float array).
+    pyvinecopulib 0.6 accepted a Python list; 0.7 requires an ndarray of shape (k, 1)."""
+    return np.asarray(values, dtype=float).reshape(-1, 1)
 
 
 class MomentMatch:
@@ -189,12 +208,12 @@ class MomentMatch:
         theta_clayton = fsolve(self.theta_for_corr,
                                x0=[0.2],
                                args=(corr_x_y, 'Clayton'))
-        clay_cop = pv.Bicop(family=pv.BicopFamily.clayton, parameters=[theta_clayton])
+        clay_cop = pv.Bicop(family=pv.BicopFamily.clayton, parameters=bicop_params(theta_clayton))
         u_clay_cop = clay_cop.simulate(n=1000000, seeds=[1])
         X_clay_cop = norm.ppf(np.array([u_clay_cop[:, 0],
                                         u_clay_cop[:, 1]]).T)
         x_clay, y_clay = X_clay_cop[:, 0], X_clay_cop[:, 1]
-        clay180_cop = pv.Bicop(family=pv.BicopFamily.clayton, parameters=[theta_clayton])
+        clay180_cop = pv.Bicop(family=pv.BicopFamily.clayton, parameters=bicop_params(theta_clayton))
         u_clay180_cop = clay180_cop.simulate(n=1000000, seeds=[1])
         X_clay180_cop = norm.ppf(np.array([1 - u_clay180_cop[:, 0],
                                            1 - u_clay180_cop[:, 1]]).T)

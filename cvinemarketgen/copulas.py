@@ -13,6 +13,7 @@ from scipy.stats import norm, skew, kurtosis, bernoulli
 from scipy.optimize import minimize, fsolve, brentq
 from itertools import product
 import pyvinecopulib as pv
+from .moment_match import bicop_params, bicop_bounds
 
 
 class CopulaTools:
@@ -292,7 +293,7 @@ class CopulaTools:
             def tau_of_theta(theta):
                 bic = pv.Bicop(
                     family=pv.BicopFamily.joe,
-                    parameters=[theta]
+                    parameters=bicop_params(theta)
                 )
                 return bic.tau
 
@@ -340,7 +341,7 @@ class CopulaTools:
                 raise ValueError("Joe theta must be >= 1.")
             bic = pv.Bicop(
                 family=pv.BicopFamily.joe,
-                parameters=[theta]
+                parameters=bicop_params(theta)
             )
             return float(bic.tau)
 
@@ -393,7 +394,7 @@ class CopulaTools:
             theta_or_rho = self._theta_from_tau(family, tau)
 
         # 2) build base bicop in vinecopulib and simulate from it
-        base = pv.Bicop(family=family, parameters=[theta_or_rho],
+        base = pv.Bicop(family=family, parameters=bicop_params(theta_or_rho),
                         rotation=rotation)
 
         # 2.1) Simulate base copula uniforms (n x 2) from vinecopulib
@@ -523,7 +524,7 @@ class CopulaTools:
                 np.column_stack([t1_p, t2_p])  # ++
             ])  # (4n,2)
 
-            cop = pv.Bicop(family=family, rotation=rotation, parameters=[theta])
+            cop = pv.Bicop(family=family, rotation=rotation, parameters=bicop_params(theta))
             pdf_all = cop.pdf(X)  # (4n,)
             biv_copulapdf[:] = pdf_all.reshape(4, n).T
 
@@ -690,7 +691,7 @@ class CopulaTools:
         # ---- build / reuse copula ----
         if cop is None:
             try:
-                cop = pv.Bicop(family=family, rotation=rotation, parameters=[theta])
+                cop = pv.Bicop(family=family, rotation=rotation, parameters=bicop_params(theta))
             except TypeError:
                 cop = pv.Bicop(family, rotation, np.array([[theta]], dtype=float))
 
@@ -860,7 +861,7 @@ class CopulaTools:
         # ---- build / reuse copula ----
         if cop is None:
             try:
-                cop = pv.Bicop(family=family, rotation=rotation, parameters=[theta])
+                cop = pv.Bicop(family=family, rotation=rotation, parameters=bicop_params(theta))
             except TypeError:
                 cop = pv.Bicop(family, rotation, np.array([[theta]], dtype=float))
 
@@ -1164,8 +1165,8 @@ class CopulaTools:
                 for rotation in rotations:
                     copula = pv.Bicop(family, rotation)
 
-                    copula.fit(data)
-                    bic = copula.bic(data) / len(data)
+                    copula.fit(np.asarray(data, dtype=float))
+                    bic = copula.bic(np.asarray(data, dtype=float)) / len(data)
                     if bic < best_bic:
                         best_bic = bic
                         best_copula = copula
@@ -1174,8 +1175,8 @@ class CopulaTools:
             else:
                 rotation = 0
                 copula = pv.Bicop(family, rotation)
-                copula.fit(data)
-                bic = copula.bic(data) / len(data)
+                copula.fit(np.asarray(data, dtype=float))
+                bic = copula.bic(np.asarray(data, dtype=float)) / len(data)
                 if bic < best_bic:
                     best_bic = bic
                     best_copula = copula
@@ -1265,8 +1266,8 @@ class CopulaTools:
 
             copula = pv.Bicop(family, rotation)
 
-            copula.fit(data)
-            bic = copula.bic(data) / len(data)
+            copula.fit(np.asarray(data, dtype=float))
+            bic = copula.bic(np.asarray(data, dtype=float)) / len(data)
             if bic < best_bic:
                 best_bic = bic
                 best_copula = copula
@@ -1334,7 +1335,7 @@ class CopulaTools:
         # Build copula once
         if cop is None:
             try:
-                cop = pv.Bicop(family=family, rotation=rotation, parameters=[theta])
+                cop = pv.Bicop(family=family, rotation=rotation, parameters=bicop_params(theta))
             except TypeError:
                 cop = pv.Bicop(family, rotation, np.array([[theta]], dtype=float))
 
@@ -1394,7 +1395,7 @@ class CopulaTools:
         # Pre-build copula
         if cop is None:
             try:
-                cop = pv.Bicop(family=family, rotation=rotation, parameters=[theta])
+                cop = pv.Bicop(family=family, rotation=rotation, parameters=bicop_params(theta))
             except TypeError:
                 cop = pv.Bicop(family, rotation, np.array([[theta]], dtype=float))
 
@@ -1501,8 +1502,8 @@ class CopulaTools:
         families_w_rotations_1 = families_w_rotations[0]
         families_w_rotations_2 = families_w_rotations[1]
 
-        families_w_rotations_1.parameters = np.array([par_fam1])
-        families_w_rotations_2.parameters = np.array([par_fam2])
+        families_w_rotations_1.parameters = bicop_params(par_fam1)
+        families_w_rotations_2.parameters = bicop_params(par_fam2)
 
         h1 = families_w_rotations_1.hfunc1(np.array([u1, u2]).T)
         h2 = families_w_rotations_2.hfunc1(np.array([u1, u2]).T)
@@ -1619,11 +1620,11 @@ class CopulaTools:
         families_w_rotations_1 = families_w_rotations[0]
         families_w_rotations_2 = families_w_rotations[1]
 
-        families_w_rotations_1.parameters = np.array([par_fam1])
-        families_w_rotations_2.parameters = np.array([par_fam2])
+        families_w_rotations_1.parameters = bicop_params(par_fam1)
+        families_w_rotations_2.parameters = bicop_params(par_fam2)
 
-        nLL = -np.sum(np.log(w * families_w_rotations_1.pdf(pseudo_obs) + \
-                             (1 - w) * families_w_rotations_2.pdf(pseudo_obs))
+        nLL = -np.sum(np.log(w * families_w_rotations_1.pdf(np.asarray(pseudo_obs, dtype=float)) + \
+                             (1 - w) * families_w_rotations_2.pdf(np.asarray(pseudo_obs, dtype=float)))
                       )
 
         return 2 * nLL + np.log(len(pseudo_obs)) * (len(params) + 1)
@@ -1634,15 +1635,15 @@ class CopulaTools:
         #                                                 pv.Bicop(pv.BicopFamily.gumbel, 0)]
         #                              )
 
-        mixture_bounds = [(0, 1)] + [(val.parameters_lower_bounds()[0, 0] + 1e-5,
-                                      val.parameters_upper_bounds()[0, 0] - 1e-5) for val in copulas_families]
+        mixture_bounds = [(0, 1)] + [(bicop_bounds(val, 'lower')[0, 0] + 1e-5,
+                                      bicop_bounds(val, 'upper')[0, 0] - 1e-5) for val in copulas_families]
 
         init_val = np.asarray([0.5] + [val.parameters[0, 0] for val in copulas_families])
 
         def spearman_const(x):
             t_copulas_families = []
             for i, v in enumerate(copulas_families):
-                v.parameters = np.array([x[i + 1]])
+                v.parameters = bicop_params(x[i + 1])
                 t_copulas_families.append(v)
 
             _rho = x[0] * t_copulas_families[0].rho() + (1 - x[0]) * t_copulas_families[1].rho()
@@ -1677,7 +1678,7 @@ class CopulaTools:
         else:
             new_copulas_families = []
             for i, val in enumerate(copulas_families):
-                val.parameters = np.array([results.x[i + 1]])
+                val.parameters = bicop_params(results.x[i + 1])
                 new_copulas_families.append(val)
             results.copulas_families = new_copulas_families
 

@@ -94,8 +94,7 @@ def _yield_factor(daily_pct, duration, sign):
     sign = -1 for a long bond position (price falls when the yield rises),
     sign = +1 for a long TIPS / short nominal position on the breakeven.
     """
-    m = daily_pct.resample('M').last() / 100.0
-    m.index = m.index.to_period('M')
+    m = daily_pct.groupby(daily_pct.index.to_period('M')).last() / 100.0   # month-end value, PeriodIndex('M')
     return (m.shift(1) / 12.0 + sign * duration * m.diff()).dropna()
 
 
