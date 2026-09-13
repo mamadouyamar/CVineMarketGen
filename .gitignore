@@ -6,3 +6,4 @@ build/
 dist/
 .DS_Store
 data/factors_cache.csv
+examples/data/

@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "CVineMarketGen: C-vine copula financial market generator with moment and tail dependence targeting"
+authors:
+  - family-names: Thioub
+    given-names: Mamadou Yamar
+    email: mamadou-yamar.thioub@hec.ca
+version: 0.1.0
+date-released: 2026-09-13
+license: MIT
+repository-code: "https://github.com/mamadouyamar/CVineMarketGen"
+keywords:
+  - vine copula
+  - moment matching
+  - tail dependence
+  - financial market simulation
+  - long-term capital market assumptions
+references:
+  - type: thesis
+    title: "Vine-Copula Based Financial Market Simulation with Moment and Tail Dependence Targeting"
+    authors:
+      - family-names: Thioub
+        given-names: Mamadou Yamar
+    notes: "Third article of the doctoral thesis, HEC Montréal."
