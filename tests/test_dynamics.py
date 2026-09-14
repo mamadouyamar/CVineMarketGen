@@ -4,6 +4,7 @@ import pytest
 
 arch = pytest.importorskip('arch')
 from cvinemarketgen.dynamics import GarchFamily, AssetDynamics, parse_spec
+from cvinemarketgen.selection import cvm_statistic
 
 
 def _garch_series(n=2500, seed=0, a=0.0002, b=0.05, om=2e-6, al=0.08, be=0.90):
@@ -54,3 +55,46 @@ def test_asset_dynamics_container():
     assert list(ad.report['model']) == ['AR(1)-GARCH(1,1)', 'Const-GJR(1,1)']
     ad2 = AssetDynamics.from_dict(ad.to_dict())
     assert np.allclose(ad2.unfilter(np.zeros((1, 3, 2))), Y[:1, :3])
+
+
+# ---- Gaussian HMM (Task 6) -------------------------------------------------------
+from cvinemarketgen.hmm import GaussianHMM
+
+
+def _hmm_ref():
+    import json, os
+    return json.load(open(os.path.join(os.path.dirname(__file__), 'data', 'genhmm1d_reference.json')))
+
+
+def test_hmm_matches_genhmm1d_reference():
+    ref = _hmm_ref()
+    y = pd.Series(ref['y'])
+    m = GaussianHMM(2).fit(y)
+    theta = np.array(ref['theta'])
+    assert np.allclose(m.mu, theta[:, 0], atol=1e-4) and np.allclose(m.sigma, theta[:, 1], atol=1e-4)
+    # GenHMM1d stops its EM on a parameter-change rule slightly before ours (our log-likelihood is
+    # the higher one, by 9e-5): the transition matrix and the uniforms agree to a few 1e-4
+    assert np.allclose(m.Q, np.array(ref['Q']), atol=5e-4)
+    assert np.allclose(m.uniforms().values, np.array(ref['U']), atol=5e-4)
+    assert abs(cvm_statistic(m.uniforms().values) - ref['cvm']) < 1e-3
+    assert abs(m.loglik - ref['LL']) < 1e-3 and m.loglik >= ref['LL'] - 1e-6
+
+
+def test_hmm_filter_unfilter_inverse_and_persistence():
+    ref = _hmm_ref()
+    m = GaussianHMM(2).fit(pd.Series(ref['y']))
+    assert m.name == 'HMM(2)' and m.n_params == 6 and m.regimes.shape == (2000, 2)
+    znew = np.random.default_rng(3).standard_normal((2, 30))
+    ynew = m.unfilter(znew)
+    assert np.allclose(m.filter_new(ynew[0]), znew[0], atol=1e-8)
+    m2 = GaussianHMM.from_dict(m.to_dict())
+    assert np.allclose(m2.unfilter(znew), ynew)
+    assert m.simulate(100, seed=0).shape == (100,)
+
+
+def test_selector_picks_hmm_on_hmm_data():
+    from cvinemarketgen.selection import select_dynamics
+    ref = _hmm_ref()
+    y = pd.DataFrame({'H': ref['y']})
+    ad = select_dynamics(y, candidates=('const', 'hmm'), states=(2, 3), gof=False, verbose=False)
+    assert ad.report.loc['H', 'model'] in ('HMM(2)', 'HMM(3)')

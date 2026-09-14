@@ -10,11 +10,12 @@ from .paths import Paths
 from .factors import FactorModel
 from .dynamics import AR1, AR1GARCH, AssetDynamics, GarchFamily, parse_spec
 from .selection import select_dynamics, iid_tests, gof_bootstrap
+from .hmm import GaussianHMM
 from .functions import (fit_johnson_su, johnson_su_moments, johnson_su_sample, fit_fleishman,
                         exceedance_curve, classify_pair, select_family)
 
 __all__ = ['Targets', 'FleishmanMarket', 'CVineMarket', 'Diagnostics', 'Paths', 'FactorModel', 'AR1', 'AR1GARCH',
-           'AssetDynamics', 'GarchFamily', 'parse_spec', 'select_dynamics', 'iid_tests', 'gof_bootstrap',
+           'AssetDynamics', 'GarchFamily', 'GaussianHMM', 'parse_spec', 'select_dynamics', 'iid_tests', 'gof_bootstrap',
            'fit_johnson_su', 'johnson_su_moments', 'johnson_su_sample', 'fit_fleishman',
            'exceedance_curve', 'classify_pair', 'select_family', 'partial_correlations',
            'MomentMatch', 'CopulaTools', 'CVineGenerator', 'FleishmanGenerator',
