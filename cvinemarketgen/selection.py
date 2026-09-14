@@ -71,7 +71,7 @@ def gof_bootstrap(model, y, B=100, seed=0, verbose=False):
     for b in range(B):
         ys = model.simulate(n, seed=None if seed is None else seed + b)
         try:
-            mb = model.clone().fit(pd.Series(ys))
+            mb = model.refit(pd.Series(ys))
             out[b] = cvm_statistic(stats.norm.cdf(np.asarray(mb.filter(), float)))
         except Exception:
             out[b] = np.nan

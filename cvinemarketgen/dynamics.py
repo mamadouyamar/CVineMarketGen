@@ -264,6 +264,10 @@ class GarchFamily:
         """Unfitted copy with the same specification."""
         return GarchFamily(**self.spec)
 
+    def refit(self, y):
+        """Fit a fresh copy on ``y`` (bootstrap refit)."""
+        return self.clone().fit(y)
+
     # ---- fit -----------------------------------------------------------------
     def fit(self, y):
         arch_model = _arch()

@@ -36,6 +36,7 @@ class GaussianHMM:
         self.mu = self.sigma = self.Q = None
         self.eta_T = None
         self._u = self._eta = None
+        self._init = None                                                   # warm start (mu, sigma, Q), see refit
         self.n_obs = self.loglik = self.n_params = self.bic = None
 
     @property
@@ -52,6 +53,17 @@ class GaussianHMM:
     def clone(self):
         """Unfitted copy with the same specification."""
         return GaussianHMM(self.K, self.n_init, self.max_iter, self.tol, self.seed)
+
+    def refit(self, y):
+        """
+        Fit a fresh copy on ``y`` starting from this model's parameters (plus two
+        perturbed starts): what the parametric bootstrap needs, at a fraction of
+        the cost of the full multi-start.
+        """
+        m = self.clone()
+        m.n_init = 3
+        m._init = (self.mu.copy(), self.sigma.copy(), self.Q.copy())
+        return m.fit(y)
 
     # ---- likelihood pieces -----------------------------------------------------
     def _dens(self, v):
@@ -102,13 +114,16 @@ class GaussianHMM:
         return float(np.log(c).sum())
 
     def _init_params(self, v, rng, perturb):
-        qs = np.quantile(v, np.linspace(0, 1, self.K + 1))
-        mu = np.array([v[(v >= qs[k]) & (v <= qs[k + 1])].mean() for k in range(self.K)])
-        sigma = np.array([v[(v >= qs[k]) & (v <= qs[k + 1])].std() for k in range(self.K)])
+        if self._init is not None:
+            mu, sigma, Q = (np.array(x, float) for x in self._init)
+        else:
+            qs = np.quantile(v, np.linspace(0, 1, self.K + 1))
+            mu = np.array([v[(v >= qs[k]) & (v <= qs[k + 1])].mean() for k in range(self.K)])
+            sigma = np.array([v[(v >= qs[k]) & (v <= qs[k + 1])].std() for k in range(self.K)])
+            Q = np.full((self.K, self.K), 0.1 / max(self.K - 1, 1)); np.fill_diagonal(Q, 0.9)
         if perturb:
             mu = mu + rng.standard_normal(self.K) * v.std() * 0.5
             sigma = sigma * np.exp(rng.standard_normal(self.K) * 0.3)
-        Q = np.full((self.K, self.K), 0.1 / max(self.K - 1, 1)); np.fill_diagonal(Q, 0.9)
         return mu, np.maximum(sigma, 1e-8), Q
 
     # ---- fit -----------------------------------------------------------------

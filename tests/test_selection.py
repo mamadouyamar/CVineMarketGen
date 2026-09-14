@@ -42,3 +42,15 @@ def test_gof_bootstrap_runs_small():
     m = parse_spec('ar1-garch(1,1)').fit(y)
     g = gof_bootstrap(m, y, B=5, seed=0)
     assert 0 <= g['pvalue'] <= 1 and len(g['stats']) == 5 and g['stat'] > 0
+
+
+def test_gof_bootstrap_hmm_uses_warm_refits():
+    import json
+    from cvinemarketgen.hmm import GaussianHMM
+    ref = json.load(open(os.path.join(HERE, 'data', 'genhmm1d_reference.json')))
+    y = pd.Series(ref['y'])
+    m = GaussianHMM(2).fit(y)
+    r = m.refit(y)                                   # warm start: same optimum, fewer starts
+    assert r is not m and np.allclose(r.mu, m.mu, atol=1e-5) and np.allclose(r.Q, m.Q, atol=1e-4)
+    g = gof_bootstrap(m, y, B=3, seed=0)
+    assert len(g['stats']) == 3 and np.isfinite(g['stats']).all() and 0 <= g['pvalue'] <= 1
