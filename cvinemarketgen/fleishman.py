@@ -121,9 +121,10 @@ class FleishmanGenerator(MomentMatch):
         return self.fit_result
 
     # ------------------------------------------------------------------
-    def simulate(self, n, corr_tol=2e-2, seed=None, max_tries=500, verbose=True):
+    def simulate(self, n, corr_tol=2e-2, seed=None, max_tries=500, verbose=True, accept=True):
         """
-        Step 3 of Section 3.2 with the accept-reject loop of Algorithm 5.
+        Step 3 of Section 3.2 with the accept-reject loop of Algorithm 5
+        (``accept=False`` keeps the first draw, after the re-fit of the coefficients).
 
         Returns (returns DataFrame n x N, errors dict, coef_refit DataFrame), where
         errors holds the max absolute errors on mean, vol, skew, kurt and correlation
@@ -160,9 +161,9 @@ class FleishmanGenerator(MomentMatch):
                 'kurt': np.max(np.abs(kurtosis(sim) - self.exkurt.values)),
                 'corr': np.max(np.abs(np.corrcoef(sim.T.values) - self.corr_target.values)),
             }
-            accepted = (max(errors['mean'], errors['vol']) <= self.TOL_MEAN_VOL) and \
-                       (max(errors['skew'], errors['kurt']) <= self.TOL_SKEW_KURT) and \
-                       (errors['corr'] <= corr_tol)
+            accepted = (not accept) or ((max(errors['mean'], errors['vol']) <= self.TOL_MEAN_VOL) and
+                                        (max(errors['skew'], errors['kurt']) <= self.TOL_SKEW_KURT) and
+                                        (errors['corr'] <= corr_tol))
             if verbose:
                 print(f"try {n_tries}: err mean/vol={max(errors['mean'], errors['vol']):.2e}  "
                       f"skew/kurt={max(errors['skew'], errors['kurt']):.3f}  corr={errors['corr']:.4f}  "

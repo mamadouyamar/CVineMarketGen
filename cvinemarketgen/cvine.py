@@ -872,6 +872,12 @@ class CVineGenerator(MomentMatch, CopulaTools):
         optimal_params['Distr'] = 'JSU'     # object column (pandas >= 3 refuses a string in a float column)
 
         for i, asset in enumerate(targeted_mom3.index):
+            if abs(targeted_mom3.loc[asset]) < 1e-9 and abs(targeted_mom4.loc[asset] - 3) < 1e-9:
+                # normal marginal: the Johnson SU limit gamma = xi = 0, delta = lambda -> infinity
+                optimal_params.iloc[i, :-2] = [0.0, 0.0, 1e4, 1e4]
+                optimal_params.iloc[i, -2] = 0.0
+                optimal_params.iloc[i, -1] = 'JSU'
+                continue
             try:
                 params, res = self.find_params_for_moments_matching_JSU(
                     [0, 1, targeted_mom3.loc[asset], targeted_mom4.loc[asset] - 3],
@@ -1677,7 +1683,7 @@ class CVineGenerator(MomentMatch, CopulaTools):
     # ------------------------------------------------------------------
     # Inputs as DataFrames (package version of load_data_and_setup)
     # ------------------------------------------------------------------
-    def load_data_and_setup(self, ltcma, historical_data, asset_order=None):
+    def load_data_and_setup(self, ltcma, historical_data=None, asset_order=None, higher_moments=None):
         """
         Set up the targets of the simulation (Algorithm 1 of the paper).
 
@@ -1688,8 +1694,19 @@ class CVineGenerator(MomentMatch, CopulaTools):
                           target skewness and kurtosis and for copula family selection.
         asset_order     : list of assets; the first one is the central node of the
                           C-vine. Defaults to the columns of historical_data.
+        higher_moments  : optional DataFrame indexed by asset with columns 'Skewness'
+                          and 'Kurtosis' (raw, normal = 3). When given, the target
+                          skewness and kurtosis are taken from it instead of the
+                          history, and historical_data may be None (no family
+                          selection possible then; see fit_results_from_spec).
         """
         print("Loading data and setting up simulation parameters...")
+        if historical_data is None:
+            if higher_moments is None:
+                raise ValueError('give historical_data, or higher_moments (Skewness, Kurtosis) per asset')
+            if asset_order is None:
+                asset_order = list(higher_moments.index)
+            historical_data = pd.DataFrame(columns=asset_order, dtype=float)
         historical_data = historical_data.ffill().dropna()
         ltcma = ltcma.copy()
         if 'Geometric Mean' not in ltcma.columns:
@@ -1714,8 +1731,12 @@ class CVineGenerator(MomentMatch, CopulaTools):
         targeted_GM = ltcma_moments.loc[asset_order, 'Geometric Mean']  # Target geometric means
         targeted_SD = ltcma_moments.loc[asset_order, 'Volatility']  # Target standard deviations
 
-        targeted_mom3 = historical_data[asset_order].skew()  # Skewness from historical data
-        targeted_mom4 = historical_data[asset_order].kurtosis() + 3  # Kurtosis from historical data
+        if higher_moments is not None:
+            targeted_mom3 = higher_moments.loc[asset_order, 'Skewness'].astype(float)
+            targeted_mom4 = higher_moments.loc[asset_order, 'Kurtosis'].astype(float)
+        else:
+            targeted_mom3 = historical_data[asset_order].skew()  # Skewness from historical data
+            targeted_mom4 = historical_data[asset_order].kurtosis() + 3  # Kurtosis from historical data
 
         targeted_mom3.name = 'Skewness'
         targeted_mom4.name = 'Kurtosis'
@@ -1925,3 +1946,36 @@ class CVineGenerator(MomentMatch, CopulaTools):
                 rows.append({'tree': k, 'edge': f"{asset_order[i - 1]} , {asset_order[k - 1]}{cond}",
                              'selected family': fam, 'parameters': par})
         return pd.DataFrame(rows)
+
+    def fit_results_from_spec(self, spec, asset_order, target_corr):
+        """
+        Build the dictionary that :meth:`run_vine_optimization` expects from a
+        vine specification (output of :meth:`make_vine_spec`), i.e. without
+        running the family selection of Algorithm 3 on a history. Used when the
+        families are chosen by the user or set to Gaussian. Fallback lists are
+        empty, so the calibration keeps the given families.
+        """
+        d = len(asset_order)
+        empty_lists = np.empty((d - 1, d - 1), dtype=object)
+        for r in range(d - 1):
+            for c in range(d - 1):
+                empty_lists[r, c] = []
+        fams = spec['fams']
+        names = np.empty(fams.shape, dtype=object)
+        for r in range(fams.shape[0]):
+            for c in range(fams.shape[1]):
+                f = fams[r, c]
+                if isinstance(f, list):
+                    names[r, c] = [b.family.name for b in f]
+                elif isinstance(f, pv.BicopFamily):
+                    names[r, c] = f.name
+        return {'thetas_final_1p': spec['thetas_1p'].copy(), 'thetas_final_2p': spec['thetas_2p'].copy(),
+                'a1_final': spec['a1_s'].copy(), 'a2_final': spec['a2_s'].copy(),
+                'fams_cops': spec['fams'].copy(), 'fams_cops_name': names,
+                'fams_ncscops_status': spec['ncsstatus'].copy(), 'fams_rots': spec['rotations'].copy(),
+                'fams_mixture_status': spec['mixturestatus'].copy(), 'fams_status': spec['familystatus'].copy(),
+                'LTCMAs_corr': target_corr.loc[asset_order, asset_order].copy(),
+                'trees_copulas': {}, 'trees_hfunc': {}, 'trees_prespecification': {},
+                'copulas_specifications': self.get_copulas_specifications(),
+                'testable_copulas': empty_lists.copy(), 'testable_copulas_only_tail': empty_lists.copy(),
+                'fams_mixture_status_': None}
