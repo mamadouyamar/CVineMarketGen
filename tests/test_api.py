@@ -139,3 +139,31 @@ def test_functions():
     assert set(cl) >= {'l', 'u', 's', 'm', 'metrics', 'curve'} and cl['m'] in (-1, 1)
     sel = select_family(h['A'], h['B'])
     assert sel['status'] in ('ordinary', 'mixture') and 'bic' in sel
+
+
+# ---------------------------------------------------------------- per-asset dynamics (0.3.0)
+def test_cvine_market_auto_dynamics_and_roundtrip(tmp_path):
+    pytest.importorskip('arch')
+    h = _synthetic_history(n=1500)
+    t = Targets.from_history(h)
+    cv = CVineMarket(t, families='gaussian', n_opt=2000, dynamics='auto',
+                     dynamics_kwargs=dict(candidates=('const', 'garch'), pq=(1, 1), gof=False, verbose=False)).fit()
+    rep = cv.dynamics_report
+    assert list(rep.index) == ['A', 'B', 'C'] and set(rep.columns) >= {'model', 'bic', 'passed'}
+    P = cv.simulate_paths(20, 30, seed=1)
+    assert P.array.shape == (20, 30, 3)
+    p = tmp_path / 'auto.json'; cv.save(str(p))
+    cv2 = CVineMarket.load(str(p))
+    assert cv2.dynamics_report['model'].equals(rep['model'])
+    assert np.allclose(cv2.simulate_paths(3, 5, seed=2).array, cv.simulate_paths(3, 5, seed=2).array)
+
+
+def test_cvine_market_dict_dynamics_with_hmm():
+    pytest.importorskip('arch')
+    h = _synthetic_history(n=1500)
+    t = Targets.from_history(h)
+    cv = CVineMarket(t, families='gaussian', n_opt=2000,
+                     dynamics={'A': 'ar1-garch(1,1)', 'B': 'hmm(2)', 'C': 'const'}).fit()
+    assert list(cv.dynamics_report['model']) == ['AR(1)-GARCH(1,1)', 'HMM(2)', 'Const-Const']
+    assert cv.fit_targets.layer == 'residuals'
+    assert cv.simulate_paths(5, 10, seed=0).array.shape == (5, 10, 3)
