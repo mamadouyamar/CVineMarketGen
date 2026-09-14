@@ -5,7 +5,7 @@ authors:
   - family-names: Thioub
     given-names: Mamadou Yamar
     email: mamadou-yamar.thioub@hec.ca
-version: 0.1.0
+version: 0.2.0
 date-released: 2026-09-13
 license: MIT
 repository-code: "https://github.com/mamadouyamar/CVineMarketGen"

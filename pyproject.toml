@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "CVineMarketGen"
-version = "0.1.0"
+version = "0.2.0"
 description = "C-vine copula financial market generator with moment and tail dependence targeting, and the Fleishman / Vale-Maurelli benchmark (thesis, article 3)."
 readme = "README.md"
 license = { file = "LICENSE.txt" }
@@ -28,6 +28,7 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
+garch = ["arch"]
 doc = ["sphinx", "sphinx_rtd_theme", "myst-nb", "ipykernel"]
 
 [project.urls]

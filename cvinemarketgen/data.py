@@ -161,3 +161,46 @@ def factor_targets(returns):
     for c in cols:
         out[c] = corr[c].values
     return out
+
+
+# ----------------------------------------------------------------------------
+# daily prices, for the backtesting example
+# ----------------------------------------------------------------------------
+def yahoo_daily_adjclose(ticker, start=None, timeout=60):
+    """Daily adjusted close (dividends reinvested) from Yahoo Finance, DatetimeIndex."""
+    p1 = int(pd.Timestamp(start or '1990-01-01').timestamp())
+    p2 = int(pd.Timestamp.utcnow().timestamp()) + 86400
+    url = f'https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?period1={p1}&period2={p2}&interval=1d'
+    r = requests.get(url, timeout=timeout, headers=UA)
+    r.raise_for_status()
+    res = json.loads(r.text)['chart']['result'][0]
+    ts = pd.to_datetime(res['timestamp'], unit='s').normalize()
+    adj = res['indicators']['adjclose'][0]['adjclose']
+    s = pd.Series(adj, index=ts, name=ticker).dropna()
+    s = s[~s.index.duplicated(keep='last')]
+    return s.loc[start:] if start else s
+
+
+def load_daily_returns(tickers, start='2010-01-01', cache='data/daily_cache.csv', refresh=False, verbose=True):
+    """
+    Daily simple returns of a list of Yahoo Finance tickers (adjusted closes),
+    aligned on common dates, cached locally as a CSV (git-ignored).
+    """
+    tickers = list(tickers)
+    if cache and os.path.exists(cache) and not refresh:
+        df = pd.read_csv(cache, index_col=0, parse_dates=True)
+        if set(tickers) <= set(df.columns):
+            df = df.loc[start:, tickers].dropna()
+            if verbose:
+                print(f'daily returns read from cache {cache}: {df.shape[0]} days, {df.index.min().date()} to {df.index.max().date()}')
+            return df
+    prices = pd.concat([yahoo_daily_adjclose(t, start=start) for t in tickers], axis=1).dropna()
+    df = prices.pct_change().dropna()
+    df.index.name = 'date'
+    if cache:
+        os.makedirs(os.path.dirname(cache) or '.', exist_ok=True)
+        df.to_csv(cache)
+    if verbose:
+        print(f'daily returns downloaded: {df.shape[0]} days, {df.index.min().date()} to {df.index.max().date()}'
+              + (f', cached to {cache}' if cache else ''))
+    return df

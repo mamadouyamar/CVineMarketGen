@@ -9,3 +9,4 @@ data/factors_cache.csv
 examples/data/
 docs/_build/
 docs/examples/
+data/daily_cache.csv
