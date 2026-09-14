@@ -447,7 +447,7 @@ class AssetDynamics:
     def to_dict(self):
         return {'name': self.name, 'models': {a: m.to_dict() for a, m in self.models.items()},
                 'report': None if self.report is None else self.report.to_dict(orient='index'),
-                'candidates': None if self.candidates is None else self.candidates.reset_index().to_dict(orient='list')}
+                'candidates': None if self.candidates is None else self.candidates.to_dict(orient='list')}
 
     @classmethod
     def from_dict(cls, d):
@@ -456,8 +456,7 @@ class AssetDynamics:
         if d.get('report'):
             m.report = pd.DataFrame(d['report']).T.loc[list(m.models)]
         if d.get('candidates'):
-            c = pd.DataFrame(d['candidates'])
-            m.candidates = c.set_index(list(c.columns[:2])) if c.shape[1] > 2 else c
+            m.candidates = pd.DataFrame(d['candidates'])
         return m
 
 

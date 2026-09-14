@@ -155,6 +155,7 @@ def test_cvine_market_auto_dynamics_and_roundtrip(tmp_path):
     p = tmp_path / 'auto.json'; cv.save(str(p))
     cv2 = CVineMarket.load(str(p))
     assert list(cv2.dynamics_report['model']) == list(rep['model'])
+    assert list(cv2.dynamics.candidates.columns) == list(cv.dynamics.candidates.columns) and len(cv2.dynamics.candidates) == len(cv.dynamics.candidates)
     assert np.allclose(cv2.simulate_paths(3, 5, seed=2).array, cv.simulate_paths(3, 5, seed=2).array)
 
 
