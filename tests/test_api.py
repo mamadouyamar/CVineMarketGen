@@ -151,10 +151,10 @@ def test_cvine_market_auto_dynamics_and_roundtrip(tmp_path):
     rep = cv.dynamics_report
     assert list(rep.index) == ['A', 'B', 'C'] and set(rep.columns) >= {'model', 'bic', 'passed'}
     P = cv.simulate_paths(20, 30, seed=1)
-    assert P.array.shape == (20, 30, 3)
+    assert P.array.shape == (20, 30, 3) and np.isfinite(P.array).all()
     p = tmp_path / 'auto.json'; cv.save(str(p))
     cv2 = CVineMarket.load(str(p))
-    assert cv2.dynamics_report['model'].equals(rep['model'])
+    assert list(cv2.dynamics_report['model']) == list(rep['model'])
     assert np.allclose(cv2.simulate_paths(3, 5, seed=2).array, cv.simulate_paths(3, 5, seed=2).array)
 
 
@@ -166,4 +166,16 @@ def test_cvine_market_dict_dynamics_with_hmm():
                      dynamics={'A': 'ar1-garch(1,1)', 'B': 'hmm(2)', 'C': 'const'}).fit()
     assert list(cv.dynamics_report['model']) == ['AR(1)-GARCH(1,1)', 'HMM(2)', 'Const-Const']
     assert cv.fit_targets.layer == 'residuals'
-    assert cv.simulate_paths(5, 10, seed=0).array.shape == (5, 10, 3)
+    P = cv.simulate_paths(5, 10, seed=0)
+    assert P.array.shape == (5, 10, 3) and np.isfinite(P.array).all()
+
+
+def test_residual_layer_kurtosis_floor_keeps_marginals_feasible():
+    pytest.importorskip('arch')
+    h = _synthetic_history(n=1500)          # Gaussian innovations: residual kurtosis below 3, outside the Johnson SU range
+    t = Targets.from_history(h)
+    with pytest.warns(UserWarning, match='kurtosis'):
+        cv = CVineMarket(t, families='gaussian', n_opt=2000, dynamics={'A': 'ar1', 'B': 'ar1', 'C': 'ar1'}).fit()
+    assert (cv.fit_targets.kurt >= 3.1 - 1e-9).all() and (cv.marginals['fit residual'] < 1e-6).all()
+    X = cv.simulate(3000, seed=0)            # accept=True must terminate
+    assert np.isfinite(X.values).all()

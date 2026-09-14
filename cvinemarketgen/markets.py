@@ -11,6 +11,7 @@ Both take a :class:`~cvinemarketgen.targets.Targets`, expose ``fit``,
 import contextlib
 import io
 import json
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -20,6 +21,23 @@ from .targets import Targets
 from .cvine import CVineGenerator
 from .fleishman import FleishmanGenerator
 from .dynamics import make_dynamics, dynamics_from_dict, AR1, AR1GARCH, AssetDynamics
+
+
+def _floor_residual_kurtosis(ft):
+    """
+    The Johnson SU marginal cannot be lighter-tailed than the normal: a residual
+    layer with kurtosis at or below 3 (near-normal residuals, e.g. of an HMM)
+    would leave the marginal fit with a mismatch and the acceptance loop of
+    ``simulate`` without an acceptable draw. Floor it at ``3.1 + 2 skew^2``,
+    just above the family's boundary, with a warning.
+    """
+    floor = 3.1 + 2.0 * ft.skew ** 2
+    low = ft.kurt < floor
+    if low.any():
+        warnings.warn(f'residual kurtosis below the Johnson SU range for {list(ft.kurt.index[low])} '
+                      f'(near-normal residuals): floored at 3.1 + 2 skew^2 for the marginal fit')
+        ft.kurt = ft.kurt.where(~low, floor)
+    return ft
 from .paths import Paths
 from .functions import exceedance_curve
 
@@ -118,7 +136,7 @@ class _Market:
         if isinstance(self.dynamics, AR1):
             self.dynamics.fit(hist)
             if t.higher_moments_source != 'history':
-                self.fit_targets = self.dynamics.transfer_targets(t)      # LTCMA targets, Appendix A transfer
+                self.fit_targets = _floor_residual_kurtosis(self.dynamics.transfer_targets(t))   # LTCMA targets, Appendix A transfer
                 return
         else:
             if t.higher_moments_source != 'history':
@@ -128,7 +146,7 @@ class _Market:
                 self.dynamics = select_dynamics(hist, **self.dynamics_kwargs)
             else:
                 self.dynamics.fit(hist)
-        ft = Targets.from_history(self.dynamics.filter(hist), assets=t.assets)
+        ft = _floor_residual_kurtosis(Targets.from_history(self.dynamics.filter(hist), assets=t.assets))
         ft.layer = 'residuals'; ft.freq = t.freq
         self.fit_targets = ft
 
