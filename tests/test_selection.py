@@ -1,0 +1,44 @@
+import json, os
+import numpy as np
+import pandas as pd
+import pytest
+
+from cvinemarketgen.selection import ljung_box, arch_lm, iid_tests, cvm_statistic, gof_bootstrap, select_dynamics
+from tests.test_dynamics import _garch_series
+
+HERE = os.path.dirname(__file__)
+
+
+def test_tests_match_statsmodels_reference():
+    ref = json.load(open(os.path.join(HERE, 'data', 'ljungbox_reference.json')))
+    x = np.array(ref['x'])
+    s, p = ljung_box(x, 20)
+    assert abs(s - ref['lb_stat']) < 1e-6 and abs(p - ref['lb_p']) < 1e-8
+    s, p = arch_lm(x, 20)
+    assert abs(s - ref['lm_stat']) < 1e-4 and abs(p - ref['lm_p']) < 1e-6
+
+
+def test_cvm_statistic_uniform_is_small():
+    u = (np.arange(1, 1001) - 0.5) / 1000
+    assert abs(cvm_statistic(u) - 1 / 12000) < 1e-12
+    assert cvm_statistic(np.linspace(0, 0.5, 1000)) > 10
+
+
+def test_selector_picks_garch_family_and_passes():
+    pytest.importorskip('arch')
+    y = _garch_series().to_frame()
+    ad = select_dynamics(y, candidates=('const', 'garch', 'gjr'), pq=(1, 1), gof=False, verbose=False)
+    r = ad.report.iloc[0]
+    assert r['vol'] in ('garch', 'gjr') and r['passed'] and r['n_candidates'] == 6
+    assert set(ad.candidates.columns) >= {'asset', 'model', 'bic', 'lb_z', 'lb_z2', 'arch_lm', 'passed'}
+    z = ad.filter(y)
+    assert min(iid_tests(z['X'].values).values()) > 0.05
+
+
+def test_gof_bootstrap_runs_small():
+    pytest.importorskip('arch')
+    from cvinemarketgen.dynamics import parse_spec
+    y = _garch_series(n=800)
+    m = parse_spec('ar1-garch(1,1)').fit(y)
+    g = gof_bootstrap(m, y, B=5, seed=0)
+    assert 0 <= g['pvalue'] <= 1 and len(g['stats']) == 5 and g['stat'] > 0
