@@ -293,6 +293,8 @@ class CVineMarket(_Market):
     dynamics : None, 'ar1' or 'ar1-garch'
         Serial dependence for :meth:`simulate_paths`, fitted on the history.
 
+    Notes
+    -----
     After ``fit``, read ``marginals`` (Johnson SU parameters per asset), ``edges``
     (family, rotation and calibrated parameters per edge), and ``engine`` (the
     paper's :class:`~cvinemarketgen.cvine.CVineGenerator`, with ``fit_results``
