@@ -211,8 +211,14 @@ class FleishmanMarket(_Market):
     dynamics : None, 'ar1' or 'ar1-garch'
         Optional serial dependence for :meth:`simulate_paths`.
 
-    After :meth:`fit`: ``coefficients`` (a, b, c, d per asset), ``intermediate_corr``
-    (the Vale-Maurelli correlations of the underlying normals), ``infeasible_pairs``.
+    Attributes
+    ----------
+    coefficients : DataFrame
+        Fleishman coefficients a, b, c, d per asset (after ``fit``).
+    intermediate_corr : DataFrame
+        Vale-Maurelli correlations of the underlying normals.
+    infeasible_pairs : list
+        Pairs whose Vale-Maurelli equation has no real root in [-1, 1].
     """
 
     def __init__(self, targets, dynamics=None):
@@ -287,9 +293,14 @@ class CVineMarket(_Market):
     dynamics : None, 'ar1' or 'ar1-garch'
         Serial dependence for :meth:`simulate_paths`, fitted on the history.
 
-    After :meth:`fit`: ``marginals`` (Johnson SU table), ``edges`` (family and
-    parameters per edge), ``engine`` (the :class:`~cvinemarketgen.cvine.CVineGenerator`),
-    ``fit_results`` and ``vine_results`` (the engine's dictionaries).
+    Attributes
+    ----------
+    marginals : DataFrame
+        Johnson SU parameters per asset (after ``fit``).
+    edges : DataFrame
+        Selected family, rotation and calibrated parameters per edge.
+    engine : CVineGenerator
+        The paper's engine, with ``fit_results`` and ``vine_results`` as its dictionaries.
     """
 
     def __init__(self, targets, central=None, families='auto', mixtures=True, mixtures_deeper_trees=False,
