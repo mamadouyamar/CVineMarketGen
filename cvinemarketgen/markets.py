@@ -293,14 +293,10 @@ class CVineMarket(_Market):
     dynamics : None, 'ar1' or 'ar1-garch'
         Serial dependence for :meth:`simulate_paths`, fitted on the history.
 
-    Attributes
-    ----------
-    marginals : DataFrame
-        Johnson SU parameters per asset (after ``fit``).
-    edges : DataFrame
-        Selected family, rotation and calibrated parameters per edge.
-    engine : CVineGenerator
-        The paper's engine, with ``fit_results`` and ``vine_results`` as its dictionaries.
+    After ``fit``, read ``marginals`` (Johnson SU parameters per asset), ``edges``
+    (family, rotation and calibrated parameters per edge), and ``engine`` (the
+    paper's :class:`~cvinemarketgen.cvine.CVineGenerator`, with ``fit_results``
+    and ``vine_results`` as its dictionaries).
     """
 
     def __init__(self, targets, central=None, families='auto', mixtures=True, mixtures_deeper_trees=False,
