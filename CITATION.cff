@@ -6,8 +6,16 @@ authors:
     given-names: Mamadou Yamar
     email: mamadou-yamar.thioub@hec.ca
 version: 0.2.0
-date-released: 2026-09-13
+date-released: 2026-09-14
 license: MIT
+doi: 10.5281/zenodo.22740672
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22740671
+    description: "Concept DOI, all versions"
+  - type: doi
+    value: 10.5281/zenodo.22740672
+    description: "Version 0.2.0"
 repository-code: "https://github.com/mamadouyamar/CVineMarketGen"
 keywords:
   - vine copula
