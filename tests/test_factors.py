@@ -52,3 +52,12 @@ def test_implied_mean_and_roundtrip(tmp_path):
     assert np.allclose(fm2.beta.values, fm.beta.values)
     assert list(fm2.report.columns) == list(fm.report.columns) and np.allclose(fm2.report.values, fm.report.values)
     assert np.allclose(fm2.simulate(F.iloc[:5], seed=3).values, fm.simulate(F.iloc[:5], seed=3).values)
+
+
+def test_fit_johnson_su_heavy_tailed_residual_is_not_degenerate():
+    # HYG regression residual of notebook 08: a single Nelder-Mead start stalls at lambda = 0
+    from cvinemarketgen import fit_johnson_su, johnson_su_moments
+    p = fit_johnson_su(1.5634625201637253, 15.453695663202758)
+    assert p['lambda'] > 0.1 and p['residual'] < 1e-6
+    m = johnson_su_moments(p)
+    assert abs(m[2] - 1.5634625201637253) < 1e-4 and abs(m[3] - 12.453695663202758) < 1e-3
