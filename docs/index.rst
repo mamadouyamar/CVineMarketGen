@@ -32,45 +32,30 @@ and `pyvinecopulib <https://github.com/vinecopulib/pyvinecopulib>`_.
 First simulation
 ----------------
 
-Thirty lines that build a synthetic 4-asset market from known copula families,
-select the families back, calibrate the vine to J.P. Morgan's 2024 targets, and
-simulate 25,000 scenarios:
+Your own assumptions, nothing else, ten lines:
 
 .. code-block:: python
 
-   import numpy as np, pandas as pd
-   from cvinemarketgen import CVineGenerator
+   from cvinemarketgen import Targets, CVineMarket
 
-   assets = ['U.S. Large Cap', 'U.S. Long Treasuries', 'Commodities', 'Gold']
-   ltcma = pd.read_csv('data/jpm_ltcma_2024.csv', index_col='Assets').loc[assets]
+   t = Targets(mean={'Equity': 0.07, 'Bonds': 0.03, 'Gold': 0.04},
+               vol={'Equity': 0.16, 'Bonds': 0.05, 'Gold': 0.15},
+               corr=[[1, -0.1, 0.05], [-0.1, 1, 0.3], [0.05, 0.3, 1]],
+               assets=['Equity', 'Bonds', 'Gold'])
+   cv = CVineMarket(t, families='gaussian').fit()
+   X = cv.simulate(25000, seed=1)          # DataFrame, one row per scenario
+   cv.diagnostics(X).summary()             # target vs simulated moments and correlations
+   P = cv.simulate_paths(1000, 10, seed=1) # 1000 paths of 10 periods
 
-   gen = CVineGenerator(tol_opt=1e-10, n_samples=10000,
-                        use_ncs_on_firsttree=False, use_ncs_on_deepertrees=False,
-                        use_mixture_on_firsttree=True, use_mixture_on_deepertrees=False,
-                        force_try_ncscopula=False, tol_for_optimization_func=1e-6)
-
-   edges = {(2, 1): ('mixture', [('clayton', 270, 0.66), ('gumbel', 0, 1.84)], 0.70),
-            (3, 1): ('gumbel', 180, 1.38), (4, 1): ('gaussian', 0, 0.05),
-            (3, 2): ('gaussian', 0, -0.15), (4, 2): ('gaussian', 0, 0.30), (4, 3): ('gaussian', 0, 0.20)}
-   jsu = {'U.S. Large Cap': (2.570, 2.179, 3.540, 2.646), 'U.S. Long Treasuries': (-0.096, -0.095, 2.279, 2.062),
-          'Commodities': (0.611, 0.589, 2.092, 1.774), 'Gold': (-0.523, -0.516, 2.893, 2.675)}
-   spec = gen.make_vine_spec(assets, edges)
-   hist = gen.simulate_known_vine(spec, jsu, ltcma['Arithmetic Mean'], ltcma['Volatility'], assets, n=3000, seed=1)
-
-   np.random.seed(1)
-   res = gen.run_complete_simulation(ltcma=ltcma[['Arithmetic Mean', 'Volatility'] + assets],
-                                     historical_data=hist, asset_order=assets,
-                                     n_year=1, n_per_year=25000, corr_tol=5e-2)
-   print(gen.selected_edge_table(assets, res['CVinefitresults'], res['vine_results']).to_string(index=False))
-   sim = res['simulated_years'][0]          # 25000 x 4 DataFrame
-
-The two example notebooks show the full workflow with printed outputs and the
-exceedance-correlation figures.
+Add skewness and kurtosis, a history to select tail-dependent copula families
+from, or daily data with GARCH dynamics: the :doc:`userguide` covers each case,
+and the notebooks show them with outputs.
 
 .. toctree::
    :maxdepth: 2
    :caption: Contents
 
+   userguide
    method
    examples
    api
@@ -82,7 +67,7 @@ Citation
 .. code-block:: text
 
    Thioub, M. Y. (2026). CVineMarketGen: C-vine copula financial market generator with
-   moment and tail dependence targeting (Version 0.1.0) [Computer software].
+   moment and tail dependence targeting (Version 0.2.0) [Computer software].
    https://github.com/mamadouyamar/CVineMarketGen
 
 The repository's ``CITATION.cff`` holds the citation metadata.

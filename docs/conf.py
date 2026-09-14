@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'CVineMarketGen'
 author = 'Mamadou Yamar Thioub'
 copyright = '2026, Mamadou Yamar Thioub'
-release = '0.1.0'
+release = '0.2.0'
 
 extensions = [
     'sphinx.ext.autodoc',
