@@ -2,7 +2,8 @@
 """
 Choosing the dynamics of each asset: i.i.d. tests on the residual layer,
 BIC among the candidates that pass, and a parametric-bootstrap Cramér-von
-Mises goodness-of-fit test of the selected model (ported from GenHMM1d).
+Mises goodness-of-fit test of the selected model, as GenHMM1d's ``GofHMMGen``
+(the HMM candidates themselves are estimated by GenHMM1d).
 
 Notation: ``epsilon_t`` is the standardized residual of a univariate model
 and ``v_t = Phi(epsilon_t)`` its Rosenblatt uniform.
@@ -61,8 +62,8 @@ def gof_bootstrap(model, y, B=100, seed=0, verbose=False):
     """
     Parametric-bootstrap Cramér-von Mises test of a fitted univariate model:
     the statistic on the Rosenblatt uniforms ``v_t = Phi(epsilon_t)`` of the
-    sample, against ``B`` refits on series simulated from the model
-    (GenHMM1d, ``GofHMMGen``). Returns ``stat``, ``pvalue`` and the bootstrap ``stats``.
+    sample, against ``B`` refits on series simulated from the model, as
+    GenHMM1d's ``GofHMMGen``. Returns ``stat``, ``pvalue`` and the bootstrap ``stats``.
     """
     u = stats.norm.cdf(np.asarray(model.filter(), float))
     stat = cvm_statistic(u)

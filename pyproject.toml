@@ -24,6 +24,7 @@ dependencies = [
     "matplotlib",
     "requests",
     "pyvinecopulib>=0.6",
+    "GenHMM1d @ git+https://github.com/mamadouyamar/GenHMM1d.git",
 ]
 
 [project.optional-dependencies]

@@ -300,9 +300,11 @@ class GarchFamily:
         L = max(self.p, self.q, 1)
         self.state = {'y': float(v[-1]), 'e': e[ok][-L:].tolist(), 'h': h[ok][-L:].tolist()}
         self.n_obs = int(ok.sum())
-        self.loglik = float(res.loglikelihood)
         self.n_params = int(len(prm))
-        self.bic = float(res.bic)
+        # arch's likelihood is that of ``y * scale``; put it back on the data's scale (Jacobian ``n log scale``)
+        # so that log-likelihoods and BICs are comparable across candidates and with the HMM
+        self.loglik = float(res.loglikelihood) + self.n_obs * np.log(self.scale)
+        self.bic = float(-2 * self.loglik + self.n_params * np.log(self.n_obs))
         return self
 
     # ---- recursion -----------------------------------------------------------

@@ -6,8 +6,8 @@ Per-asset dynamics chosen from the data, and assets mapped on simulated factors.
 
 - `dynamics='auto'`: for each asset, a constant or AR(1) mean with a constant,
   GARCH, GJR or EGARCH variance (`GarchFamily`, orders up to 2) or a Gaussian
-  hidden Markov model with 2 or 3 regimes (`GaussianHMM`, checked against
-  GenHMM1d); i.i.d. tests on the residual layer (Ljung-Box, Ljung-Box on the
+  hidden Markov model with 2 or 3 regimes (`GaussianHMM`, estimated by
+  GenHMM1d, now a dependency); i.i.d. tests on the residual layer (Ljung-Box, Ljung-Box on the
   squares, ARCH-LM), BIC among the candidates that pass, parametric-bootstrap
   Cramér-von Mises goodness-of-fit test of the winner (`select_dynamics`,
   `iid_tests`, `gof_bootstrap`); `cv.dynamics_report` and `cv.dynamics.candidates`.
@@ -17,6 +17,8 @@ Per-asset dynamics chosen from the data, and assets mapped on simulated factors.
   `simulate` from factor scenarios or paths with or without a Johnson SU
   residual, `implied_mean` for a view on the factors, save/load.
 - Seventh factor, the small-cap premium (SMB); `load_etf_monthly`.
+- GARCH-family log-likelihoods and BICs reported on the data's scale (arch fits
+  returns times 100), so that they are comparable with the HMM's.
 - Fixes: the Johnson SU moment fit is multi-start with a moment check (a
   heavy-tailed residual could end degenerate); the residual-layer kurtosis is
   floored just above the Johnson SU boundary (near-normal residuals left

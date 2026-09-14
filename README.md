@@ -25,6 +25,9 @@ pip install git+https://github.com/mamadouyamar/CVineMarketGen.git
 pip install arch          # optional, for GARCH-family dynamics on daily data
 ```
 
+The HMM dynamics are estimated by [GenHMM1d](https://github.com/mamadouyamar/GenHMM1d),
+installed with the package.
+
 Python 3.8 or later; numpy, scipy, pandas, matplotlib, requests and
 [pyvinecopulib](https://github.com/vinecopulib/pyvinecopulib) (0.6 and 0.7 supported).
 
@@ -151,9 +154,8 @@ maximum likelihood and the best BIC kept, mixtures for sign-changing
 dependence; the copula parameters then re-calibrated, variable by variable, so
 that the simulated correlations match the targets; scenarios drawn with an
 accept-reject on moments and correlations. Version 0.3 adds, on top of the
-unchanged engine, the per-asset choice of the daily dynamics (GARCH family or
-Gaussian hidden Markov model, the latter checked against GenHMM1d) and the
-factor model. The docs' [Method](https://cvinemarketgen.readthedocs.io/en/latest/method.html)
+unchanged engine, the per-asset choice of the daily dynamics (GARCH family, or
+a Gaussian hidden Markov model estimated by GenHMM1d) and the factor model. The docs' [Method](https://cvinemarketgen.readthedocs.io/en/latest/method.html)
 page maps each algorithm to a function.
 
 ## Citation

@@ -181,7 +181,7 @@ Rosenblatt uniforms for the HMM) is tested for the absence of autocorrelation
 the candidates that pass at 5 percent the lowest BIC is kept, otherwise the
 lowest BIC overall with a warning. The selected model is then checked by a
 parametric-bootstrap Cramér-von Mises test on its Rosenblatt uniforms
-(``gof_pvalue``), as in GenHMM1d.
+(``gof_pvalue``), as in GenHMM1d, which also estimates the HMM candidates.
 
 Options through ``dynamics_kwargs``: ``candidates``, ``means``, ``pq``,
 ``states``, ``alpha``, ``lags``, ``gof``, ``B``, ``seed``, ``verbose``. To

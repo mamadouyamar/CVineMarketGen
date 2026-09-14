@@ -72,12 +72,12 @@ def test_hmm_matches_genhmm1d_reference():
     m = GaussianHMM(2).fit(y)
     theta = np.array(ref['theta'])
     assert np.allclose(m.mu, theta[:, 0], atol=1e-4) and np.allclose(m.sigma, theta[:, 1], atol=1e-4)
-    # GenHMM1d stops its EM on a parameter-change rule slightly before ours (our log-likelihood is
-    # the higher one, by 9e-5): the transition matrix and the uniforms agree to a few 1e-4
+    # the reference was produced by a direct GenHMM1d call (percentiles=[0.5], eps=1e-12); the wrapper
+    # starts from the median split with eps=1e-6, so the EM end points differ by a few 1e-4
     assert np.allclose(m.Q, np.array(ref['Q']), atol=5e-4)
     assert np.allclose(m.uniforms().values, np.array(ref['U']), atol=5e-4)
-    assert abs(cvm_statistic(m.uniforms().values) - ref['cvm']) < 1e-3
-    assert abs(m.loglik - ref['LL']) < 1e-3 and m.loglik >= ref['LL'] - 1e-6
+    assert abs(cvm_statistic(m.uniforms().values) - ref['cvm']) < 1e-3 and abs(m.cvm - ref['cvm']) < 1e-3
+    assert abs(m.loglik - ref['LL']) < 1e-3
 
 
 def test_hmm_filter_unfilter_inverse_and_persistence():
@@ -98,3 +98,25 @@ def test_selector_picks_hmm_on_hmm_data():
     y = pd.DataFrame({'H': ref['y']})
     ad = select_dynamics(y, candidates=('const', 'hmm'), states=(2, 3), gof=False, verbose=False)
     assert ad.report.loc['H', 'model'] in ('HMM(2)', 'HMM(3)')
+
+
+def test_garch_family_loglik_is_on_the_data_scale():
+    # arch fits returns scaled by 100; the reported log-likelihood and BIC must be on the data's own scale,
+    # so that they are comparable with the HMM's
+    y = _garch_series(n=1500)
+    m = parse_spec('const-const').fit(y)
+    v = y.values
+    expected = -0.5 * len(v) * (np.log(2 * np.pi * np.mean((v - v.mean()) ** 2)) + 1)   # Gaussian MLE log-likelihood
+    assert abs(m.loglik - expected) < 0.5
+    assert abs(m.bic - (-2 * m.loglik + 2 * np.log(len(v)))) < 1e-6
+    m2 = parse_spec('const-garch(1,1)').fit(y)
+    assert m2.loglik > m.loglik and m2.bic < m.bic
+
+
+def test_hmm_fits_heavy_tailed_data_with_three_states():
+    # extreme days underflow the density of a narrow state: not an error
+    rng = np.random.default_rng(5)
+    y = pd.Series(rng.standard_t(2.5, 3000) * 0.01)
+    m = GaussianHMM(3).fit(y)
+    assert np.isfinite(m.loglik) and m.regimes.shape == (3000, 3) and np.isfinite(m.filter().values).all()
+    assert np.allclose(m.Q.sum(1), 1.0) and (m.sigma > 0).all()
