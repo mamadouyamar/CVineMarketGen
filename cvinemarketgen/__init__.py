@@ -7,11 +7,12 @@ from .data import load_factor_data, factor_targets, load_daily_returns, load_etf
 from .targets import Targets
 from .markets import FleishmanMarket, CVineMarket, Diagnostics, partial_correlations
 from .paths import Paths
+from .factors import FactorModel
 from .dynamics import AR1, AR1GARCH
 from .functions import (fit_johnson_su, johnson_su_moments, johnson_su_sample, fit_fleishman,
                         exceedance_curve, classify_pair, select_family)
 
-__all__ = ['Targets', 'FleishmanMarket', 'CVineMarket', 'Diagnostics', 'Paths', 'AR1', 'AR1GARCH',
+__all__ = ['Targets', 'FleishmanMarket', 'CVineMarket', 'Diagnostics', 'Paths', 'FactorModel', 'AR1', 'AR1GARCH',
            'fit_johnson_su', 'johnson_su_moments', 'johnson_su_sample', 'fit_fleishman',
            'exceedance_curve', 'classify_pair', 'select_family', 'partial_correlations',
            'MomentMatch', 'CopulaTools', 'CVineGenerator', 'FleishmanGenerator',
