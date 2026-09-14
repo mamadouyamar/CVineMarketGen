@@ -1,6 +1,6 @@
 # CVineMarketGen — simulated asset returns that match your assumptions, tails included
 
-[![docs](https://readthedocs.org/projects/cvinemarketgen/badge/?version=latest)](https://cvinemarketgen.readthedocs.io/en/latest/) [![tests](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml/badge.svg)](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+[![docs](https://readthedocs.org/projects/cvinemarketgen/badge/?version=latest)](https://cvinemarketgen.readthedocs.io/en/latest/) [![tests](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml/badge.svg)](https://github.com/mamadouyamar/CVineMarketGen/actions/workflows/tests.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22740671.svg)](https://doi.org/10.5281/zenodo.22740671)
 
 You have expected returns, volatilities and correlations for a set of assets,
 perhaps skewness and kurtosis, perhaps a history at some frequency. You want
@@ -130,11 +130,13 @@ page maps each algorithm to a function.
 
 ```
 Thioub, M. Y. (2026). CVineMarketGen: C-vine copula financial market generator with
-moment and tail dependence targeting (Version 0.2.0) [Computer software].
-https://github.com/mamadouyamar/CVineMarketGen
+moment and tail dependence targeting (Version 0.2.0) [Computer software]. Zenodo.
+https://doi.org/10.5281/zenodo.22740672
 ```
 
-`CITATION.cff` holds the metadata; GitHub's "Cite this repository" button formats it.
+The DOI `10.5281/zenodo.22740672` identifies version 0.2.0; `10.5281/zenodo.22740671`
+always resolves to the latest version. `CITATION.cff` holds the metadata; GitHub's
+"Cite this repository" button formats it.
 
 ## References
 

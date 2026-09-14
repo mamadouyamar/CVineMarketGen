@@ -67,7 +67,7 @@ Citation
 .. code-block:: text
 
    Thioub, M. Y. (2026). CVineMarketGen: C-vine copula financial market generator with
-   moment and tail dependence targeting (Version 0.2.0) [Computer software].
-   https://github.com/mamadouyamar/CVineMarketGen
+   moment and tail dependence targeting (Version 0.2.0) [Computer software]. Zenodo.
+   https://doi.org/10.5281/zenodo.22740672
 
 The repository's ``CITATION.cff`` holds the citation metadata.
