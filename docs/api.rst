@@ -29,7 +29,25 @@ Dynamics
 --------
 
 .. automodule:: cvinemarketgen.dynamics
-   :members: AR1, AR1GARCH, make_dynamics
+   :members: AR1, AR1GARCH, GarchFamily, AssetDynamics, parse_spec, make_dynamics
+
+Hidden Markov model
+-------------------
+
+.. automodule:: cvinemarketgen.hmm
+   :members: GaussianHMM
+
+Selection of the dynamics
+-------------------------
+
+.. automodule:: cvinemarketgen.selection
+   :members: ljung_box, arch_lm, iid_tests, cvm_statistic, gof_bootstrap, candidate_models, select_dynamics
+
+Factors
+-------
+
+.. automodule:: cvinemarketgen.factors
+   :members: FactorModel
 
 Functions
 ---------
@@ -41,7 +59,7 @@ Market data
 -----------
 
 .. automodule:: cvinemarketgen.data
-   :members: load_factor_data, factor_targets, load_daily_returns, fred_series, fama_french_monthly, yahoo_monthly_adjclose, yahoo_daily_adjclose, FACTORS, DURATIONS
+   :members: load_factor_data, factor_targets, load_daily_returns, load_etf_monthly, fred_series, fama_french_monthly, yahoo_monthly_adjclose, yahoo_daily_adjclose, FACTORS, DURATIONS
 
 Engine: C-vine generator
 ------------------------

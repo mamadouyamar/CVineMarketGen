@@ -20,4 +20,4 @@ __all__ = ['Targets', 'FleishmanMarket', 'CVineMarket', 'Diagnostics', 'Paths', 
            'exceedance_curve', 'classify_pair', 'select_family', 'partial_correlations',
            'MomentMatch', 'CopulaTools', 'CVineGenerator', 'FleishmanGenerator',
            'load_factor_data', 'factor_targets', 'load_daily_returns', 'load_etf_monthly', 'FACTORS', 'DURATIONS']
-__version__ = '0.2.0'
+__version__ = '0.3.0'
