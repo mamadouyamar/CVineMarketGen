@@ -84,8 +84,12 @@ def gof_bootstrap(model, y, B=100, seed=0, verbose=False):
 
 # ---- candidates and selection -------------------------------------------------
 def candidate_models(candidates=('const', 'garch', 'gjr', 'egarch', 'hmm'), means=('const', 'ar1'),
-                     pq=(1, 2), states=(2, 3)):
-    """Unfitted models of every candidate specification."""
+                     pq=(2, 2), states=(2, 3)):
+    """
+    Unfitted models of every candidate specification: for each variance family,
+    every mean in ``means`` and orders ``p = 1..pq[0]``, ``q = 1..pq[1]``; for
+    ``'hmm'``, one model per number of regimes in ``states``. The defaults give 28.
+    """
     out = []
     pmax, qmax = (pq if isinstance(pq, (tuple, list)) else (pq, pq))
     for vol in candidates:
@@ -104,13 +108,13 @@ REPORT_COLUMNS = ['model', 'mean', 'vol', 'p', 'q', 'states', 'n_params', 'logli
 
 
 def select_dynamics(returns, candidates=('const', 'garch', 'gjr', 'egarch', 'hmm'), means=('const', 'ar1'),
-                    pq=(1, 2), states=(2, 3), alpha=0.05, lags=20, gof=True, B=100, seed=0, verbose=True):
+                    pq=(2, 2), states=(2, 3), alpha=0.05, lags=20, gof=True, B=100, seed=0, verbose=True):
     """
     Per asset: fit every candidate, test its residual layer for i.i.d.-ness,
     keep the lowest BIC among the candidates that pass (all three p-values
     above ``alpha``); if none passes, the lowest BIC overall with a warning.
     With ``gof``, the bootstrap Cramér-von Mises test is run on the selected
-    model. Returns an :class:`~cvinemarketgen.dynamics.AssetDynamics` whose
+    model. ``pq`` gives the largest ``p`` and ``q`` of the variance models. Returns an :class:`~cvinemarketgen.dynamics.AssetDynamics` whose
     ``report`` has one row per asset and ``candidates`` every fit.
     """
     h = pd.DataFrame(returns).astype(float)

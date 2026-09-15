@@ -54,3 +54,10 @@ def test_gof_bootstrap_hmm_uses_warm_refits():
     assert r is not m and np.allclose(r.mu, m.mu, atol=1e-5) and np.allclose(r.Q, m.Q, atol=1e-4)
     g = gof_bootstrap(m, y, B=3, seed=0)
     assert len(g['stats']) == 3 and np.isfinite(g['stats']).all() and 0 <= g['pvalue'] <= 1
+
+
+def test_default_candidate_set_has_28_models():
+    from cvinemarketgen.selection import candidate_models
+    ms = candidate_models()
+    assert len(ms) == 28 and sum(m.name.startswith('HMM') for m in ms) == 2
+    assert {(m.p, m.q) for m in ms if m.kind == 'garch' and m.vol != 'const'} == {(1, 1), (1, 2), (2, 1), (2, 2)}
