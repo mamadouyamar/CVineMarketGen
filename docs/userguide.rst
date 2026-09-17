@@ -136,8 +136,13 @@ Dynamics for daily data
 .. code-block:: python
 
    t = Targets.from_history(daily_returns)
-   cv = CVineMarket(t, families='auto', dynamics='ar1-garch').fit()   # needs: pip install arch
+   cv = CVineMarket(t, families='auto', dynamics='auto').fit()        # needs: pip install arch
    P = cv.simulate_paths(1000, 252, seed=1)
+
+``dynamics='auto'``
+   One model per asset, chosen among the GARCH family and a Gaussian hidden
+   Markov model by i.i.d. tests, BIC and a bootstrap goodness-of-fit test; see
+   the next section. A dict gives the model per asset instead.
 
 ``dynamics='ar1'``
    Per-asset AR(1) fitted on the history; the generator is fitted on the
@@ -153,7 +158,59 @@ Dynamics for daily data
 
 With dynamics, ``simulate`` returns residuals (the layer the generator is
 fitted on; ``cv.fit_targets`` shows its targets) and ``simulate_paths``
-returns returns.
+returns returns. The Johnson SU marginal cannot be lighter-tailed than the
+normal: when a residual layer has kurtosis at or below 3 (near-normal
+residuals, as an HMM produces), its target kurtosis is floored just above the
+family's boundary, with a warning.
+
+Choosing the dynamics
+---------------------
+
+.. code-block:: python
+
+   cv = CVineMarket(t, families='auto', dynamics='auto').fit()
+   cv.dynamics_report          # one row per asset: model, BIC, the three p-values, goodness-of-fit p-value
+   cv.dynamics.candidates      # every candidate fitted, per asset
+
+For each asset the candidates are a constant or AR(1) mean with a constant,
+GARCH(p,q), GJR(p,q) or EGARCH(p,q) variance (``p, q`` up to 2 by default),
+plus a Gaussian hidden Markov model with 2 or 3 regimes. Each candidate's
+residual layer (standardized residuals, or the normal scores of the
+Rosenblatt uniforms for the HMM) is tested for the absence of autocorrelation
+(Ljung-Box) and of remaining ARCH (Ljung-Box on the squares, ARCH-LM); among
+the candidates that pass at 5 percent the lowest BIC is kept, otherwise the
+lowest BIC overall with a warning. The selected model is then checked by a
+parametric-bootstrap Cramér-von Mises test on its Rosenblatt uniforms
+(``gof_pvalue``), as in GenHMM1d, which also estimates the HMM candidates.
+
+Options through ``dynamics_kwargs``: ``candidates``, ``means``, ``pq``,
+``states``, ``alpha``, ``lags``, ``gof``, ``B``, ``seed``, ``verbose``. To
+force a model per asset give a dict:
+``dynamics={'SPY': 'ar1-gjr(1,1)', 'TLT': 'hmm(2)', 'GLD': 'const-garch(1,1)'}``.
+Cost: about 28 fits per asset (seconds each) and one bootstrap of ``B``
+refits per asset. The pieces are available on their own:
+:func:`~cvinemarketgen.selection.select_dynamics`,
+:func:`~cvinemarketgen.selection.iid_tests`,
+:func:`~cvinemarketgen.selection.gof_bootstrap`,
+:class:`~cvinemarketgen.hmm.GaussianHMM` (with ``regimes``, ``uniforms``,
+``filter``, ``unfilter``).
+
+Assets on factors
+-----------------
+
+.. code-block:: python
+
+   fm = FactorModel(asset_returns, factor_returns).fit()
+   fm.report                                   # alpha, betas, t-statistics, R2, residual vol
+   F = CVineMarket(Targets.from_history(factor_returns), families='auto').fit().simulate(25000, seed=1)
+   X = fm.simulate(F)                          # asset scenarios: alpha + beta' f + Johnson SU residual
+   X0 = fm.simulate(F, residuals=False)        # factor exposure only
+   fm.implied_mean(view_on_factor_means)       # expected asset returns under a view on the factors
+
+A ``Paths`` object of factor paths gives a ``Paths`` of asset paths. Residuals
+are independent across assets and of the factors; drop them to study the
+factor exposure alone. ``load_etf_monthly`` fetches monthly ETF returns to
+regress on the seven factors of ``load_factor_data``.
 
 Save and load
 -------------

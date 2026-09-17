@@ -81,6 +81,23 @@ The pipeline
      - The four steps in sequence.
      - :meth:`~cvinemarketgen.cvine.CVineGenerator.run_complete_simulation`
 
+Beyond the chapter (version 0.3)
+--------------------------------
+
+Two steps added for daily data and for factor-based use; they sit on top of
+the pipeline and leave it unchanged.
+
+* Daily dynamics: :func:`~cvinemarketgen.selection.select_dynamics` chooses a
+  model per asset among the GARCH family and a Gaussian hidden Markov model,
+  by i.i.d. tests on the residual layer, BIC among the candidates that pass,
+  and a parametric-bootstrap Cramér-von Mises test of the selected model;
+  :class:`~cvinemarketgen.hmm.GaussianHMM` is estimated by GenHMM1d and uses the
+  Rosenblatt uniforms of the predictive mixture as its residual layer, and their
+  exact inverse for paths.
+* Assets on factors: :class:`~cvinemarketgen.factors.FactorModel` regresses
+  assets on simulated factors, with Newey-West t-statistics and a Johnson SU
+  residual per asset.
+
 Family selection in short
 -------------------------
 
