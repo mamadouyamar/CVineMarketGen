@@ -81,12 +81,13 @@ class GaussianHMM:
         if init is None:
             kw['percentiles'] = list(np.round(np.linspace(0, 100, self.K + 1)[1:-1], 6))
         else:
-            kw['initial_theta'], kw['initial_Q'] = np.asarray(init[0], float), np.asarray(init[1], float)
+            # copies: GenHMM1d's EM updates the arrays it is started from in place
+            kw['initial_theta'], kw['initial_Q'] = np.array(init[0], float, copy=True), np.array(init[1], float, copy=True)
         with contextlib.redirect_stdout(io.StringIO()):
             out = _genhmm1d().EstHMMGen(y=v, reg=self.K, family='norm', max_iter=self.max_iter,
                                         ninit=self.ninit, eps=self.eps, **kw)
         theta = np.asarray(out['theta'], float)
-        self.mu, self.sigma, self.Q = theta[:, 0].copy(), theta[:, 1].copy(), np.asarray(out['Q'], float)
+        self.mu, self.sigma, self.Q = theta[:, 0].copy(), theta[:, 1].copy(), np.array(out['Q'], float, copy=True)
         eta = np.asarray(out['eta_EM'], float)
         self._eta = pd.DataFrame(eta, index=s.index, columns=[f'state {k + 1}' for k in range(self.K)])
         self.eta_T = eta[-1].copy()
@@ -100,7 +101,7 @@ class GaussianHMM:
 
     def refit(self, y):
         """Fit a fresh copy on ``y`` starting from this model's parameters (bootstrap refit)."""
-        return self.clone().fit(y, init=(np.column_stack([self.mu, self.sigma]), self.Q))
+        return self.clone().fit(y, init=(np.column_stack([self.mu, self.sigma]), self.Q.copy()))
 
     # ---- residual layer ------------------------------------------------------
     def uniforms(self):
