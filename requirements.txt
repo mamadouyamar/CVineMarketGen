@@ -1,0 +1,13 @@
+# Runtime dependencies of CVineMarketGen (the authoritative list is pyproject.toml;
+# `pip install -e .` reads it). This file is for running the notebooks from a clone:
+#     pip install -r requirements.txt
+# Tested with numpy 1.24 / 2.4, scipy 1.10 / 1.17, pandas 1.4 / 3.0,
+# pyvinecopulib 0.6.1 / 0.7.6, arch 5.1 / 8.0 (Python 3.8 to 3.12).
+numpy
+scipy
+pandas
+matplotlib
+requests
+pyvinecopulib>=0.6
+GenHMM1d @ git+https://github.com/mamadouyamar/GenHMM1d.git
+arch            # GARCH-family dynamics (optional for the rest of the package)
