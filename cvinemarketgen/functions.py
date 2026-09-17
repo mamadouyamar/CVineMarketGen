@@ -7,7 +7,9 @@ and :class:`~cvinemarketgen.copulas.CopulaTools`.
 """
 import numpy as np
 import pandas as pd
-from scipy.optimize import fsolve
+import warnings
+
+from scipy.optimize import fsolve, minimize
 
 from .moment_match import MomentMatch
 from .copulas import CopulaTools
@@ -21,6 +23,9 @@ _mm = _Tools()
 _ct = _mm
 
 
+_JSU_STARTS = ([0, 1, 1.5, 1], [-0.5, -0.5, 1.2, 0.8], [0.5, 0.5, 1.2, 0.8], [0, 1, 3, 3], [-2, -2, 2, 1.5], [0, 0, 0.8, 0.5])
+
+
 def fit_johnson_su(skew, kurt, mean=0.0, vol=1.0):
     """
     Johnson SU parameters matching a skewness and a raw kurtosis (normal = 3).
@@ -29,10 +34,24 @@ def fit_johnson_su(skew, kurt, mean=0.0, vol=1.0):
     variable, the ``mean`` and ``vol`` to apply afterwards, and ``residual``,
     the norm of the moment mismatch. Use :func:`johnson_su_sample` to draw.
     """
-    p, res = _mm.find_params_for_moments_matching_JSU([0.0, 1.0, float(skew), float(kurt) - 3.0],
-                                                      x0=[0, 1, 1.5, 1], method='Nelder-Mead')
+    target = [0.0, 1.0, float(skew), float(kurt) - 3.0]
+    best = None
+    for x0 in _JSU_STARTS:
+        res = minimize(_mm.univariate_moments_matching_func_JSU, x0, args=([target],), method='Nelder-Mead',
+                       tol=1e-10, options={'maxfev': 20000, 'xatol': 1e-10, 'fatol': 1e-14})
+        with np.errstate(all='ignore'):
+            mism = float(np.linalg.norm(np.asarray(_mm.moments_JSU(res.x), float) - target))
+        if np.isfinite(mism) and res.x[2] > 0 and res.x[3] > 1e-6 and (best is None or mism < best[0]):
+            best = (mism, res.x)
+        if best is not None and best[0] < 1e-12:
+            break
+    if best is None:
+        raise RuntimeError(f'Johnson SU moment fit failed for skew {skew:.3f}, kurt {kurt:.3f}')
+    if best[0] > 1e-6:
+        warnings.warn(f'Johnson SU moment fit: mismatch {best[0]:.2e} for skew {skew:.3f}, kurt {kurt:.3f}')
+    mism, p = best
     return {'gamma': float(p[0]), 'xi': float(p[1]), 'delta': float(p[2]), 'lambda': float(p[3]),
-            'mean': float(mean), 'vol': float(vol), 'residual': float(res.fun)}
+            'mean': float(mean), 'vol': float(vol), 'residual': float(mism)}
 
 
 def johnson_su_moments(params):

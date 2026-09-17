@@ -12,6 +12,7 @@ excess returns in decimal:
   Real premia  long TIPS / short cash                            FRED DFII10 (10y TIPS real yield): carry - D * change
   Credit       long Baa corporates / short Treasuries            FRED BAA10Y (Moody's Baa minus 10y Treasury): carry - D * change
   Commodity    broad commodity futures ETF minus cash            Yahoo Finance DBC adjusted close minus Fama-French RF
+  Small cap    U.S. small minus big (SMB)                        Fama-French, F-F_Research_Data_Factors, SMB
 
 The three yield-based factors are duration-scaled proxies of the excess return
 of the corresponding long/short position (carry from the level, price return
@@ -34,7 +35,7 @@ import requests
 
 UA = {'User-Agent': 'CVineMarketGen/0.1 (research; contact mamadou-yamar.thioub@hec.ca)'}
 DURATIONS = {'Inflation': 8.0, 'Real premia': 8.0, 'Credit': 10.0}
-FACTORS = ['Equity DM', 'Equity EM', 'Real premia', 'Inflation', 'Credit', 'Commodity']
+FACTORS = ['Equity DM', 'Equity EM', 'Real premia', 'Inflation', 'Credit', 'Commodity', 'Small cap']
 
 
 # ----------------------------------------------------------------------------
@@ -98,29 +99,14 @@ def _yield_factor(daily_pct, duration, sign):
     return (m.shift(1) / 12.0 + sign * duration * m.diff()).dropna()
 
 
-def load_factor_data(start='2006-03', end=None, cache='data/factors_cache.csv',
-                     durations=None, refresh=False, verbose=True):
-    """
-    Monthly excess returns (decimal) of the six market factors, PeriodIndex('M'),
-    columns in the order of FACTORS. Downloaded from Fama-French, FRED and Yahoo
-    Finance, then cached to `cache` (set refresh=True to download again).
-    """
-    if cache and os.path.exists(cache) and not refresh:
-        df = pd.read_csv(cache, index_col=0)
-        df.index = pd.PeriodIndex(df.index, freq='M')
-        if verbose:
-            print(f'factor data read from cache {cache}: {df.shape[0]} months, {df.index.min()} to {df.index.max()}')
-        return df.loc[start:end] if end else df.loc[start:]
-
-    D = dict(DURATIONS)
-    if durations:
-        D.update(durations)
-
+def _download_factors(start, end, cache, D, verbose):
     dm = fama_french_monthly('Developed_3_Factors')
     em = fama_french_monthly('Emerging_5_Factors')
+    us = fama_french_monthly('F-F_Research_Data_Factors')
     rf = dm['RF'] / 100.0
     equity_dm = dm['Mkt-RF'] / 100.0
     equity_em = (em['Mkt-RF'] - dm['Mkt-RF']) / 100.0
+    small_cap = us['SMB'] / 100.0
 
     breakeven = fred_series('T10YIE', start='2003-01-01')
     real_yield = fred_series('DFII10', start='2003-01-01')
@@ -133,7 +119,7 @@ def load_factor_data(start='2006-03', end=None, cache='data/factors_cache.csv',
     commodity = (dbc.pct_change() - rf).dropna()
 
     df = pd.concat({'Equity DM': equity_dm, 'Equity EM': equity_em, 'Real premia': real_premia,
-                    'Inflation': inflation, 'Credit': credit, 'Commodity': commodity}, axis=1)
+                    'Inflation': inflation, 'Credit': credit, 'Commodity': commodity, 'Small cap': small_cap}, axis=1)
     df = df[FACTORS].dropna()
     df = df.loc[start:end] if end else df.loc[start:]
     df.index.name = 'month'
@@ -144,6 +130,30 @@ def load_factor_data(start='2006-03', end=None, cache='data/factors_cache.csv',
         print(f'factor data downloaded: {df.shape[0]} months, {df.index.min()} to {df.index.max()}'
               + (f', cached to {cache}' if cache else ''))
     return df
+
+
+def load_factor_data(start='2006-03', end=None, cache='data/factors_cache.csv',
+                     durations=None, refresh=False, verbose=True):
+    """
+    Monthly excess returns (decimal) of the seven market factors, PeriodIndex('M'),
+    columns in the order of FACTORS. Downloaded from Fama-French, FRED and Yahoo
+    Finance, then cached to `cache` (set refresh=True to download again; a cache
+    from an earlier version without the small-cap column is refreshed automatically).
+    """
+    if cache and os.path.exists(cache) and not refresh:
+        df = pd.read_csv(cache, index_col=0)
+        df.index = pd.PeriodIndex(df.index, freq='M')
+        if set(FACTORS) <= set(df.columns):
+            if verbose:
+                print(f'factor data read from cache {cache}: {df.shape[0]} months, {df.index.min()} to {df.index.max()}')
+            df = df[FACTORS]
+            return df.loc[start:end] if end else df.loc[start:]
+        if verbose:
+            print(f'cache {cache} lacks some factors, downloading again')
+    D = dict(DURATIONS)
+    if durations:
+        D.update(durations)
+    return _download_factors(start, end, cache, D, verbose)
 
 
 def factor_targets(returns):
@@ -202,5 +212,33 @@ def load_daily_returns(tickers, start='2010-01-01', cache='data/daily_cache.csv'
         df.to_csv(cache)
     if verbose:
         print(f'daily returns downloaded: {df.shape[0]} days, {df.index.min().date()} to {df.index.max().date()}'
+              + (f', cached to {cache}' if cache else ''))
+    return df
+
+
+def load_etf_monthly(tickers, start='2006-03', end=None, cache='data/etf_cache.csv', refresh=False, verbose=True):
+    """
+    Monthly simple returns (decimal) of Yahoo Finance tickers from adjusted
+    closes, PeriodIndex('M'), aligned on common months, cached as a CSV.
+    """
+    tickers = list(tickers)
+    if cache and os.path.exists(cache) and not refresh:
+        df = pd.read_csv(cache, index_col=0)
+        df.index = pd.PeriodIndex(df.index, freq='M')
+        if set(tickers) <= set(df.columns):
+            df = df.loc[start:end, tickers] if end else df.loc[start:, tickers]
+            df = df.dropna()
+            if verbose:
+                print(f'ETF returns read from cache {cache}: {df.shape[0]} months, {df.index.min()} to {df.index.max()}')
+            return df
+    prices = pd.concat([yahoo_monthly_adjclose(t) for t in tickers], axis=1).dropna()
+    df = prices.pct_change().dropna()
+    df = df.loc[start:end] if end else df.loc[start:]
+    df.index.name = 'month'
+    if cache:
+        os.makedirs(os.path.dirname(cache) or '.', exist_ok=True)
+        df.to_csv(cache)
+    if verbose:
+        print(f'ETF returns downloaded: {df.shape[0]} months, {df.index.min()} to {df.index.max()}'
               + (f', cached to {cache}' if cache else ''))
     return df

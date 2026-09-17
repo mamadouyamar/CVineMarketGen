@@ -11,6 +11,7 @@ Both take a :class:`~cvinemarketgen.targets.Targets`, expose ``fit``,
 import contextlib
 import io
 import json
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -19,7 +20,24 @@ import pyvinecopulib as pv
 from .targets import Targets
 from .cvine import CVineGenerator
 from .fleishman import FleishmanGenerator
-from .dynamics import make_dynamics, AR1, AR1GARCH
+from .dynamics import make_dynamics, dynamics_from_dict, AR1, AR1GARCH, AssetDynamics
+
+
+def _floor_residual_kurtosis(ft):
+    """
+    The Johnson SU marginal cannot be lighter-tailed than the normal: a residual
+    layer with kurtosis at or below 3 (near-normal residuals, e.g. of an HMM)
+    would leave the marginal fit with a mismatch and the acceptance loop of
+    ``simulate`` without an acceptable draw. Floor it at ``3.1 + 2 skew^2``,
+    just above the family's boundary, with a warning.
+    """
+    floor = 3.1 + 2.0 * ft.skew ** 2
+    low = ft.kurt < floor
+    if low.any():
+        warnings.warn(f'residual kurtosis below the Johnson SU range for {list(ft.kurt.index[low])} '
+                      f'(near-normal residuals): floored at 3.1 + 2 skew^2 for the marginal fit')
+        ft.kurt = ft.kurt.where(~low, floor)
+    return ft
 from .paths import Paths
 from .functions import exceedance_curve
 
@@ -97,11 +115,12 @@ class Diagnostics:
 class _Market:
     """Shared behaviour of the two generators."""
 
-    def __init__(self, targets, dynamics=None):
+    def __init__(self, targets, dynamics=None, dynamics_kwargs=None):
         if not isinstance(targets, Targets):
             raise TypeError('targets must be a Targets object')
         self.targets = targets
         self.dynamics = make_dynamics(dynamics)
+        self.dynamics_kwargs = dict(dynamics_kwargs or {})
         self.fit_targets = None     # targets of the layer the generator is fitted on
         self.fitted = False
 
@@ -113,15 +132,28 @@ class _Market:
             return
         if t.history is None:
             raise ValueError('dynamics need a history in the targets')
-        self.dynamics.fit(t.history)
-        if isinstance(self.dynamics, AR1) and t.higher_moments_source != 'history':
-            self.fit_targets = self.dynamics.transfer_targets(t)      # LTCMA targets, Appendix A transfer
-        elif isinstance(self.dynamics, AR1GARCH) and t.higher_moments_source != 'history':
-            raise ValueError("dynamics='ar1-garch' is supported with history-based targets (Targets.from_history)")
+        hist = t.history.loc[:, t.assets]
+        if isinstance(self.dynamics, AR1):
+            self.dynamics.fit(hist)
+            if t.higher_moments_source != 'history':
+                self.fit_targets = _floor_residual_kurtosis(self.dynamics.transfer_targets(t))   # LTCMA targets, Appendix A transfer
+                return
         else:
-            ft = Targets.from_history(self.dynamics.filter(t.history), assets=t.assets)
-            ft.layer = 'residuals'; ft.freq = t.freq
-            self.fit_targets = ft
+            if t.higher_moments_source != 'history':
+                raise ValueError('these dynamics are supported with history-based targets (Targets.from_history)')
+            if self.dynamics == 'auto':
+                from .selection import select_dynamics
+                self.dynamics = select_dynamics(hist, **self.dynamics_kwargs)
+            else:
+                self.dynamics.fit(hist)
+        ft = _floor_residual_kurtosis(Targets.from_history(self.dynamics.filter(hist), assets=t.assets))
+        ft.layer = 'residuals'; ft.freq = t.freq
+        self.fit_targets = ft
+
+    @property
+    def dynamics_report(self):
+        """Selection table of the per-asset dynamics (``AssetDynamics.report``), or None."""
+        return getattr(self.dynamics, 'report', None)
 
     # ---- public -------------------------------------------------------------
     @property
@@ -208,8 +240,12 @@ class FleishmanMarket(_Market):
     Parameters
     ----------
     targets : Targets
-    dynamics : None, 'ar1' or 'ar1-garch'
-        Optional serial dependence for :meth:`simulate_paths`.
+    dynamics : None, 'ar1', 'ar1-garch', 'auto', dict or AssetDynamics
+        Optional serial dependence for :meth:`simulate_paths`. ``'auto'`` selects a
+        model per asset with :func:`~cvinemarketgen.selection.select_dynamics`; a
+        dict gives one spec per asset (``'ar1-garch(1,1)'``, ``'const-gjr'``, ``'hmm(2)'``).
+    dynamics_kwargs : dict, optional
+        Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``gof``, ``B``).
 
     Attributes
     ----------
@@ -221,8 +257,8 @@ class FleishmanMarket(_Market):
         Pairs whose Vale-Maurelli equation has no real root in [-1, 1].
     """
 
-    def __init__(self, targets, dynamics=None):
-        super().__init__(targets, dynamics)
+    def __init__(self, targets, dynamics=None, dynamics_kwargs=None):
+        super().__init__(targets, dynamics, dynamics_kwargs)
         self.engine = FleishmanGenerator()
 
     def fit(self):
@@ -253,7 +289,7 @@ class FleishmanMarket(_Market):
             d = json.load(f)
         m = cls(Targets.from_dict(d['targets']))
         if d['dynamics'] is not None:
-            m.dynamics = (AR1 if d['dynamics']['name'] == 'ar1' else AR1GARCH).from_dict(d['dynamics'])
+            m.dynamics = dynamics_from_dict(d['dynamics'])
         m.fit_targets = m.targets if m.dynamics is None else None
         if m.dynamics is not None:
             raise NotImplementedError('loading a FleishmanMarket with dynamics: refit from the history instead')
@@ -290,8 +326,14 @@ class CVineMarket(_Market):
     tol_func : float, default 1e-6
         Objective value below which the calibration of a variable is accepted
         without trying fallback families (paper: 5e-8).
-    dynamics : None, 'ar1' or 'ar1-garch'
+    dynamics : None, 'ar1', 'ar1-garch', 'auto', dict or AssetDynamics
         Serial dependence for :meth:`simulate_paths`, fitted on the history.
+        ``'auto'`` selects a model per asset (GARCH family or Gaussian HMM) with
+        :func:`~cvinemarketgen.selection.select_dynamics`; a dict gives one spec
+        per asset (``'ar1-garch(1,1)'``, ``'const-gjr'``, ``'hmm(2)'``); read
+        ``dynamics_report`` after ``fit``.
+    dynamics_kwargs : dict, optional
+        Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``gof``, ``B``).
 
     Notes
     -----
@@ -302,8 +344,8 @@ class CVineMarket(_Market):
     """
 
     def __init__(self, targets, central=None, families='auto', mixtures=True, mixtures_deeper_trees=False,
-                 n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None):
-        super().__init__(targets, dynamics)
+                 n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None, dynamics_kwargs=None):
+        super().__init__(targets, dynamics, dynamics_kwargs)
         self.central = central or targets.assets[0]
         if self.central not in targets.assets:
             raise ValueError(f'central asset {self.central!r} not in targets')
@@ -466,7 +508,7 @@ class CVineMarket(_Market):
         m.fit_targets = _reorder(Targets.from_dict(d['fit_targets']), d['order'])
         m.order = d['order']
         if d['dynamics'] is not None:
-            m.dynamics = (AR1 if d['dynamics']['name'] == 'ar1' else AR1GARCH).from_dict(d['dynamics'])
+            m.dynamics = dynamics_from_dict(d['dynamics'])
         edges = {}
         for e in d['edges']:
             if e['status'] == 'ordinary':
