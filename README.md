@@ -185,13 +185,14 @@ always resolves to the latest version. `CITATION.cff` holds the metadata; GitHub
 
 ## Contributing
 
-Please report bugs to mamadou.yamar.thioub@hec.ca with:
+Please report bugs to mamadou.yamar.thioub@gmail.com and mamadou-yamar.thioub@hec.ca with:
 * a clear and descriptive title;
 * the exact steps necessary to reproduce the problem;
 * your environment (`pip freeze` output, Python version);
 * a minimal code example.
+* Thank you in advance !
 
 ## Contact
 
-Mamadou Yamar Thioub — [@MamadouYamar](https://twitter.com/MamadouYamar) —
-mamadou-yamar.thioub@hec.ca
+Mamadou Yamar Thioub — [@MamadouYamar](https://www.linkedin.com/in/mamadou-yamar-thioub-98aba151/) —
+mamadou.yamar.thioub@gmail.com and mamadou-yamar.thioub@hec.ca
