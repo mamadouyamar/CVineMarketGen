@@ -162,11 +162,11 @@ page maps each algorithm to a function.
 
 ```
 Thioub, M. Y. (2026). CVineMarketGen: C-vine copula financial market generator with
-moment and tail dependence targeting (Version 0.2.0) [Computer software]. Zenodo.
-https://doi.org/10.5281/zenodo.22740672
+moment and tail dependence targeting (Version 0.3.0) [Computer software]. Zenodo.
+https://doi.org/10.5281/zenodo.22804158
 ```
 
-The DOI `10.5281/zenodo.22740672` identifies version 0.2.0; `10.5281/zenodo.22740671`
+The DOI `10.5281/zenodo.22804158` identifies version 0.3.0; `10.5281/zenodo.22740671`
 always resolves to the latest version. `CITATION.cff` holds the metadata; GitHub's
 "Cite this repository" button formats it.
 
