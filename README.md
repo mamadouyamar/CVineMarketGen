@@ -194,5 +194,5 @@ Please report bugs to mamadou.yamar.thioub@gmail.com and mamadou-yamar.thioub@he
 
 ## Contact
 
-Mamadou Yamar Thioub — [@MamadouYamar](https://twitter.com/MamadouYamar) —
+Mamadou Yamar Thioub — [@MamadouYamar](https://www.linkedin.com/in/mamadou-yamar-thioub-98aba151/) —
 mamadou.yamar.thioub@gmail.com and mamadou-yamar.thioub@hec.ca
