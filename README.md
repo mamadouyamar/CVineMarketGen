@@ -185,7 +185,7 @@ always resolves to the latest version. `CITATION.cff` holds the metadata; GitHub
 
 ## Contributing
 
-Please report bugs to mamadou.yamar.thioub@gmail.com and mamadou.yamar.thioub@hec.ca with:
+Please report bugs to mamadou.yamar.thioub@gmail.com and mamadou-yamar.thioub@hec.ca with:
 * a clear and descriptive title;
 * the exact steps necessary to reproduce the problem;
 * your environment (`pip freeze` output, Python version);
