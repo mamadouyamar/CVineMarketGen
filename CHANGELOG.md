@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 (unreleased)
+## 0.3.0 (2026-09-17)
 
 Per-asset dynamics chosen from the data, and assets mapped on simulated factors.
 
