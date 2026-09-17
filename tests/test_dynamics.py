@@ -120,3 +120,12 @@ def test_hmm_fits_heavy_tailed_data_with_three_states():
     m = GaussianHMM(3).fit(y)
     assert np.isfinite(m.loglik) and m.regimes.shape == (3000, 3) and np.isfinite(m.filter().values).all()
     assert np.allclose(m.Q.sum(1), 1.0) and (m.sigma > 0).all()
+
+
+def test_hmm_refit_leaves_the_parent_unchanged():
+    # GenHMM1d's EM writes into the starting matrix it is given: the warm start must be a copy
+    ref = _hmm_ref()
+    m = GaussianHMM(2).fit(pd.Series(ref['y']))
+    Q0, mu0, s0, eta0 = m.Q.copy(), m.mu.copy(), m.sigma.copy(), m.eta_T.copy()
+    m.refit(pd.Series(m.simulate(2000, seed=0)))
+    assert np.array_equal(m.Q, Q0) and np.array_equal(m.mu, mu0) and np.array_equal(m.sigma, s0) and np.array_equal(m.eta_T, eta0)
