@@ -14,7 +14,7 @@ from cvinemarketgen import (MomentMatch, CopulaTools, CVineGenerator, FleishmanG
 
 
 def test_version():
-    assert cvinemarketgen.__version__ == "0.2.0"
+    assert cvinemarketgen.__version__ == "0.3.0"
 
 
 def test_fleishman_coefficients_match_paper():
