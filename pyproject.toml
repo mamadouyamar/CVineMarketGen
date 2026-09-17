@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "CVineMarketGen"
-version = "0.2.0"
+version = "0.3.0"
 description = "C-vine copula financial market generator with moment and tail dependence targeting, and the Fleishman / Vale-Maurelli benchmark (thesis, article 3)."
 readme = "README.md"
 license = { file = "LICENSE.txt" }
@@ -24,6 +24,7 @@ dependencies = [
     "matplotlib",
     "requests",
     "pyvinecopulib>=0.6",
+    "GenHMM1d @ git+https://github.com/mamadouyamar/GenHMM1d.git",
 ]
 
 [project.optional-dependencies]

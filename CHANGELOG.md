@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.0 (unreleased)
+
+Per-asset dynamics chosen from the data, and assets mapped on simulated factors.
+
+- `dynamics='auto'`: for each asset, a constant or AR(1) mean with a constant,
+  GARCH, GJR or EGARCH variance (`GarchFamily`, orders up to 2) or a Gaussian
+  hidden Markov model with 2 or 3 regimes (`GaussianHMM`, estimated by
+  GenHMM1d, now a dependency); i.i.d. tests on the residual layer (Ljung-Box, Ljung-Box on the
+  squares, ARCH-LM), BIC among the candidates that pass, parametric-bootstrap
+  Cramér-von Mises goodness-of-fit test of the winner (`select_dynamics`,
+  `iid_tests`, `gof_bootstrap`); `cv.dynamics_report` and `cv.dynamics.candidates`.
+- A dict of specs per asset (`dynamics={'SPY': 'ar1-gjr(1,1)', 'TLT': 'hmm(2)'}`),
+  `AssetDynamics`, JSON round trip of every model.
+- `FactorModel`: assets regressed on factors (Newey-West t-statistics, R2),
+  `simulate` from factor scenarios or paths with or without a Johnson SU
+  residual, `implied_mean` for a view on the factors, save/load.
+- Seventh factor, the small-cap premium (SMB); `load_etf_monthly`.
+- GARCH-family log-likelihoods and BICs reported on the data's scale (arch fits
+  returns times 100), so that they are comparable with the HMM's.
+- Fixes: the Johnson SU moment fit is multi-start with a moment check (a
+  heavy-tailed residual could end degenerate); the residual-layer kurtosis is
+  floored just above the Johnson SU boundary (near-normal residuals left
+  `simulate` without an acceptable draw).
+- Notebooks 08 (assets on macro factors) and 09 (HMM dynamics); 07 now selects
+  the dynamics; 06 with seven factors.
+
 ## 0.2.0 (2026-09-13)
 
 User-facing layer for practitioners, on top of the unchanged engine.
