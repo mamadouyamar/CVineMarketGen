@@ -10,3 +10,5 @@ examples/data/
 docs/_build/
 docs/examples/
 data/daily_cache.csv
+data/etf_cache.csv
+examples/*.json
