@@ -43,11 +43,11 @@ class Paths:
                             columns=[f'path {i}' for i in range(self.n_paths)])
 
     def cumulative(self):
-        """Paths of cumulative returns ``prod(1 + r) - 1`` along the horizon."""
+        """Paths of cumulative returns ``prod(1 + r) - 1`` along the horizon (meaningful for return columns only)."""
         return Paths(np.cumprod(1.0 + self.array, axis=1) - 1.0, self.assets, layer='cumulative returns')
 
     def terminal(self):
-        """DataFrame ``n_paths x N`` of cumulative returns at the end of the horizon."""
+        """DataFrame ``n_paths x N`` of cumulative returns at the end of the horizon (meaningful for return columns only)."""
         return pd.DataFrame(np.prod(1.0 + self.array, axis=1) - 1.0, columns=self.assets)
 
     def summary(self):

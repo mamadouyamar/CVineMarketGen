@@ -242,3 +242,34 @@ def load_etf_monthly(tickers, start='2006-03', end=None, cache='data/etf_cache.c
         print(f'ETF returns downloaded: {df.shape[0]} months, {df.index.min()} to {df.index.max()}'
               + (f', cached to {cache}' if cache else ''))
     return df
+
+
+def load_fred_monthly(series_ids, start='2003-01', end=None, cache='data/fred_cache.csv', refresh=False, verbose=True):
+    """
+    Monthly means of daily FRED series (yields, breakevens, spreads), one column
+    per series id, ``PeriodIndex('M')``, rows where every series has a value;
+    cached locally as a CSV (git-ignored). Units are FRED's (percent for yields).
+    """
+    ids = list(series_ids)
+    if cache and os.path.exists(cache) and not refresh:
+        df = pd.read_csv(cache, index_col=0)
+        df.index = pd.PeriodIndex(df.index, freq='M')
+        if set(ids) <= set(df.columns):
+            df = (df.loc[start:end, ids] if end else df.loc[start:, ids]).dropna()
+            if verbose:
+                print(f'FRED series read from cache {cache}: {df.shape[0]} months, {df.index.min()} to {df.index.max()}')
+            return df
+    parts = []
+    for sid in ids:
+        s = fred_series(sid, start=str(pd.Period(start, 'M').start_time.date()))
+        parts.append(s.groupby(s.index.to_period('M')).mean().rename(sid))
+    df = pd.concat(parts, axis=1).dropna()
+    df = df.loc[start:end] if end else df.loc[start:]
+    df.index.name = 'month'
+    if cache:
+        os.makedirs(os.path.dirname(cache) or '.', exist_ok=True)
+        df.to_csv(cache)
+    if verbose:
+        print(f'FRED series downloaded: {df.shape[0]} months, {df.index.min()} to {df.index.max()}'
+              + (f', cached to {cache}' if cache else ''))
+    return df
