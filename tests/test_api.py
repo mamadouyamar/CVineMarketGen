@@ -180,3 +180,19 @@ def test_residual_layer_kurtosis_floor_keeps_marginals_feasible():
     assert (cv.fit_targets.kurt >= 3.1 - 1e-9).all() and (cv.marginals['fit residual'] < 1e-6).all()
     X = cv.simulate(3000, seed=0)            # accept=True must terminate
     assert np.isfinite(X.values).all()
+
+
+def test_cvine_market_with_a_block(tmp_path):
+    pytest.importorskip('statsmodels')
+    from tests.test_blocks import _cointegrated
+    X = _cointegrated(n=600)
+    X['d'] = 0.0002 + 0.01 * np.random.default_rng(4).standard_normal(len(X))
+    t = Targets.from_history(X)
+    cv = CVineMarket(t, families='gaussian', n_opt=2000, dynamics={('a', 'b', 'c'): 'vecm(r=1,q=1)', 'd': 'ar1'}).fit()
+    assert cv.fit_targets.layer == 'residuals' and list(cv.dynamics_report['model'])[:3] == ['VECM(r=1, q=1)'] * 3
+    P = cv.simulate_paths(10, 12, seed=0)
+    assert P.array.shape == (10, 12, 4) and np.isfinite(P.array).all()
+    assert abs(P.array[:, 0, 0].mean() - X['a'].iloc[-1]) < 1.0         # levels continue from the last observation
+    p = tmp_path / 'block.json'; cv.save(str(p))
+    cv2 = CVineMarket.load(str(p))
+    assert np.allclose(cv2.simulate_paths(2, 4, seed=1).array, cv.simulate_paths(2, 4, seed=1).array)

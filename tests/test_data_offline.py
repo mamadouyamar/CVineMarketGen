@@ -1,4 +1,5 @@
 """Offline checks of the data module: constants and cache handling, no download."""
+import numpy as np
 import pandas as pd
 from cvinemarketgen import data
 
@@ -27,3 +28,18 @@ def test_load_etf_monthly_from_cache(tmp_path):
     pd.DataFrame({'SPY': [0.01, -0.02, 0.03], 'TLT': [0.0, 0.01, -0.01]}, index=idx).to_csv(tmp_path / 'etf.csv')
     df = data.load_etf_monthly(['TLT', 'SPY'], cache=str(tmp_path / 'etf.csv'), verbose=False)
     assert list(df.columns) == ['TLT', 'SPY'] and isinstance(df.index, pd.PeriodIndex) and df.shape == (3, 2)
+
+
+def test_load_fred_monthly_offline(monkeypatch, tmp_path):
+    import cvinemarketgen.data as data
+    idx = pd.date_range('2020-01-01', '2020-03-31', freq='B')
+    fake = {'DGS2': pd.Series(np.linspace(1.0, 2.0, len(idx)), index=idx, name='DGS2'),
+            'DGS10': pd.Series(np.linspace(2.0, 3.0, len(idx)), index=idx, name='DGS10')}
+    monkeypatch.setattr(data, 'fred_series', lambda sid, start='1986-01-01', timeout=60: fake[sid].loc[start:])
+    cache = tmp_path / 'fred.csv'
+    df = data.load_fred_monthly(['DGS2', 'DGS10'], start='2020-01', cache=str(cache), verbose=False)
+    assert list(df.columns) == ['DGS2', 'DGS10'] and df.index.freqstr == 'M' and len(df) == 3
+    assert abs(df.loc['2020-02', 'DGS2'] - fake['DGS2'].loc['2020-02'].mean()) < 1e-12
+    monkeypatch.setattr(data, 'fred_series', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('network')))
+    df2 = data.load_fred_monthly(['DGS2'], start='2020-01', cache=str(cache), verbose=False)   # served from the cache
+    assert df2.shape == (3, 1)
