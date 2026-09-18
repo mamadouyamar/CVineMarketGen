@@ -97,6 +97,10 @@ the pipeline and leave it unchanged.
 * Assets on factors: :class:`~cvinemarketgen.factors.FactorModel` regresses
   assets on simulated factors, with Newey-West t-statistics and a Johnson SU
   residual per asset.
+* Block filters: :class:`~cvinemarketgen.blocks.BlockVECM` and
+  :class:`~cvinemarketgen.blocks.BlockVAR` filter a block of variables jointly;
+  their standardized innovations are the block's residual layer and paths come
+  back in levels.
 
 Family selection in short
 -------------------------
