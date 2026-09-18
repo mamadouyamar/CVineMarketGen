@@ -43,6 +43,12 @@ Selection of the dynamics
 .. automodule:: cvinemarketgen.selection
    :members: ljung_box, arch_lm, iid_tests, cvm_statistic, gof_bootstrap, candidate_models, select_dynamics
 
+Blocks
+------
+
+.. automodule:: cvinemarketgen.blocks
+   :members: BlockVECM, BlockVAR
+
 Factors
 -------
 

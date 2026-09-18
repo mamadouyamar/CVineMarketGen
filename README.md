@@ -93,6 +93,13 @@ parametric-bootstrap Cramér-von Mises test. `dynamics='ar1-garch'` keeps the
 fixed AR(1)-GARCH(1,1) of version 0.2; a dict fixes the model per asset,
 `dynamics={'SPY': 'ar1-gjr(1,1)', 'TLT': 'hmm(2)'}`.
 
+Variables in levels that share long-run relations go in one block:
+`dynamics={('DGS10', 'DFII10'): 'vecm', 'SPY': 'ar1-garch'}` fits a vector
+error-correction model on the block (needs `statsmodels`), feeds its
+standardized innovations to the vine, and simulates the block in levels from
+the last observed values; notebook 10 shows it on the nominal and real 10-year
+Treasury yields.
+
 ## Assets on factors
 
 ```python

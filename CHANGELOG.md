@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 (unreleased)
+
+- Block filters: `BlockVECM` (cointegration rank by the Johansen trace test, lags
+  by BIC) and `BlockVAR` filter a block of variables jointly; a tuple key in
+  `dynamics` declares the block, `dynamics={('DGS10', 'DFII10'): 'vecm', 'SPY': 'ar1-garch'}`;
+  the block's standardized innovations form its residual layer and its paths come
+  back in levels from the last observed rows. Optional dependency `statsmodels`
+  (`pip install cvinemarketgen[blocks]`).
+- `load_fred_monthly`: monthly means of daily FRED series.
+- Notebook 10, a VECM block on the nominal and real 10-year yields.
+
 ## 0.3.0 (2026-09-17)
 
 Per-asset dynamics chosen from the data, and assets mapped on simulated factors.

@@ -195,6 +195,27 @@ refits per asset. The pieces are available on their own:
 :class:`~cvinemarketgen.hmm.GaussianHMM` (with ``regimes``, ``uniforms``,
 ``filter``, ``unfilter``).
 
+Blocks of variables
+-------------------
+
+.. code-block:: python
+
+   yields = load_fred_monthly(['DGS10', 'DFII10'])
+   t = Targets.from_history(yields.join(spy_returns, how='inner'))
+   cv = CVineMarket(t, central='SPY', families='auto',
+                    dynamics={('DGS10', 'DFII10'): 'vecm', 'SPY': 'ar1-garch'}).fit()
+   P = cv.simulate_paths(1000, 24, seed=1)      # yields in levels, SPY in returns
+
+Variables observed in levels that share long-run relations (yields, breakevens,
+spreads) are filtered jointly: a tuple key gives the block, ``'vecm'`` fits a
+vector error-correction model (cointegration rank by the Johansen trace test,
+lags by BIC; ``'vecm(r=1,q=2)'`` fixes them) and ``'var'`` a vector
+autoregression. The block's residual layer is its standardized innovations, one
+per variable; their correlation is left to the vine, like everything else. Paths
+of the block's variables come back in levels, from the last observed rows,
+through the model's own recursion; ``Paths.cumulative`` and ``terminal`` apply to
+the return columns. Needs ``pip install statsmodels``.
+
 Assets on factors
 -----------------
 
