@@ -93,6 +93,13 @@ parametric-bootstrap Cramér-von Mises test. `dynamics='ar1-garch'` keeps the
 fixed AR(1)-GARCH(1,1) of version 0.2; a dict fixes the model per asset,
 `dynamics={'SPY': 'ar1-gjr(1,1)', 'TLT': 'hmm(2)'}`.
 
+Variables in levels that share long-run relations go in one block:
+`dynamics={('DGS10', 'DFII10'): 'vecm', 'SPY': 'ar1-garch'}` fits a vector
+error-correction model on the block (needs `statsmodels`), feeds its
+standardized innovations to the vine, and simulates the block in levels from
+the last observed values; notebook 10 shows it on the nominal and real 10-year
+Treasury yields.
+
 ## Assets on factors
 
 ```python
@@ -121,7 +128,7 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Nine tutorials in [`examples/`](examples/), each one small step at a time,
+Ten tutorials in [`examples/`](examples/), each one small step at a time,
 all executed, each with a Colab badge. Start with the first.
 
 | | Notebook | What it shows |
@@ -135,6 +142,7 @@ all executed, each with a Colab badge. Start with the first.
 | 07 | [`07_daily_paths_for_backtesting`](examples/07_daily_paths_for_backtesting.ipynb) | daily ETF returns, dynamics chosen per asset (GARCH family or HMM) by i.i.d. tests, BIC and a bootstrap test, 1,000 one-year paths |
 | 08 | [`08_assets_on_macro_factors`](examples/08_assets_on_macro_factors.ipynb) | ten ETFs regressed on the seven factors, a view on the factors turned into asset distributions and paths |
 | 09 | [`09_hmm_dynamics`](examples/09_hmm_dynamics.ipynb) | Gaussian HMM for one asset: regimes, the Rosenblatt residual layer, the bootstrap goodness-of-fit test, a simulated year |
+| 10 | [`10_block_filters_vecm`](examples/10_block_filters_vecm.ipynb) | a VECM on the nominal and real 10-year yields as one block of the residual layer, paths in levels, the breakeven kept anchored |
 
 ## Data
 
