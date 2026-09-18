@@ -62,3 +62,33 @@ def test_statsmodels_missing_message(monkeypatch):
     monkeypatch.setattr(b, '_sm', boom)
     with pytest.raises(ImportError, match='statsmodels'):
         BlockVAR(lags=1).fit(pd.DataFrame({'u': [0.0, 1.0, 0.5, 0.2], 'v': [0.0, 0.5, 0.1, 0.3]}))
+
+
+from cvinemarketgen.dynamics import AssetDynamics, parse_spec
+
+
+def test_parse_block_specs():
+    assert parse_spec('vecm').spec['rank'] == 'auto'
+    m = parse_spec('vecm(r=1,q=2)'); assert m.rank_spec == 1 and m.lags_spec == 2
+    assert parse_spec('var').spec['lags'] == 'auto' and parse_spec('var(q=3)').lags_spec == 3
+
+
+def test_container_with_a_block_and_a_univariate_model():
+    X = _cointegrated()
+    rng = np.random.default_rng(3)
+    X['d'] = 0.0002 + 0.01 * rng.standard_normal(len(X))
+    ad = AssetDynamics({('a', 'b', 'c'): 'vecm(r=1,q=1)', 'd': 'ar1'}).fit(X)
+    assert ad.blocks == [('a', 'b', 'c')]
+    Z = ad.filter(X)
+    assert list(Z.columns) == ['a', 'b', 'c', 'd'] and Z.shape[0] == len(X) - 2
+    assert list(ad.report.index) == ['a', 'b', 'c', 'd'] and ad.report.loc['a', 'model'] == ad.report.loc['c', 'model'] == 'VECM(r=1, q=1)'
+    Y = ad.unfilter(np.zeros((3, 6, 4)))
+    assert Y.shape == (3, 6, 4) and np.isfinite(Y).all()
+    ad2 = AssetDynamics.from_dict(ad.to_dict())
+    assert ad2.blocks == [('a', 'b', 'c')] and np.allclose(ad2.unfilter(np.zeros((1, 3, 4))), Y[:1, :3])
+    # the history's column order is respected even when the block is not contiguous
+    X2 = X[['d', 'a', 'b', 'c']]
+    ad3 = AssetDynamics({('a', 'b', 'c'): 'vecm(r=1,q=1)', 'd': 'ar1'}).fit(X2)
+    assert list(ad3.filter(X2).columns) == ['d', 'a', 'b', 'c']
+    Y3 = ad3.unfilter(np.zeros((1, 3, 4)))
+    assert np.allclose(Y3[0, :, 1:], Y[0, :3, :3]) and np.allclose(Y3[0, :, 0], Y[0, :3, 3])

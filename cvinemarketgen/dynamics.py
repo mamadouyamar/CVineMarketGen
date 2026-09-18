@@ -208,6 +208,19 @@ class AR1GARCH:
 
 _SPEC_RE = re.compile(r'^(const|ar1)(?:-(const|garch|gjr|egarch)(?:\((\d+),(\d+)\))?)?$')
 _HMM_RE = re.compile(r'^hmm(?:\((\d+)\))?$')
+_BLOCK_RE = re.compile(r'^(vecm|var)(?:\(([^)]*)\))?$')
+
+
+def _block_args(s):
+    """``'r=1,q=2'`` -> {'rank': 1, 'lags': 2}; ``'q=3'`` -> {'lags': 3}."""
+    out = {}
+    for part in (s or '').split(','):
+        part = part.strip()
+        if not part:
+            continue
+        k, v = part.split('=')
+        out[{'r': 'rank', 'q': 'lags'}[k.strip()]] = int(v)
+    return out
 
 
 def _arch():
@@ -388,6 +401,11 @@ def parse_spec(spec):
     if m:
         from .hmm import GaussianHMM
         return GaussianHMM(int(m.group(1) or 2))
+    m = _BLOCK_RE.match(s)
+    if m:
+        from .blocks import BlockVECM, BlockVAR
+        args = _block_args(m.group(2))
+        return BlockVECM(**args) if m.group(1) == 'vecm' else BlockVAR(**args)
     m = _SPEC_RE.match(s)
     if not m:
         raise ValueError(f'cannot parse dynamics spec {spec!r}')
@@ -396,67 +414,103 @@ def parse_spec(spec):
 
 
 def model_from_dict(d):
-    """Univariate model from its ``to_dict`` output."""
+    """Model from its ``to_dict`` output (univariate or block)."""
     if d['kind'] == 'garch':
         return GarchFamily.from_dict(d)
+    if d['kind'] in ('vecm', 'var'):
+        from .blocks import block_from_dict
+        return block_from_dict(d)
     from .hmm import GaussianHMM
     return GaussianHMM.from_dict(d)
 
 
+def _key(k):
+    return tuple(k) if isinstance(k, (tuple, list)) else k
+
+
 class AssetDynamics:
     """
-    Per-asset dynamics: one univariate model per asset (``{asset: spec or model}``),
-    sharing the market interface. ``report`` lists the fitted model, its number
-    of parameters, log-likelihood and BIC per asset; ``candidates`` holds the
-    selection table when the models were chosen by :func:`selection.select_dynamics`.
+    Per-asset dynamics: one model per asset or per block of assets
+    (``{asset: spec or model, (asset, asset, ...): 'vecm' | 'var'}``), sharing the
+    market interface. ``report`` lists the fitted model, its number of parameters,
+    log-likelihood and BIC per variable (the variables of a block share one row's
+    values); ``candidates`` holds the selection table when the univariate models
+    were chosen by :func:`selection.select_dynamics`; ``blocks`` lists the block keys.
     """
 
     name = 'assets'
 
     def __init__(self, models=None):
-        self.models = {a: parse_spec(m) for a, m in (models or {}).items()}
+        self.models = {_key(a): parse_spec(m) for a, m in (models or {}).items()}
+        self.columns = None
         self.report = None
         self.candidates = None
 
     def __repr__(self):
         return f'AssetDynamics({ {a: m.name for a, m in self.models.items()} })'
 
+    @property
+    def blocks(self):
+        return [k for k in self.models if isinstance(k, tuple)]
+
+    @staticmethod
+    def _vars(key):
+        return list(key) if isinstance(key, tuple) else [key]
+
     def fit(self, history):
         h = pd.DataFrame(history).astype(float)
-        for a in h.columns:
-            if a not in self.models:
-                raise ValueError(f'no dynamics model given for {a!r}')
-            self.models[a].fit(h[a])
-        self.models = {a: self.models[a] for a in h.columns}      # history order
+        covered = [c for k in self.models for c in self._vars(k)]
+        missing = [c for c in h.columns if c not in covered]
+        if missing:
+            raise ValueError(f'no dynamics model given for {missing}')
+        extra = [c for c in covered if c not in h.columns]
+        if extra or len(covered) != len(set(covered)):
+            raise ValueError(f'dynamics keys must partition the history columns; unknown or repeated: {extra or covered}')
+        for k, m in self.models.items():
+            m.fit(h[list(k)] if isinstance(k, tuple) else h[k])
+        self.columns = list(h.columns)
         if self.report is None:
-            self.report = pd.DataFrame({a: {'model': m.name, 'n_params': m.n_params, 'loglik': m.loglik, 'bic': m.bic}
-                                        for a, m in self.models.items()}).T
+            rows = {}
+            for k, m in self.models.items():
+                for c in self._vars(k):
+                    rows[c] = {'model': m.name, 'n_params': m.n_params, 'loglik': m.loglik, 'bic': m.bic}
+            self.report = pd.DataFrame(rows).T.loc[self.columns]
         return self
 
     def filter(self, history):
-        """Residual layer of the fitted sample, one column per asset, rows where every asset has a value."""
+        """Residual layer of the fitted sample, one column per variable in the history's column order."""
         cols = list(pd.DataFrame(history).columns)
-        return pd.concat({a: self.models[a].filter() for a in cols}, axis=1, sort=False).dropna()[cols]
+        parts = []
+        for k, m in self.models.items():
+            z = m.filter()
+            parts.append(z if isinstance(z, pd.DataFrame) else z.to_frame(k))
+        return pd.concat(parts, axis=1, sort=False).dropna()[cols]
 
     def unfilter(self, Z):
-        """Returns from residual paths ``(n_paths, horizon, N)``, assets in the order of ``models``."""
+        """Returns (levels for blocks) from residual paths ``(n_paths, horizon, N)``, columns as in the history."""
         Z = np.asarray(Z, float)
         out = np.empty_like(Z)
-        for j, a in enumerate(self.models):
-            out[:, :, j] = self.models[a].unfilter(Z[:, :, j])
+        for k, m in self.models.items():
+            idx = [self.columns.index(c) for c in self._vars(k)]
+            if isinstance(k, tuple):
+                out[:, :, idx] = m.unfilter(Z[:, :, idx])
+            else:
+                out[:, :, idx[0]] = m.unfilter(Z[:, :, idx[0]])
         return out
 
     def to_dict(self):
-        return {'name': self.name, 'models': {a: m.to_dict() for a, m in self.models.items()},
+        return {'name': self.name, 'columns': self.columns,
+                'models': {('|'.join(k) if isinstance(k, tuple) else k): m.to_dict() for k, m in self.models.items()},
                 'report': None if self.report is None else self.report.to_dict(orient='index'),
                 'candidates': None if self.candidates is None else self.candidates.to_dict(orient='list')}
 
     @classmethod
     def from_dict(cls, d):
         m = cls()
-        m.models = {a: model_from_dict(md) for a, md in d['models'].items()}
+        m.models = {(tuple(a.split('|')) if md['kind'] in ('vecm', 'var') else a): model_from_dict(md) for a, md in d['models'].items()}
+        m.columns = d.get('columns') or [c for k in m.models for c in cls._vars(k)]
         if d.get('report'):
-            m.report = pd.DataFrame(d['report']).T.loc[list(m.models)]
+            m.report = pd.DataFrame(d['report']).T.loc[m.columns]
         if d.get('candidates'):
             m.candidates = pd.DataFrame(d['candidates'])
         return m

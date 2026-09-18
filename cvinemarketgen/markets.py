@@ -178,6 +178,8 @@ class _Market:
     def simulate_paths(self, n_paths, horizon, seed=None, corr_tol=None, accept=False):
         """
         Return paths: :class:`~cvinemarketgen.paths.Paths` of shape ``(n_paths, horizon, N)``.
+        Columns handled by a block model are in the units of the history (levels for a
+        VECM); ``Paths.cumulative`` and ``terminal`` apply to return columns.
 
         The ``n_paths * horizon`` per-period observations are drawn as one
         cross-section (``accept=False`` by default: no accept-reject, since a
@@ -246,6 +248,9 @@ class FleishmanMarket(_Market):
         dict gives one spec per asset (``'ar1-garch(1,1)'``, ``'const-gjr'``, ``'hmm(2)'``).
     dynamics_kwargs : dict, optional
         Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``gof``, ``B``).
+        A block of variables filtered jointly is given as a tuple key,
+        ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
+        in the units of the history (levels for a VECM).
 
     Attributes
     ----------
@@ -334,6 +339,9 @@ class CVineMarket(_Market):
         ``dynamics_report`` after ``fit``.
     dynamics_kwargs : dict, optional
         Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``gof``, ``B``).
+        A block of variables filtered jointly is given as a tuple key,
+        ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
+        in the units of the history (levels for a VECM).
 
     Notes
     -----

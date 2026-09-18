@@ -160,6 +160,7 @@ def select_dynamics(returns, candidates=('const', 'garch', 'gjr', 'egarch', 'hmm
                   + (f'  GoF {row["gof_pvalue"]:.2f}' if gof else ''))
     ad = AssetDynamics()
     ad.models = chosen
+    ad.columns = list(h.columns)
     ad.candidates = pd.concat(cands, ignore_index=True)
     ad.report = pd.DataFrame(rows).set_index('asset')[REPORT_COLUMNS]
     return ad
