@@ -59,7 +59,7 @@ Market data
 -----------
 
 .. automodule:: cvinemarketgen.data
-   :members: load_factor_data, factor_targets, load_daily_returns, load_etf_monthly, fred_series, fama_french_monthly, yahoo_monthly_adjclose, yahoo_daily_adjclose, FACTORS, DURATIONS
+   :members: load_factor_data, factor_targets, load_daily_returns, load_etf_monthly, load_fred_monthly, fred_series, fama_french_monthly, yahoo_monthly_adjclose, yahoo_daily_adjclose, FACTORS, DURATIONS
 
 Engine: C-vine generator
 ------------------------
