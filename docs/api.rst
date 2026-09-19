@@ -61,6 +61,12 @@ Yield curve
 .. automodule:: cvinemarketgen.yieldcurve
    :members: NelsonSiegel, PCACurve, yield_at, discount, bond_price, par_yield, zero_return, constant_maturity_return, curve_returns
 
+Bridge to a quarterly series
+----------------------------
+
+.. automodule:: cvinemarketgen.bridge
+   :members: Bridge, growth_to_level, recession_probability
+
 Factors
 -------
 
@@ -77,7 +83,7 @@ Market data
 -----------
 
 .. automodule:: cvinemarketgen.data
-   :members: load_factor_data, factor_targets, load_daily_returns, load_etf_monthly, load_fred_monthly, fred_series, fama_french_monthly, yahoo_monthly_adjclose, yahoo_daily_adjclose, FACTORS, DURATIONS
+   :members: load_factor_data, factor_targets, load_daily_returns, load_etf_monthly, load_fred_monthly, load_fred_quarterly, fred_series, fama_french_monthly, yahoo_monthly_adjclose, yahoo_daily_adjclose, FACTORS, DURATIONS
 
 Engine: C-vine generator
 ------------------------
