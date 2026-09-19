@@ -230,3 +230,23 @@ def test_jsu_on_draw_falls_back_when_the_refit_fails():
     assert np.all(np.isfinite(x)) and abs(x.mean()) < 0.1 and abs(x.std() - 1) < 0.1
     x2 = _jsu_on_draw(MomentMatch(), [0, 1, -0.67, 4.8], x0, U)
     assert np.all(np.isfinite(x2))
+
+
+def test_exclude_periods_from_the_residual_layer():
+    from cvinemarketgen import AR1GARCH
+    rng = np.random.default_rng(3)
+    idx = pd.period_range('2000-01', periods=240, freq='M')
+    X = pd.DataFrame(rng.standard_normal((240, 2)) * 0.03, index=idx, columns=['A', 'B'])
+    X.loc['2010-06', 'A'] = 0.9                                          # one 30-sigma month
+    t = Targets.from_history(X)
+    full = CVineMarket(t, families='gaussian', dynamics={'A': 'ar1', 'B': 'ar1'}).fit()
+    cut = CVineMarket(t, families='gaussian', dynamics={'A': 'ar1', 'B': 'ar1'}, exclude=['2010-06']).fit()
+    assert full.fit_targets.moments.loc['A', 'kurt'] > 30 and cut.fit_targets.moments.loc['A', 'kurt'] < 6
+    P = cut.simulate_paths(20, 6, seed=1)
+    assert np.all(np.isfinite(P.array))
+    cut.save('_tmp_exclude.json')
+    back = CVineMarket.load('_tmp_exclude.json')
+    import os; os.remove('_tmp_exclude.json')
+    assert back.exclude == ['2010-06']
+    with pytest.warns(UserWarning):
+        CVineMarket(t, families='gaussian', dynamics={'A': 'ar1', 'B': 'ar1'}, exclude=['1999-01']).fit()

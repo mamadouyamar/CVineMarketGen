@@ -251,11 +251,14 @@ def load_fred_monthly(series_ids, start='2003-01', end=None, cache='data/fred_ca
     cached locally as a CSV (git-ignored). Units are FRED's (percent for yields).
     """
     ids = list(series_ids)
+    old = None
     if cache and os.path.exists(cache) and not refresh:
-        df = pd.read_csv(cache, index_col=0)
-        df.index = pd.PeriodIndex(df.index, freq='M')
-        if set(ids) <= set(df.columns):
-            df = (df.loc[start:end, ids] if end else df.loc[start:, ids]).dropna()
+        old = pd.read_csv(cache, index_col=0)
+        old.index = pd.PeriodIndex(old.index, freq='M')
+        have = [c for c in ids if c in old.columns and old[c].first_valid_index() is not None]
+        covers = len(have) == len(ids) and all(old[c].first_valid_index() <= pd.Period(start, 'M') + 1 for c in ids)
+        if covers:
+            df = (old.loc[start:end, ids] if end else old.loc[start:, ids]).dropna()
             if verbose:
                 print(f'FRED series read from cache {cache}: {df.shape[0]} months, {df.index.min()} to {df.index.max()}')
             return df
@@ -268,7 +271,13 @@ def load_fred_monthly(series_ids, start='2003-01', end=None, cache='data/fred_ca
     df.index.name = 'month'
     if cache:
         os.makedirs(os.path.dirname(cache) or '.', exist_ok=True)
-        df.to_csv(cache)
+        if old is not None:                         # merge: the new series replace their columns, the others stay
+            keep = old.drop(columns=[c for c in ids if c in old.columns])
+            merged = pd.concat([keep, df], axis=1, sort=True)
+            merged.index.name = 'month'
+            merged.to_csv(cache)
+        else:
+            df.to_csv(cache)
     if verbose:
         print(f'FRED series downloaded: {df.shape[0]} months, {df.index.min()} to {df.index.max()}'
               + (f', cached to {cache}' if cache else ''))
