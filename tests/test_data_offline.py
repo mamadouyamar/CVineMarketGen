@@ -43,3 +43,21 @@ def test_load_fred_monthly_offline(monkeypatch, tmp_path):
     monkeypatch.setattr(data, 'fred_series', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('network')))
     df2 = data.load_fred_monthly(['DGS2'], start='2020-01', cache=str(cache), verbose=False)   # served from the cache
     assert df2.shape == (3, 1)
+
+
+def test_load_fred_monthly_cache_stale_start_and_merge(monkeypatch, tmp_path):
+    idx = pd.date_range('2010-01-01', '2021-12-31', freq='D')
+    fake = {sid: pd.Series(np.linspace(1, 2, len(idx)) + k, index=idx) for k, sid in enumerate(['A', 'B', 'C'])}
+    monkeypatch.setattr(data, 'fred_series', lambda sid, start='1986-01-01', timeout=60: fake[sid].loc[start:])
+    cache = tmp_path / 'fred.csv'
+    df1 = data.load_fred_monthly(['A', 'B'], start='2015-01', cache=str(cache), verbose=False)
+    assert str(df1.index.min()) == '2015-01'
+    df2 = data.load_fred_monthly(['A'], start='2011-01', cache=str(cache), verbose=False)   # cache starts later: refetch
+    assert str(df2.index.min()) == '2011-01'
+    cached = pd.read_csv(cache, index_col=0)
+    assert set(cached.columns) == {'A', 'B'}                                                # B kept in the merged cache
+    df3 = data.load_fred_monthly(['C'], start='2012-01', cache=str(cache), verbose=False)
+    assert set(pd.read_csv(cache, index_col=0).columns) == {'A', 'B', 'C'} and str(df3.index.min()) == '2012-01'
+    monkeypatch.setattr(data, 'fred_series', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('network')))
+    df4 = data.load_fred_monthly(['A', 'B'], start='2016-01', cache=str(cache), verbose=False)   # served from the cache
+    assert str(df4.index.min()) == '2016-01' and list(df4.columns) == ['A', 'B']
