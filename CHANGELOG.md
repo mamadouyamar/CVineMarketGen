@@ -22,9 +22,18 @@
   could fail silently for a fat-tailed target and fill the column with NaN;
   `simulate` and `simulate_paths` now fall back to Nelder-Mead and then to the
   calibrated parameters.
+- `exclude=[...]` on the markets: periods left out of the residual layer before
+  the marginals and the vine are fitted (known one-off interventions, such as
+  the pandemic months for the unemployment rate); saved with the model.
+- `load_fred_monthly` refetches when the cache starts after the requested
+  `start`, and merges new series into the cache instead of overwriting it.
+- `price_level`, `yoy` and `deflate`: price levels, year-on-year rates and real
+  returns from a column of monthly inflation along the paths.
 - Notebooks 10 (a VECM block on the nominal and real 10-year yields), 11
-  (USDCAD on the rate differential and oil) and 12 (the Treasury curve as
-  Nelson-Siegel factors filtered as a block, fixed income priced along the paths).
+  (USDCAD on the rate differential and oil), 12 (the Treasury curve as
+  Nelson-Siegel factors filtered as a block, fixed income priced along the
+  paths) and 13 (CPI inflation as a child of oil, unemployment and
+  expectations; price levels, an oil scenario, real returns).
 
 ## 0.3.0 (2026-09-17)
 

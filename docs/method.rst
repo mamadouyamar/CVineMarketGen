@@ -108,6 +108,10 @@ the pipeline and leave it unchanged.
   curve as level, slope and curvature (principal components as the benchmark);
   the factors are filtered as a block, and simulated factors give whole curves,
   discount factors and bond returns by :func:`~cvinemarketgen.yieldcurve.curve_returns`.
+* Inflation: a structural child in linear form with lags on oil, unemployment
+  and expectations; :func:`~cvinemarketgen.paths.price_level`,
+  :func:`~cvinemarketgen.paths.yoy` and :func:`~cvinemarketgen.paths.deflate`
+  read price levels, year-on-year rates and real returns off the paths.
 
 Family selection in short
 -------------------------

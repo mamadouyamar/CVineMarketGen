@@ -23,7 +23,7 @@ Paths
 -----
 
 .. automodule:: cvinemarketgen.paths
-   :members: Paths
+   :members: Paths, price_level, yoy, deflate
 
 Dynamics
 --------

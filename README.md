@@ -112,6 +112,12 @@ turns simulated factors into whole curves, and `curve_returns` prices
 constant-maturity or zero-coupon bonds along the paths; notebook 12 shows it on
 the 1- to 30-year Treasury curve since 1993.
 
+Inflation is a child too: `'pi': 'linear(d_log_oil, unrate, mich; lags=3)'` is a
+Phillips-curve equation of monthly CPI inflation on the change of oil, the
+unemployment rate and survey expectations; `yoy`, `price_level` and `deflate`
+read year-on-year rates, price levels and real asset returns off the paths;
+notebook 13 shows it with an oil scenario.
+
 ## Assets on factors
 
 ```python
@@ -140,7 +146,7 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Twelve tutorials in [`examples/`](examples/), each one small step at a time,
+Thirteen tutorials in [`examples/`](examples/), each one small step at a time,
 all executed, each with a Colab badge. Start with the first.
 
 | | Notebook | What it shows |
@@ -157,13 +163,14 @@ all executed, each with a Colab badge. Start with the first.
 | 10 | [`10_block_filters_vecm`](examples/10_block_filters_vecm.ipynb) | a VECM on the nominal and real 10-year yields as one block of the residual layer, paths in levels, the breakeven kept anchored |
 | 11 | [`11_structural_layer_fx`](examples/11_structural_layer_fx.ipynb) | USDCAD on the U.S. minus Canada 10-year differential and oil: the structural layer, a parent scenario, paths in levels |
 | 12 | [`12_yield_curve_fixed_income`](examples/12_yield_curve_fixed_income.ipynb) | the Treasury curve as Nelson-Siegel level, slope and curvature (PCA as benchmark), the factors filtered as a block, simulated curves, constant-maturity bond returns priced along the paths |
+| 13 | [`13_inflation`](examples/13_inflation.ipynb) | headline and core CPI inflation as children of oil, unemployment and expectations: the equation, paths of inflation and price levels, an oil scenario, real returns of SPY |
 
 ## Data
 
 `data/jpm_ltcma_2024.csv` holds the arithmetic mean, volatility and correlation
 matrix of 59 asset classes from J.P. Morgan's 2024 Long-Term Capital Market
 Assumptions (USD), as published in the public report. Nothing else is shipped:
-notebooks 06 to 12 download their series at run time (Fama-French, FRED,
+notebooks 06 to 13 download their series at run time (Fama-French, FRED,
 Yahoo Finance) into a git-ignored cache. The paper's own historical data
 (Finaeon/GFD) is licensed and not included.
 

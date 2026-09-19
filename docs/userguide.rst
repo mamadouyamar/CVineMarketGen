@@ -261,6 +261,29 @@ levels; simulated factors give curves at any maturity through ``curve``, and
 constant-maturity par bonds along the paths, with continuous compounding on
 yields in percent.
 
+Inflation and real returns
+--------------------------
+
+.. code-block:: python
+
+   spec = 'linear(d_log_oil, unrate, mich; lags=3)'
+   cv = CVineMarket(Targets.from_history(data), central='SPY', families='auto',
+                    dynamics={('d_log_oil', 'unrate', 'mich'): 'vecm', 'pi': spec, 'core': spec,
+                              'SPY': 'ar1-garch'}).fit()
+   P = cv.simulate_paths(1000, 24, seed=1)
+   yoy(P, 'pi', data['pi'])            # year-on-year inflation along the paths (percent)
+   price_level(P, 'pi')                # CPI index from 100 at the last observation
+   deflate(P, 'SPY', 'pi')             # real returns of SPY, a one-column Paths
+
+Inflation is a child in the linear form on its monthly annualized rate, with
+lags: a Phillips-curve equation on the change of oil, the unemployment rate
+and survey expectations. ``yoy``, ``price_level`` and ``deflate`` turn a column
+of monthly log inflation in percent a year into year-on-year rates, price
+levels and real returns of another column. ``exclude=['2020-03', '2020-04']``
+leaves known one-off months out of the residual layer on which the marginals
+and the vine are fitted (the April 2020 unemployment jump is a 14-sigma
+innovation); the filters still use the whole history.
+
 Assets on factors
 -----------------
 
