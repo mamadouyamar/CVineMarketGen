@@ -128,7 +128,7 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Ten tutorials in [`examples/`](examples/), each one small step at a time,
+Eleven tutorials in [`examples/`](examples/), each one small step at a time,
 all executed, each with a Colab badge. Start with the first.
 
 | | Notebook | What it shows |
@@ -143,6 +143,7 @@ all executed, each with a Colab badge. Start with the first.
 | 08 | [`08_assets_on_macro_factors`](examples/08_assets_on_macro_factors.ipynb) | ten ETFs regressed on the seven factors, a view on the factors turned into asset distributions and paths |
 | 09 | [`09_hmm_dynamics`](examples/09_hmm_dynamics.ipynb) | Gaussian HMM for one asset: regimes, the Rosenblatt residual layer, the bootstrap goodness-of-fit test, a simulated year |
 | 10 | [`10_block_filters_vecm`](examples/10_block_filters_vecm.ipynb) | a VECM on the nominal and real 10-year yields as one block of the residual layer, paths in levels, the breakeven kept anchored |
+| 11 | [`11_structural_layer_fx`](examples/11_structural_layer_fx.ipynb) | USDCAD on the U.S. minus Canada 10-year differential and oil: the structural layer, a parent scenario, paths in levels |
 
 ## Data
 
