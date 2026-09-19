@@ -12,4 +12,4 @@ docs/examples/
 data/daily_cache.csv
 data/etf_cache*.csv
 examples/*.json
-data/fred_cache.csv
+data/fred_cache*.csv
