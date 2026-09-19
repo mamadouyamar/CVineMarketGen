@@ -101,6 +101,17 @@ the pipeline and leave it unchanged.
   :class:`~cvinemarketgen.blocks.BlockVAR` filter a block of variables jointly;
   their standardized innovations are the block's residual layer and paths come
   back in levels.
+* Structural filters: :class:`~cvinemarketgen.structural.Structural`, a child on
+  parents plus its own innovation, in error-correction form on levels or linear
+  form on returns; parents are simulated first.
+* Yield curve: :class:`~cvinemarketgen.yieldcurve.NelsonSiegel` reads the
+  curve as level, slope and curvature (principal components as the benchmark);
+  the factors are filtered as a block, and simulated factors give whole curves,
+  discount factors and bond returns by :func:`~cvinemarketgen.yieldcurve.curve_returns`.
+* Inflation: a structural child in linear form with lags on oil, unemployment
+  and expectations; :func:`~cvinemarketgen.paths.price_level`,
+  :func:`~cvinemarketgen.paths.yoy` and :func:`~cvinemarketgen.paths.deflate`
+  read price levels, year-on-year rates and real returns off the paths.
 
 Family selection in short
 -------------------------

@@ -216,6 +216,74 @@ of the block's variables come back in levels, from the last observed rows,
 through the model's own recursion; ``Paths.cumulative`` and ``terminal`` apply to
 the return columns. Needs ``pip install statsmodels``.
 
+The structural layer
+--------------------
+
+.. code-block:: python
+
+   cv = CVineMarket(t, central='SPY', families='auto',
+                    dynamics={('rate_diff', 'log_oil'): 'vecm(r=0,q=1)',
+                              'log_fx': 'ecm(rate_diff, log_oil)',
+                              'SPY': 'ar1-garch'}).fit()
+   cv.dynamics.order                    # parents before children
+   cv.dynamics.models['log_fx'].theta   # long-run elasticities
+
+A variable driven by others is a child: ``'ecm(p1, p2)'`` fits the
+single-equation error-correction model in levels (adjustment ``kappa``, long-run
+relation ``theta``, contemporaneous response ``gamma``), ``'linear(p1, p2)'`` the
+linear model in returns, ``'linear(p1, p2; lags=0)'`` the plain factor map. The
+child's innovation is its residual layer; on a path the parents are simulated
+first, by their own models, and the child is rebuilt from them and from its own
+draw. Parents are taken as weakly exogenous; cycles are refused.
+
+The yield curve and fixed income
+--------------------------------
+
+.. code-block:: python
+
+   Y = load_fred_monthly(['DGS1', 'DGS2', 'DGS5', 'DGS10', 'DGS30'], start='1993-10')
+   ns = NelsonSiegel(0.7308).fit(Y)             # level, slope, curvature by least squares per date
+   ns.rmse                                      # fitting error by maturity
+   data = ns.factors.join(spy_returns, how='inner')
+   cv = CVineMarket(Targets.from_history(data), central='SPY', families='auto',
+                    dynamics={('level', 'slope', 'curvature'): 'vecm', 'SPY': 'ar1-garch'}).fit()
+   P = cv.simulate_paths(1000, 24, seed=1)
+   PF = Paths(P.array[:, :, :3], ['level', 'slope', 'curvature'])
+   curves = ns.curve(PF)                                       # yields at the fitted maturities
+   R = curve_returns(PF, [2, 10, 30], ns, ns.factors.iloc[-1].values)   # constant-maturity bond returns
+
+The curve is three observed factors, level, slope and curvature, estimated by
+least squares per date on the Nelson-Siegel loadings with the decay ``lam`` in
+years (``'auto'`` searches it; ``PCACurve`` is the benchmark with the same
+interface). They enter the market as a block like any other variables in
+levels; simulated factors give curves at any maturity through ``curve``, and
+``bond_price``, ``par_yield`` and ``curve_returns`` price zero-coupon and
+constant-maturity par bonds along the paths, with continuous compounding on
+yields in percent.
+
+Inflation and real returns
+--------------------------
+
+.. code-block:: python
+
+   spec = 'linear(d_log_oil, unrate, mich; lags=3)'
+   cv = CVineMarket(Targets.from_history(data), central='SPY', families='auto',
+                    dynamics={('d_log_oil', 'unrate', 'mich'): 'vecm', 'pi': spec, 'core': spec,
+                              'SPY': 'ar1-garch'}).fit()
+   P = cv.simulate_paths(1000, 24, seed=1)
+   yoy(P, 'pi', data['pi'])            # year-on-year inflation along the paths (percent)
+   price_level(P, 'pi')                # CPI index from 100 at the last observation
+   deflate(P, 'SPY', 'pi')             # real returns of SPY, a one-column Paths
+
+Inflation is a child in the linear form on its monthly annualized rate, with
+lags: a Phillips-curve equation on the change of oil, the unemployment rate
+and survey expectations. ``yoy``, ``price_level`` and ``deflate`` turn a column
+of monthly log inflation in percent a year into year-on-year rates, price
+levels and real returns of another column. ``exclude=['2020-03', '2020-04']``
+leaves known one-off months out of the residual layer on which the marginals
+and the vine are fitted (the April 2020 unemployment jump is a 14-sigma
+innovation); the filters still use the whole history.
+
 Assets on factors
 -----------------
 

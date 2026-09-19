@@ -23,7 +23,7 @@ Paths
 -----
 
 .. automodule:: cvinemarketgen.paths
-   :members: Paths
+   :members: Paths, price_level, yoy, deflate
 
 Dynamics
 --------
@@ -48,6 +48,18 @@ Blocks
 
 .. automodule:: cvinemarketgen.blocks
    :members: BlockVECM, BlockVAR
+
+Structural layer
+----------------
+
+.. automodule:: cvinemarketgen.structural
+   :members: Structural
+
+Yield curve
+-----------
+
+.. automodule:: cvinemarketgen.yieldcurve
+   :members: NelsonSiegel, PCACurve, yield_at, discount, bond_price, par_yield, zero_return, constant_maturity_return, curve_returns
 
 Factors
 -------
