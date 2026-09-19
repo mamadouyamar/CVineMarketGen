@@ -61,3 +61,18 @@ def test_load_fred_monthly_cache_stale_start_and_merge(monkeypatch, tmp_path):
     monkeypatch.setattr(data, 'fred_series', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('network')))
     df4 = data.load_fred_monthly(['A', 'B'], start='2016-01', cache=str(cache), verbose=False)   # served from the cache
     assert str(df4.index.min()) == '2016-01' and list(df4.columns) == ['A', 'B']
+
+
+def test_load_fred_quarterly_offline(monkeypatch, tmp_path):
+    idx = pd.date_range('2015-01-01', '2021-12-31', freq='D')
+    fake = {'GDPC1': pd.Series(np.nan, index=idx), 'M': pd.Series(np.arange(len(idx), dtype=float), index=idx)}
+    q_ends = pd.date_range('2015-01-01', '2021-12-31', freq='QS')
+    fake['GDPC1'].loc[q_ends] = np.arange(len(q_ends), dtype=float) + 100
+    monkeypatch.setattr(data, 'fred_series', lambda sid, start='1986-01-01', timeout=60: fake[sid].loc[start:])
+    cache = tmp_path / 'fred_q.csv'
+    df = data.load_fred_quarterly(['GDPC1', 'M'], start='2016Q1', cache=str(cache), verbose=False)
+    assert isinstance(df.index, pd.PeriodIndex) and df.index.freqstr.startswith('Q') and str(df.index.min()) == '2016Q1'
+    assert df['GDPC1'].iloc[0] == 104.0                                     # the quarterly value passes through
+    monkeypatch.setattr(data, 'fred_series', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('network')))
+    df2 = data.load_fred_quarterly(['GDPC1'], start='2017Q1', cache=str(cache), verbose=False)
+    assert str(df2.index.min()) == '2017Q1' and list(df2.columns) == ['GDPC1']
