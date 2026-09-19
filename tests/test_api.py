@@ -212,3 +212,21 @@ def test_cvine_market_with_a_child_on_a_block(tmp_path):
     p = tmp_path / 'child.json'; cv.save(str(p))
     cv2 = CVineMarket.load(str(p))
     assert np.allclose(cv2.simulate_paths(2, 4, seed=1).array, cv.simulate_paths(2, 4, seed=1).array)
+
+
+def test_jsu_on_draw_falls_back_when_the_refit_fails():
+    from cvinemarketgen.markets import _jsu_on_draw
+    from cvinemarketgen.moment_match import MomentMatch
+    from cvinemarketgen import fit_johnson_su
+
+    class Failing(MomentMatch):
+        def find_params_for_moments_matching_JSU_with_U(self, targeted_moments, x0, U, method='CG', maxiter=100):
+            return np.array([np.nan] * 4), None
+
+    p = fit_johnson_su(-0.67, 7.8)
+    x0 = np.array([p['gamma'], p['xi'], p['delta'], p['lambda']])
+    U = np.random.default_rng(1).uniform(size=5000)
+    x = _jsu_on_draw(Failing(), [0, 1, -0.67, 4.8], x0, U)
+    assert np.all(np.isfinite(x)) and abs(x.mean()) < 0.1 and abs(x.std() - 1) < 0.1
+    x2 = _jsu_on_draw(MomentMatch(), [0, 1, -0.67, 4.8], x0, U)
+    assert np.all(np.isfinite(x2))

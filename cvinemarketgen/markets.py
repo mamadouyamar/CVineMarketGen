@@ -303,6 +303,25 @@ class FleishmanMarket(_Market):
         return m.fit()
 
 
+def _jsu_on_draw(engine, target, x0, U):
+    """
+    Standardized Johnson SU values on the uniform draw ``U``, with the parameters
+    re-fitted on the draw (Step 2 of Algorithm 5). SLSQP first, as in the paper;
+    when it fails (non-finite parameters or values, which happens on some draws for
+    fat-tailed targets) Nelder-Mead from the same start, and failing that the
+    calibrated parameters ``x0`` themselves, whose moments match in expectation.
+    """
+    for method in ('SLSQP', 'Nelder-Mead'):
+        with _quiet(), np.errstate(all='ignore'):
+            p, _ = engine.find_params_for_moments_matching_JSU_with_U(target, x0=x0, U=U, method=method)
+            p = np.asarray(p, float)
+            if np.all(np.isfinite(p)) and p[2] > 0 and p[3] > 0:
+                x = engine.sim_JSU_with_U(U, p)
+                if np.all(np.isfinite(x)):
+                    return x
+    return engine.sim_JSU_with_U(U, np.asarray(x0, float))
+
+
 # =============================================================================
 class CVineMarket(_Market):
     """
@@ -464,10 +483,9 @@ class CVineMarket(_Market):
         out = pd.DataFrame(np.zeros((n, len(self.order))), columns=self.order)
         for j, a in enumerate(self.order):
             x0 = opt.loc[a, ['a', 'b', 'c', 'd']].values.astype(float)
-            with _quiet():
-                p, _ = self.engine.find_params_for_moments_matching_JSU_with_U(
-                    [0, 1, vr['targeted_mom3'][a], vr['targeted_mom4'][a] - 3], x0=x0, U=U[:, j], method='SLSQP')
-            out[a] = vr['targeted_mom1'][a] + self.engine.sim_JSU_with_U(U[:, j], p) * vr['targeted_mom2'][a] ** 0.5
+            target = [0, 1, vr['targeted_mom3'][a], vr['targeted_mom4'][a] - 3]
+            x = _jsu_on_draw(self.engine, target, x0, U[:, j])
+            out[a] = vr['targeted_mom1'][a] + x * vr['targeted_mom2'][a] ** 0.5
         return out.loc[:, self.targets.assets]
 
     # ---- save / load ---------------------------------------------------------------

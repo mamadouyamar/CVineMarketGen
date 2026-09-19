@@ -13,8 +13,18 @@
   own innovation, `'ecm(p1, p2)'` in levels or `'linear(p1, p2)'` in returns;
   `AssetDynamics` orders parents before children (`order`, cycles refused) and
   hands the child the parents' simulated paths.
-- Notebooks 10 (a VECM block on the nominal and real 10-year yields) and 11
-  (USDCAD on the rate differential and oil).
+- The yield curve: `NelsonSiegel` (factors by least squares per date for a fixed
+  or searched decay, curves at any maturity from factors or factor paths) and
+  `PCACurve` as the benchmark; pricing from the factors, `bond_price`,
+  `par_yield`, `zero_return`, `constant_maturity_return` and `curve_returns`
+  (returns of constant-maturity or zero-coupon bonds along simulated paths).
+- Fix: the Johnson SU re-fit on a drawn cross-section (Step 2 of Algorithm 5)
+  could fail silently for a fat-tailed target and fill the column with NaN;
+  `simulate` and `simulate_paths` now fall back to Nelder-Mead and then to the
+  calibrated parameters.
+- Notebooks 10 (a VECM block on the nominal and real 10-year yields), 11
+  (USDCAD on the rate differential and oil) and 12 (the Treasury curve as
+  Nelson-Siegel factors filtered as a block, fixed income priced along the paths).
 
 ## 0.3.0 (2026-09-17)
 
