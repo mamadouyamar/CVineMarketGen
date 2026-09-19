@@ -58,3 +58,34 @@ class Paths:
 
     def __repr__(self):
         return f'Paths(n_paths={self.n_paths}, horizon={self.horizon}, assets={len(self.assets)}, {self.layer})'
+
+
+# ---- inflation paths ---------------------------------------------------------------------
+def price_level(P, column, base=100.0, scale=1200.0):
+    """
+    Price index along each path, ``(n_paths, horizon)``, from a column of monthly log
+    inflation in percent a year (``scale=1200``; ``scale=100`` for a monthly rate):
+    ``base * exp(cumsum(pi / scale))``.
+    """
+    x = P.array[:, :, P.assets.index(column)] / scale
+    return base * np.exp(np.cumsum(x, axis=1))
+
+
+def yoy(P, column, history, scale=1200.0):
+    """
+    Year-on-year inflation in percent along the paths, ``(n_paths, horizon)``; the last
+    11 observed monthly rates in ``history`` complete the first windows.
+    """
+    x = P.array[:, :, P.assets.index(column)] / scale
+    h = np.asarray(history, float)[-11:] / scale
+    full = np.concatenate([np.tile(h, (x.shape[0], 1)), x], axis=1)
+    c = np.concatenate([np.zeros((x.shape[0], 1)), np.cumsum(full, axis=1)], axis=1)
+    s = c[:, 12:] - c[:, :-12]
+    return 100.0 * (np.exp(s[:, -x.shape[1]:]) - 1.0)
+
+
+def deflate(P, asset, inflation, scale=1200.0):
+    """Real per-period returns of the return column ``asset`` deflated by the ``inflation`` column: a one-column ``Paths``."""
+    r = P.array[:, :, P.assets.index(asset)]
+    x = P.array[:, :, P.assets.index(inflation)] / scale
+    return Paths(((1.0 + r) / np.exp(x) - 1.0)[:, :, None], [f'{asset} (real)'], layer='returns')

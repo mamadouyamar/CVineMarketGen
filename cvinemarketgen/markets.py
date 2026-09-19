@@ -115,12 +115,13 @@ class Diagnostics:
 class _Market:
     """Shared behaviour of the two generators."""
 
-    def __init__(self, targets, dynamics=None, dynamics_kwargs=None):
+    def __init__(self, targets, dynamics=None, dynamics_kwargs=None, exclude=None):
         if not isinstance(targets, Targets):
             raise TypeError('targets must be a Targets object')
         self.targets = targets
         self.dynamics = make_dynamics(dynamics)
         self.dynamics_kwargs = dict(dynamics_kwargs or {})
+        self.exclude = None if exclude is None else [str(x) for x in exclude]   # periods left out of the residual layer's fit
         self.fit_targets = None     # targets of the layer the generator is fitted on
         self.fitted = False
 
@@ -146,7 +147,13 @@ class _Market:
                 self.dynamics = select_dynamics(hist, **self.dynamics_kwargs)
             else:
                 self.dynamics.fit(hist)
-        ft = _floor_residual_kurtosis(Targets.from_history(self.dynamics.filter(hist), assets=t.assets))
+        Z = self.dynamics.filter(hist)
+        if self.exclude:
+            labels = [x for x in Z.index if str(x) in self.exclude]
+            if len(labels) != len(self.exclude):
+                warnings.warn(f'exclude: {len(self.exclude) - len(labels)} period(s) not found in the residual layer')
+            Z = Z.drop(labels)
+        ft = _floor_residual_kurtosis(Targets.from_history(Z, assets=t.assets))
         ft.layer = 'residuals'; ft.freq = t.freq
         self.fit_targets = ft
 
@@ -246,11 +253,19 @@ class FleishmanMarket(_Market):
         Optional serial dependence for :meth:`simulate_paths`. ``'auto'`` selects a
         model per asset with :func:`~cvinemarketgen.selection.select_dynamics`; a
         dict gives one spec per asset (``'ar1-garch(1,1)'``, ``'const-gjr'``, ``'hmm(2)'``).
+    exclude : list of str, optional
+        Periods (index labels of the history, as strings, e.g. ``['2020-03', '2020-04']``)
+        left out of the residual layer before the marginals and the vine are fitted:
+        known one-off interventions whose innovations no four-moment marginal should
+        carry. The filters are still estimated on the full history and paths start
+        from the last observed state.
     dynamics_kwargs : dict, optional
         Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``gof``, ``B``).
         A block of variables filtered jointly is given as a tuple key,
         ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
         in the units of the history (levels for a VECM).
+        A variable driven by others is given as a child, ``'ecm(rate_diff, log_oil)'`` (levels)
+        or ``'linear(f1, f2)'`` (returns); its parents are simulated first.
 
     Attributes
     ----------
@@ -301,6 +316,25 @@ class FleishmanMarket(_Market):
         return m.fit()
 
 
+def _jsu_on_draw(engine, target, x0, U):
+    """
+    Standardized Johnson SU values on the uniform draw ``U``, with the parameters
+    re-fitted on the draw (Step 2 of Algorithm 5). SLSQP first, as in the paper;
+    when it fails (non-finite parameters or values, which happens on some draws for
+    fat-tailed targets) Nelder-Mead from the same start, and failing that the
+    calibrated parameters ``x0`` themselves, whose moments match in expectation.
+    """
+    for method in ('SLSQP', 'Nelder-Mead'):
+        with _quiet(), np.errstate(all='ignore'):
+            p, _ = engine.find_params_for_moments_matching_JSU_with_U(target, x0=x0, U=U, method=method)
+            p = np.asarray(p, float)
+            if np.all(np.isfinite(p)) and p[2] > 0 and p[3] > 0:
+                x = engine.sim_JSU_with_U(U, p)
+                if np.all(np.isfinite(x)) and abs(x.mean()) < 0.1 and abs(x.std() - 1.0) < 0.1:
+                    return x
+    return engine.sim_JSU_with_U(U, np.asarray(x0, float))
+
+
 # =============================================================================
 class CVineMarket(_Market):
     """
@@ -342,6 +376,8 @@ class CVineMarket(_Market):
         A block of variables filtered jointly is given as a tuple key,
         ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
         in the units of the history (levels for a VECM).
+        A variable driven by others is given as a child, ``'ecm(rate_diff, log_oil)'`` (levels)
+        or ``'linear(f1, f2)'`` (returns); its parents are simulated first.
 
     Notes
     -----
@@ -352,8 +388,8 @@ class CVineMarket(_Market):
     """
 
     def __init__(self, targets, central=None, families='auto', mixtures=True, mixtures_deeper_trees=False,
-                 n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None, dynamics_kwargs=None):
-        super().__init__(targets, dynamics, dynamics_kwargs)
+                 n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None, dynamics_kwargs=None, exclude=None):
+        super().__init__(targets, dynamics, dynamics_kwargs, exclude)
         self.central = central or targets.assets[0]
         if self.central not in targets.assets:
             raise ValueError(f'central asset {self.central!r} not in targets')
@@ -460,10 +496,9 @@ class CVineMarket(_Market):
         out = pd.DataFrame(np.zeros((n, len(self.order))), columns=self.order)
         for j, a in enumerate(self.order):
             x0 = opt.loc[a, ['a', 'b', 'c', 'd']].values.astype(float)
-            with _quiet():
-                p, _ = self.engine.find_params_for_moments_matching_JSU_with_U(
-                    [0, 1, vr['targeted_mom3'][a], vr['targeted_mom4'][a] - 3], x0=x0, U=U[:, j], method='SLSQP')
-            out[a] = vr['targeted_mom1'][a] + self.engine.sim_JSU_with_U(U[:, j], p) * vr['targeted_mom2'][a] ** 0.5
+            target = [0, 1, vr['targeted_mom3'][a], vr['targeted_mom4'][a] - 3]
+            x = _jsu_on_draw(self.engine, target, x0, U[:, j])
+            out[a] = vr['targeted_mom1'][a] + x * vr['targeted_mom2'][a] ** 0.5
         return out.loc[:, self.targets.assets]
 
     # ---- save / load ---------------------------------------------------------------
@@ -494,7 +529,7 @@ class CVineMarket(_Market):
              'targets': self.targets.to_dict(), 'fit_targets': self.fit_targets.to_dict(),
              'settings': {'central': self.central, 'families': 'auto' if self.families == 'auto' else 'given',
                           'mixtures': self.mixtures, 'mixtures_deeper_trees': self.mixtures_deeper_trees,
-                          'n_opt': self.n_opt, 'corr_tol': self.corr_tol, 'tol_func': self.tol_func},
+                          'n_opt': self.n_opt, 'corr_tol': self.corr_tol, 'tol_func': self.tol_func, 'exclude': self.exclude},
              'order': self.order,
              'marginals': self.setup['optimal_params'][['a', 'b', 'c', 'd', 'fun']].astype(float).to_dict(orient='index'),
              'edges': self._edge_records(),
@@ -511,7 +546,7 @@ class CVineMarket(_Market):
         s = d['settings']
         m = cls(t, central=s['central'], families='gaussian' if s['families'] == 'given' else 'auto',
                 mixtures=s['mixtures'], mixtures_deeper_trees=s['mixtures_deeper_trees'],
-                n_opt=s['n_opt'], corr_tol=s['corr_tol'], tol_func=s['tol_func'])
+                n_opt=s['n_opt'], corr_tol=s['corr_tol'], tol_func=s['tol_func'], exclude=s.get('exclude'))
         m.families = s['families']
         m.fit_targets = _reorder(Targets.from_dict(d['fit_targets']), d['order'])
         m.order = d['order']
