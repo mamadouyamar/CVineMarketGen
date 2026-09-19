@@ -105,6 +105,13 @@ fits an error-correction equation of the exchange rate on the yield
 differential and oil, its innovation joins the residual layer, and on a path the
 parents are simulated first; notebook 11 shows it on USDCAD.
 
+The yield curve is three factors: `NelsonSiegel(0.7308).fit(yields)` reads the
+Treasury curve as a level, a slope and a curvature date by date, the three
+factors go in a block like any other variables in levels, `ns.curve(paths)`
+turns simulated factors into whole curves, and `curve_returns` prices
+constant-maturity or zero-coupon bonds along the paths; notebook 12 shows it on
+the 1- to 30-year Treasury curve since 1993.
+
 ## Assets on factors
 
 ```python
@@ -133,7 +140,7 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Eleven tutorials in [`examples/`](examples/), each one small step at a time,
+Twelve tutorials in [`examples/`](examples/), each one small step at a time,
 all executed, each with a Colab badge. Start with the first.
 
 | | Notebook | What it shows |
@@ -149,13 +156,14 @@ all executed, each with a Colab badge. Start with the first.
 | 09 | [`09_hmm_dynamics`](examples/09_hmm_dynamics.ipynb) | Gaussian HMM for one asset: regimes, the Rosenblatt residual layer, the bootstrap goodness-of-fit test, a simulated year |
 | 10 | [`10_block_filters_vecm`](examples/10_block_filters_vecm.ipynb) | a VECM on the nominal and real 10-year yields as one block of the residual layer, paths in levels, the breakeven kept anchored |
 | 11 | [`11_structural_layer_fx`](examples/11_structural_layer_fx.ipynb) | USDCAD on the U.S. minus Canada 10-year differential and oil: the structural layer, a parent scenario, paths in levels |
+| 12 | [`12_yield_curve_fixed_income`](examples/12_yield_curve_fixed_income.ipynb) | the Treasury curve as Nelson-Siegel level, slope and curvature (PCA as benchmark), the factors filtered as a block, simulated curves, constant-maturity bond returns priced along the paths |
 
 ## Data
 
 `data/jpm_ltcma_2024.csv` holds the arithmetic mean, volatility and correlation
 matrix of 59 asset classes from J.P. Morgan's 2024 Long-Term Capital Market
 Assumptions (USD), as published in the public report. Nothing else is shipped:
-notebooks 06 to 09 download their series at run time (Fama-French, FRED,
+notebooks 06 to 12 download their series at run time (Fama-French, FRED,
 Yahoo Finance) into a git-ignored cache. The paper's own historical data
 (Finaeon/GFD) is licensed and not included.
 

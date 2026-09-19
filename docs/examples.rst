@@ -1,7 +1,7 @@
 Examples
 ========
 
-Eleven executed notebooks, in order. Each one does one thing at a time: create
+Twelve executed notebooks, in order. Each one does one thing at a time: create
 an object, print it, plot it. Start with 01. Every notebook carries a Colab
 badge.
 
@@ -19,3 +19,4 @@ badge.
    examples/09_hmm_dynamics
    examples/10_block_filters_vecm
    examples/11_structural_layer_fx
+   examples/12_yield_curve_fixed_income
