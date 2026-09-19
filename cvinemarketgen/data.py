@@ -282,3 +282,41 @@ def load_fred_monthly(series_ids, start='2003-01', end=None, cache='data/fred_ca
         print(f'FRED series downloaded: {df.shape[0]} months, {df.index.min()} to {df.index.max()}'
               + (f', cached to {cache}' if cache else ''))
     return df
+
+
+def load_fred_quarterly(series_ids, start='1990Q1', end=None, cache='data/fred_cache_q.csv', refresh=False, verbose=True):
+    """
+    Quarterly means of FRED series (a quarterly series such as GDPC1 passes
+    through), ``PeriodIndex('Q')``, aligned on common quarters, cached as a CSV
+    with the same rules as :func:`load_fred_monthly`.
+    """
+    ids = list(series_ids)
+    start_q = pd.Period(start, 'Q')
+    old = None
+    if cache and os.path.exists(cache) and not refresh:
+        old = pd.read_csv(cache, index_col=0)
+        old.index = pd.PeriodIndex(old.index, freq='Q')
+        have = [c for c in ids if c in old.columns and old[c].first_valid_index() is not None]
+        covers = len(have) == len(ids) and all(old[c].first_valid_index() <= start_q + 1 for c in ids)
+        if covers:
+            df = (old.loc[start_q:end, ids] if end else old.loc[start_q:, ids]).dropna()
+            if verbose:
+                print(f'FRED series read from cache {cache}: {df.shape[0]} quarters, {df.index.min()} to {df.index.max()}')
+            return df
+    parts = []
+    for sid in ids:
+        s = fred_series(sid, start=str(start_q.start_time.date()))
+        parts.append(s.groupby(s.index.to_period('Q')).mean().rename(sid))
+    df = pd.concat(parts, axis=1).dropna()
+    df = df.loc[start_q:end] if end else df.loc[start_q:]
+    df.index.name = 'quarter'
+    if cache:
+        os.makedirs(os.path.dirname(cache) or '.', exist_ok=True)
+        if old is not None:
+            keep = old.drop(columns=[c for c in ids if c in old.columns])
+            merged = pd.concat([keep, df], axis=1, sort=True); merged.index.name = 'quarter'; merged.to_csv(cache)
+        else:
+            df.to_csv(cache)
+    if verbose:
+        print(f'FRED series downloaded: {df.shape[0]} quarters, {df.index.min()} to {df.index.max()}' + (f', cached to {cache}' if cache else ''))
+    return df
