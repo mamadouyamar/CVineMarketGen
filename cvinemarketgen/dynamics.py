@@ -209,6 +209,7 @@ class AR1GARCH:
 _SPEC_RE = re.compile(r'^(const|ar1)(?:-(const|garch|gjr|egarch)(?:\((\d+),(\d+)\))?)?$')
 _HMM_RE = re.compile(r'^hmm(?:\((\d+)\))?$')
 _BLOCK_RE = re.compile(r'^(vecm|var)(?:\(([^)]*)\))?$')
+_STRUCT_RE = re.compile(r'^(ecm|linear)\(([^;)]*)(?:;\s*lags\s*=\s*(\d+))?\)$')
 
 
 def _block_args(s):
@@ -396,6 +397,11 @@ def parse_spec(spec):
     """``'const-garch(1,1)'``, ``'ar1-gjr(1,2)'``, ``'ar1'`` (constant variance), ``'hmm(3)'`` -> model."""
     if not isinstance(spec, str):
         return spec
+    m = _STRUCT_RE.match(spec.strip())
+    if m:
+        from .structural import Structural
+        parents = [p.strip() for p in m.group(2).split(',') if p.strip()]
+        return Structural(parents, form=m.group(1), lags=int(m.group(3)) if m.group(3) else (1 if m.group(1) == 'ecm' else 0))
     s = spec.strip().lower()
     m = _HMM_RE.match(s)
     if m:
@@ -420,6 +426,9 @@ def model_from_dict(d):
     if d['kind'] in ('vecm', 'var'):
         from .blocks import block_from_dict
         return block_from_dict(d)
+    if d['kind'] == 'structural':
+        from .structural import Structural
+        return Structural.from_dict(d)
     from .hmm import GaussianHMM
     return GaussianHMM.from_dict(d)
 
@@ -443,6 +452,7 @@ class AssetDynamics:
     def __init__(self, models=None):
         self.models = {_key(a): parse_spec(m) for a, m in (models or {}).items()}
         self.columns = None
+        self.order = None
         self.report = None
         self.candidates = None
 
@@ -457,6 +467,28 @@ class AssetDynamics:
     def _vars(key):
         return list(key) if isinstance(key, tuple) else [key]
 
+    @property
+    def children(self):
+        return [k for k, m in self.models.items() if getattr(m, 'kind', None) == 'structural']
+
+    def _dependency_order(self):
+        """Keys with parents before children (Kahn's algorithm); a cycle raises."""
+        owner = {c: k for k in self.models for c in self._vars(k)}
+        deps = {}
+        for k, m in self.models.items():
+            ps = getattr(m, 'parents', None) or []
+            missing = [p for p in ps if p not in owner]
+            if missing:
+                raise ValueError(f'{k!r}: parents {missing} are not columns of the history')
+            deps[k] = {owner[p] for p in ps}
+        order, done = [], set()
+        while len(order) < len(deps):
+            ready = [k for k in deps if k not in done and deps[k] <= done]
+            if not ready:
+                raise ValueError('the structural equations form a cycle')
+            order += ready; done |= set(ready)
+        return order
+
     def fit(self, history):
         h = pd.DataFrame(history).astype(float)
         covered = [c for k in self.models for c in self._vars(k)]
@@ -466,8 +498,15 @@ class AssetDynamics:
         extra = [c for c in covered if c not in h.columns]
         if extra or len(covered) != len(set(covered)):
             raise ValueError(f'dynamics keys must partition the history columns; unknown or repeated: {extra or covered}')
-        for k, m in self.models.items():
-            m.fit(h[list(k)] if isinstance(k, tuple) else h[k])
+        self.order = self._dependency_order()
+        for k in self.order:
+            m = self.models[k]
+            if getattr(m, 'kind', None) == 'structural':
+                m.fit(h[k], h[m.parents])
+            elif isinstance(k, tuple):
+                m.fit(h[list(k)])
+            else:
+                m.fit(h[k])
         self.columns = list(h.columns)
         if self.report is None:
             rows = {}
@@ -490,9 +529,13 @@ class AssetDynamics:
         """Returns (levels for blocks) from residual paths ``(n_paths, horizon, N)``, columns as in the history."""
         Z = np.asarray(Z, float)
         out = np.empty_like(Z)
-        for k, m in self.models.items():
+        for k in (self.order or list(self.models)):
+            m = self.models[k]
             idx = [self.columns.index(c) for c in self._vars(k)]
-            if isinstance(k, tuple):
+            if getattr(m, 'kind', None) == 'structural':
+                pidx = [self.columns.index(p) for p in m.parents]
+                out[:, :, idx[0]] = m.unfilter(Z[:, :, idx[0]], out[:, :, pidx])
+            elif isinstance(k, tuple):
                 out[:, :, idx] = m.unfilter(Z[:, :, idx])
             else:
                 out[:, :, idx[0]] = m.unfilter(Z[:, :, idx[0]])
@@ -500,6 +543,7 @@ class AssetDynamics:
 
     def to_dict(self):
         return {'name': self.name, 'columns': self.columns,
+                'order': None if self.order is None else [list(k) if isinstance(k, tuple) else k for k in self.order],
                 'models': {('|'.join(k) if isinstance(k, tuple) else k): m.to_dict() for k, m in self.models.items()},
                 'report': None if self.report is None else self.report.to_dict(orient='index'),
                 'candidates': None if self.candidates is None else self.candidates.to_dict(orient='list')}
@@ -509,6 +553,7 @@ class AssetDynamics:
         m = cls()
         m.models = {(tuple(a.split('|')) if md['kind'] in ('vecm', 'var') else a): model_from_dict(md) for a, md in d['models'].items()}
         m.columns = d.get('columns') or [c for k in m.models for c in cls._vars(k)]
+        m.order = m._dependency_order()
         if d.get('report'):
             m.report = pd.DataFrame(d['report']).T.loc[m.columns]
         if d.get('candidates'):

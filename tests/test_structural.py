@@ -59,3 +59,33 @@ def test_linear_without_lags_is_the_factor_map():
 def test_bad_form_and_positive_kappa_warning():
     with pytest.raises(ValueError):
         Structural(['a'], form='quadratic')
+
+
+from cvinemarketgen.dynamics import AssetDynamics, parse_spec
+
+
+def test_parse_structural_specs():
+    m = parse_spec('ecm(rd, oil)'); assert m.form == 'ecm' and m.parents == ['rd', 'oil'] and m.lags == 1
+    m = parse_spec('linear(f1, f2; lags=2)'); assert m.form == 'linear' and m.parents == ['f1', 'f2'] and m.lags == 2
+    m = parse_spec('ecm(rd; lags=3)'); assert m.parents == ['rd'] and m.lags == 3
+
+
+def test_container_orders_parents_before_children():
+    pytest.importorskip('statsmodels')
+    s, Z = _system(n=800)
+    h = Z.copy(); h['fx'] = s; h['spy'] = 0.0003 + 0.01 * np.random.default_rng(3).standard_normal(len(h))
+    h = h[['fx', 'spy', 'rd', 'oil']]                                   # child listed first on purpose
+    ad = AssetDynamics({('rd', 'oil'): 'vecm(r=0,q=1)', 'fx': 'ecm(rd, oil)', 'spy': 'ar1'}).fit(h)
+    assert ad.order[0] == ('rd', 'oil') and ad.order.index('fx') > ad.order.index(('rd', 'oil')) and ad.children == ['fx']
+    Zr = ad.filter(h)
+    assert list(Zr.columns) == ['fx', 'spy', 'rd', 'oil']
+    Y = ad.unfilter(np.zeros((4, 12, 4)))
+    assert Y.shape == (4, 12, 4) and np.isfinite(Y).all()
+    # the child moves with its parents: shock the parents' innovations only
+    Zs = np.zeros((4, 12, 4)); Zs[:, :, 2] = 3.0
+    Ys = ad.unfilter(Zs)
+    assert not np.allclose(Ys[:, :, 0], Y[:, :, 0]) and np.allclose(Ys[:, :, 1], Y[:, :, 1])
+    ad2 = AssetDynamics.from_dict(ad.to_dict())
+    assert ad2.order == ad.order and np.allclose(ad2.unfilter(np.zeros((1, 3, 4))), Y[:1, :3])
+    with pytest.raises(ValueError):
+        AssetDynamics({'a': 'ecm(b)', 'b': 'ecm(a)'}).fit(pd.DataFrame({'a': s.values, 'b': Z['rd'].values}))

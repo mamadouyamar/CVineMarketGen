@@ -196,3 +196,19 @@ def test_cvine_market_with_a_block(tmp_path):
     p = tmp_path / 'block.json'; cv.save(str(p))
     cv2 = CVineMarket.load(str(p))
     assert np.allclose(cv2.simulate_paths(2, 4, seed=1).array, cv.simulate_paths(2, 4, seed=1).array)
+
+
+def test_cvine_market_with_a_child_on_a_block(tmp_path):
+    pytest.importorskip('statsmodels')
+    from tests.test_structural import _system
+    s, Z = _system(n=600)
+    h = Z.copy(); h['fx'] = s; h['spy'] = 0.0003 + 0.01 * np.random.default_rng(5).standard_normal(len(h))
+    t = Targets.from_history(h)
+    cv = CVineMarket(t, central='spy', families='gaussian', n_opt=2000,
+                     dynamics={('rd', 'oil'): 'vecm(r=0,q=1)', 'fx': 'ecm(rd, oil)', 'spy': 'ar1'}).fit()
+    assert cv.dynamics_report.loc['fx', 'model'] == 'ECM(fx | rd, oil)'
+    P = cv.simulate_paths(8, 12, seed=0)
+    assert P.array.shape == (8, 12, 4) and np.isfinite(P.array).all()
+    p = tmp_path / 'child.json'; cv.save(str(p))
+    cv2 = CVineMarket.load(str(p))
+    assert np.allclose(cv2.simulate_paths(2, 4, seed=1).array, cv.simulate_paths(2, 4, seed=1).array)

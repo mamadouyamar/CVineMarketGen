@@ -251,6 +251,8 @@ class FleishmanMarket(_Market):
         A block of variables filtered jointly is given as a tuple key,
         ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
         in the units of the history (levels for a VECM).
+        A variable driven by others is given as a child, ``'ecm(rate_diff, log_oil)'`` (levels)
+        or ``'linear(f1, f2)'`` (returns); its parents are simulated first.
 
     Attributes
     ----------
@@ -342,6 +344,8 @@ class CVineMarket(_Market):
         A block of variables filtered jointly is given as a tuple key,
         ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
         in the units of the history (levels for a VECM).
+        A variable driven by others is given as a child, ``'ecm(rate_diff, log_oil)'`` (levels)
+        or ``'linear(f1, f2)'`` (returns); its parents are simulated first.
 
     Notes
     -----
