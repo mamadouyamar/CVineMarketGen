@@ -9,7 +9,12 @@
   back in levels from the last observed rows. Optional dependency `statsmodels`
   (`pip install cvinemarketgen[blocks]`).
 - `load_fred_monthly`: monthly means of daily FRED series.
-- Notebook 10, a VECM block on the nominal and real 10-year yields.
+- The structural layer: `Structural`, a child variable on parent variables plus its
+  own innovation, `'ecm(p1, p2)'` in levels or `'linear(p1, p2)'` in returns;
+  `AssetDynamics` orders parents before children (`order`, cycles refused) and
+  hands the child the parents' simulated paths.
+- Notebooks 10 (a VECM block on the nominal and real 10-year yields) and 11
+  (USDCAD on the rate differential and oil).
 
 ## 0.3.0 (2026-09-17)
 

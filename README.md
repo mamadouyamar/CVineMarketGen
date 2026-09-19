@@ -100,6 +100,11 @@ standardized innovations to the vine, and simulates the block in levels from
 the last observed values; notebook 10 shows it on the nominal and real 10-year
 Treasury yields.
 
+A variable driven by others is a child: `'log_fx': 'ecm(rate_diff, log_oil)'`
+fits an error-correction equation of the exchange rate on the yield
+differential and oil, its innovation joins the residual layer, and on a path the
+parents are simulated first; notebook 11 shows it on USDCAD.
+
 ## Assets on factors
 
 ```python

@@ -216,6 +216,26 @@ of the block's variables come back in levels, from the last observed rows,
 through the model's own recursion; ``Paths.cumulative`` and ``terminal`` apply to
 the return columns. Needs ``pip install statsmodels``.
 
+The structural layer
+--------------------
+
+.. code-block:: python
+
+   cv = CVineMarket(t, central='SPY', families='auto',
+                    dynamics={('rate_diff', 'log_oil'): 'vecm(r=0,q=1)',
+                              'log_fx': 'ecm(rate_diff, log_oil)',
+                              'SPY': 'ar1-garch'}).fit()
+   cv.dynamics.order                    # parents before children
+   cv.dynamics.models['log_fx'].theta   # long-run elasticities
+
+A variable driven by others is a child: ``'ecm(p1, p2)'`` fits the
+single-equation error-correction model in levels (adjustment ``kappa``, long-run
+relation ``theta``, contemporaneous response ``gamma``), ``'linear(p1, p2)'`` the
+linear model in returns, ``'linear(p1, p2; lags=0)'`` the plain factor map. The
+child's innovation is its residual layer; on a path the parents are simulated
+first, by their own models, and the child is rebuilt from them and from its own
+draw. Parents are taken as weakly exogenous; cycles are refused.
+
 Assets on factors
 -----------------
 

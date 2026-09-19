@@ -49,6 +49,12 @@ Blocks
 .. automodule:: cvinemarketgen.blocks
    :members: BlockVECM, BlockVAR
 
+Structural layer
+----------------
+
+.. automodule:: cvinemarketgen.structural
+   :members: Structural
+
 Factors
 -------
 

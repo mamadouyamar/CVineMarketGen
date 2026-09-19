@@ -101,6 +101,9 @@ the pipeline and leave it unchanged.
   :class:`~cvinemarketgen.blocks.BlockVAR` filter a block of variables jointly;
   their standardized innovations are the block's residual layer and paths come
   back in levels.
+* Structural filters: :class:`~cvinemarketgen.structural.Structural`, a child on
+  parents plus its own innovation, in error-correction form on levels or linear
+  form on returns; parents are simulated first.
 
 Family selection in short
 -------------------------
