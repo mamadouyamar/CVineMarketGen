@@ -13,11 +13,12 @@ from .selection import select_dynamics, iid_tests, gof_bootstrap
 from .hmm import GaussianHMM
 from .blocks import BlockVECM, BlockVAR
 from .structural import Structural
+from .yieldcurve import NelsonSiegel, PCACurve, curve_returns, bond_price, par_yield
 from .functions import (fit_johnson_su, johnson_su_moments, johnson_su_sample, fit_fleishman,
                         exceedance_curve, classify_pair, select_family)
 
 __all__ = ['Targets', 'FleishmanMarket', 'CVineMarket', 'Diagnostics', 'Paths', 'FactorModel', 'AR1', 'AR1GARCH',
-           'AssetDynamics', 'GarchFamily', 'GaussianHMM', 'BlockVECM', 'BlockVAR', 'Structural', 'parse_spec', 'select_dynamics', 'iid_tests', 'gof_bootstrap',
+           'AssetDynamics', 'GarchFamily', 'GaussianHMM', 'BlockVECM', 'BlockVAR', 'Structural', 'NelsonSiegel', 'PCACurve', 'curve_returns', 'bond_price', 'par_yield', 'parse_spec', 'select_dynamics', 'iid_tests', 'gof_bootstrap',
            'fit_johnson_su', 'johnson_su_moments', 'johnson_su_sample', 'fit_fleishman',
            'exceedance_curve', 'classify_pair', 'select_family', 'partial_correlations',
            'MomentMatch', 'CopulaTools', 'CVineGenerator', 'FleishmanGenerator',
