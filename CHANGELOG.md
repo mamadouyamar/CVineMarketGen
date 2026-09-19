@@ -9,7 +9,31 @@
   back in levels from the last observed rows. Optional dependency `statsmodels`
   (`pip install cvinemarketgen[blocks]`).
 - `load_fred_monthly`: monthly means of daily FRED series.
-- Notebook 10, a VECM block on the nominal and real 10-year yields.
+- The structural layer: `Structural`, a child variable on parent variables plus its
+  own innovation, `'ecm(p1, p2)'` in levels or `'linear(p1, p2)'` in returns;
+  `AssetDynamics` orders parents before children (`order`, cycles refused) and
+  hands the child the parents' simulated paths.
+- The yield curve: `NelsonSiegel` (factors by least squares per date for a fixed
+  or searched decay, curves at any maturity from factors or factor paths) and
+  `PCACurve` as the benchmark; pricing from the factors, `bond_price`,
+  `par_yield`, `zero_return`, `constant_maturity_return` and `curve_returns`
+  (returns of constant-maturity or zero-coupon bonds along simulated paths).
+- Fix: the Johnson SU re-fit on a drawn cross-section (Step 2 of Algorithm 5)
+  could fail silently for a fat-tailed target and fill the column with NaN;
+  `simulate` and `simulate_paths` now fall back to Nelder-Mead and then to the
+  calibrated parameters.
+- `exclude=[...]` on the markets: periods left out of the residual layer before
+  the marginals and the vine are fitted (known one-off interventions, such as
+  the pandemic months for the unemployment rate); saved with the model.
+- `load_fred_monthly` refetches when the cache starts after the requested
+  `start`, and merges new series into the cache instead of overwriting it.
+- `price_level`, `yoy` and `deflate`: price levels, year-on-year rates and real
+  returns from a column of monthly inflation along the paths.
+- Notebooks 10 (a VECM block on the nominal and real 10-year yields), 11
+  (USDCAD on the rate differential and oil), 12 (the Treasury curve as
+  Nelson-Siegel factors filtered as a block, fixed income priced along the
+  paths) and 13 (CPI inflation as a child of oil, unemployment and
+  expectations; price levels, an oil scenario, real returns).
 
 ## 0.3.0 (2026-09-17)
 
