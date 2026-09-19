@@ -27,13 +27,18 @@
   the pandemic months for the unemployment rate); saved with the model.
 - `load_fred_monthly` refetches when the cache starts after the requested
   `start`, and merges new series into the cache instead of overwriting it.
+- `Bridge`: a quarterly series (GDP growth) on the quarterly means of monthly
+  parents plus its lags, applied to simulated monthly paths with a Johnson SU
+  quarterly innovation; `growth_to_level`, `recession_probability`;
+  `load_fred_quarterly`.
 - `price_level`, `yoy` and `deflate`: price levels, year-on-year rates and real
   returns from a column of monthly inflation along the paths.
 - Notebooks 10 (a VECM block on the nominal and real 10-year yields), 11
   (USDCAD on the rate differential and oil), 12 (the Treasury curve as
   Nelson-Siegel factors filtered as a block, fixed income priced along the
   paths) and 13 (CPI inflation as a child of oil, unemployment and
-  expectations; price levels, an oil scenario, real returns).
+  expectations; price levels, an oil scenario, real returns) and 14 (quarterly
+  GDP from the monthly paths through a bridge equation, recession probabilities).
 
 ## 0.3.0 (2026-09-17)
 

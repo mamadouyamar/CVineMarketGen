@@ -284,6 +284,28 @@ leaves known one-off months out of the residual layer on which the marginals
 and the vine are fitted (the April 2020 unemployment jump is a 14-sigma
 innovation); the filters still use the whole history.
 
+Quarterly output from monthly paths
+-----------------------------------
+
+.. code-block:: python
+
+   gdp = load_fred_quarterly(['GDPC1'], start='1993Q1')
+   g = (400 * np.log(gdp['GDPC1']).diff()).dropna()             # growth, percent annualized
+   br = Bridge(['d_payems', 'd_indpro', 'd_unrate'], lags=1).fit(g, data[parents])
+   br.report                                                     # coefficients and t-statistics
+   P = cv.simulate_paths(1000, 24, seed=1)                       # monthly paths of the parents' block and SPY
+   G = br.simulate(P, g.values, seed=1)                          # Paths (1000, 8, 1) of quarterly growth
+   growth_to_level(G)                                            # level of output, last quarter = 100
+   recession_probability(G, k=2)                                 # share of paths with two negative quarters
+
+A quarterly series is a child at its own frequency: ``Bridge`` regresses it on
+the quarterly means of monthly parents plus its lags (the bridge equation), and
+on simulated monthly paths it averages each quarter's parents, applies the
+equation and draws a quarterly Johnson SU innovation, independent of the
+monthly residual layer. The monthly sample must end at a quarter end, so that
+the simulated months start a new quarter; ``load_fred_quarterly`` fetches
+quarterly FRED series.
+
 Assets on factors
 -----------------
 

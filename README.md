@@ -118,6 +118,13 @@ unemployment rate and survey expectations; `yoy`, `price_level` and `deflate`
 read year-on-year rates, price levels and real asset returns off the paths;
 notebook 13 shows it with an oil scenario.
 
+Quarterly output comes from the monthly paths through a bridge equation:
+`Bridge(['d_payems', 'd_indpro', 'd_unrate']).fit(gdp_growth, monthly_data)`
+regresses GDP growth on the quarterly means of payroll growth, industrial
+production and the change in unemployment, and `br.simulate(paths, history)`
+gives eight quarters of growth from 24 simulated months, with the level of
+output and the probability of a recession; notebook 14.
+
 ## Assets on factors
 
 ```python
@@ -146,7 +153,7 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Thirteen tutorials in [`examples/`](examples/), each one small step at a time,
+Fourteen tutorials in [`examples/`](examples/), each one small step at a time,
 all executed, each with a Colab badge. Start with the first.
 
 | | Notebook | What it shows |
@@ -164,13 +171,14 @@ all executed, each with a Colab badge. Start with the first.
 | 11 | [`11_structural_layer_fx`](examples/11_structural_layer_fx.ipynb) | USDCAD on the U.S. minus Canada 10-year differential and oil: the structural layer, a parent scenario, paths in levels |
 | 12 | [`12_yield_curve_fixed_income`](examples/12_yield_curve_fixed_income.ipynb) | the Treasury curve as Nelson-Siegel level, slope and curvature (PCA as benchmark), the factors filtered as a block, simulated curves, constant-maturity bond returns priced along the paths |
 | 13 | [`13_inflation`](examples/13_inflation.ipynb) | headline and core CPI inflation as children of oil, unemployment and expectations: the equation, paths of inflation and price levels, an oil scenario, real returns of SPY |
+| 14 | [`14_gdp_bridge`](examples/14_gdp_bridge.ipynb) | quarterly GDP growth from monthly paths through a bridge equation on payrolls, industrial production and unemployment: the equation with and without the pandemic quarters, eight-quarter fans, recession probabilities, a payroll scenario |
 
 ## Data
 
 `data/jpm_ltcma_2024.csv` holds the arithmetic mean, volatility and correlation
 matrix of 59 asset classes from J.P. Morgan's 2024 Long-Term Capital Market
 Assumptions (USD), as published in the public report. Nothing else is shipped:
-notebooks 06 to 13 download their series at run time (Fama-French, FRED,
+notebooks 06 to 14 download their series at run time (Fama-French, FRED,
 Yahoo Finance) into a git-ignored cache. The paper's own historical data
 (Finaeon/GFD) is licensed and not included.
 

@@ -112,6 +112,9 @@ the pipeline and leave it unchanged.
   and expectations; :func:`~cvinemarketgen.paths.price_level`,
   :func:`~cvinemarketgen.paths.yoy` and :func:`~cvinemarketgen.paths.deflate`
   read price levels, year-on-year rates and real returns off the paths.
+* Quarterly output: :class:`~cvinemarketgen.bridge.Bridge`, a bridge equation
+  on the quarterly means of monthly parents, applied to the monthly paths with
+  an independent quarterly innovation.
 
 Family selection in short
 -------------------------
