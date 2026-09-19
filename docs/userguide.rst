@@ -236,6 +236,31 @@ child's innovation is its residual layer; on a path the parents are simulated
 first, by their own models, and the child is rebuilt from them and from its own
 draw. Parents are taken as weakly exogenous; cycles are refused.
 
+The yield curve and fixed income
+--------------------------------
+
+.. code-block:: python
+
+   Y = load_fred_monthly(['DGS1', 'DGS2', 'DGS5', 'DGS10', 'DGS30'], start='1993-10')
+   ns = NelsonSiegel(0.7308).fit(Y)             # level, slope, curvature by least squares per date
+   ns.rmse                                      # fitting error by maturity
+   data = ns.factors.join(spy_returns, how='inner')
+   cv = CVineMarket(Targets.from_history(data), central='SPY', families='auto',
+                    dynamics={('level', 'slope', 'curvature'): 'vecm', 'SPY': 'ar1-garch'}).fit()
+   P = cv.simulate_paths(1000, 24, seed=1)
+   PF = Paths(P.array[:, :, :3], ['level', 'slope', 'curvature'])
+   curves = ns.curve(PF)                                       # yields at the fitted maturities
+   R = curve_returns(PF, [2, 10, 30], ns, ns.factors.iloc[-1].values)   # constant-maturity bond returns
+
+The curve is three observed factors, level, slope and curvature, estimated by
+least squares per date on the Nelson-Siegel loadings with the decay ``lam`` in
+years (``'auto'`` searches it; ``PCACurve`` is the benchmark with the same
+interface). They enter the market as a block like any other variables in
+levels; simulated factors give curves at any maturity through ``curve``, and
+``bond_price``, ``par_yield`` and ``curve_returns`` price zero-coupon and
+constant-maturity par bonds along the paths, with continuous compounding on
+yields in percent.
+
 Assets on factors
 -----------------
 

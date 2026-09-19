@@ -104,6 +104,10 @@ the pipeline and leave it unchanged.
 * Structural filters: :class:`~cvinemarketgen.structural.Structural`, a child on
   parents plus its own innovation, in error-correction form on levels or linear
   form on returns; parents are simulated first.
+* Yield curve: :class:`~cvinemarketgen.yieldcurve.NelsonSiegel` reads the
+  curve as level, slope and curvature (principal components as the benchmark);
+  the factors are filtered as a block, and simulated factors give whole curves,
+  discount factors and bond returns by :func:`~cvinemarketgen.yieldcurve.curve_returns`.
 
 Family selection in short
 -------------------------
