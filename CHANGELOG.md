@@ -27,6 +27,9 @@
   the pandemic months for the unemployment rate); saved with the model.
 - `load_fred_monthly` refetches when the cache starts after the requested
   `start`, and merges new series into the cache instead of overwriting it.
+- Every notebook states the mathematics of each step before the code cell that
+  runs it: the object, its formula with the symbols defined, the estimator or
+  algorithm, and how to read the output.
 - `Bridge`: a quarterly series (GDP growth) on the quarterly means of monthly
   parents plus its lags, applied to simulated monthly paths with a Johnson SU
   quarterly innovation; `growth_to_level`, `recession_probability`;
