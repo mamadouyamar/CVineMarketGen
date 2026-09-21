@@ -239,6 +239,13 @@ class _Market:
         if not self.fitted:
             raise RuntimeError('call fit() first')
 
+    def __repr__(self):
+        n = len(self.targets.assets)
+        parts = [f'{n} assets', 'fitted' if self.fitted else 'not fitted']
+        if self.dynamics is not None:
+            parts.append('with dynamics')
+        return f'{type(self).__name__}({", ".join(parts)})'
+
 
 # =============================================================================
 class FleishmanMarket(_Market):
