@@ -1,197 +1,63 @@
-# The Notebook Series as a Course: Design
+# The Notebook Series: Design (definitive)
 
-**Date:** 2026-09-20. **Status:** for approval.
+**Date:** 2026-09-21 (replaces the 2026-09-20 draft). **Status:** approved in chat.
 
-## Why
+## Logic
 
-The fourteen notebooks were built one feature at a time. Each is a demo of one
-object, with SPY alongside, and the series has no spine: objects are named
-before they are introduced ("Targets is the object both generators take" in
-01, before any generator is shown), the econometric models of 10 to 14 never
-reach an asset, and the factor model of 08 is never connected to them. The
-notebooks are going to asset managers. They must read as a course with two
-tracks, each notebook answering a question its reader asks, using only what
-earlier notebooks defined, and ending in a deliverable the reader can use.
+The notebooks are a course. Each one is motivated by a limitation the previous
+one runs into, introduces the one object that removes it, runs the whole process
+again with it, and checks the result. No object is named before the reader needs
+it. Readers: asset managers and portfolio construction teams, risk managers,
+traders and systematic structurers, econometricians. Every notebook carries the
+mathematics of each step before the cell that runs it (the object, its formula
+with the symbols defined, the estimator or algorithm, how to read the output).
 
-## The readers
+The process, always the same: **targets** (what the synthetic data must
+reproduce), **fit** (learn the generator), **check** (diagnostics against the
+targets and the history), **use** (scenarios, paths, a change, a stress). Both
+generators, Fleishman and C-vine, are kept from notebook 2 on; Fleishman is the
+benchmark.
 
-Five kinds of reader, one course. Each notebook is written for the reader who
-asks its question; the reading guide (README and docs) gives each reader an
-ordered path through the series.
+## The chain
 
-- **Asset managers and portfolio construction teams.** Monthly or annual data,
-  horizons of months to years. Scenario sets consistent with their
-  capital-market assumptions, with realistic tails; views and stresses on the
-  economy propagated to every asset class; fixed income repriced from the
-  curve; real returns. Path: Part I, then Part II.
-- **Risk managers.** The same horizons, the opposite tail. Value at risk and
-  expected shortfall of a portfolio under fat tails and tail dependence, stress
-  scenarios that propagate through the economy to every position, the
-  distribution of drawdowns, and reverse stress: which factor moves explain the
-  worst losses. Path: Part I, Part II, and notebook 15.
-- **Traders and systematic strategy structurers.** Daily data, horizons of
-  days. Many synthetic years of daily paths with the right clustering, tails
-  and regimes; a strategy's distribution of Sharpe ratio, drawdown and turnover
-  across those years against the one history. Path: Part I (at least 01, 02,
-  05), then Part III.
-- **Econometricians.** The estimation and the tests behind every step: the
-  moment equations and the four algorithms of the generator (04), the filters
-  and the residual layer (05), the cointegration, structural and bridge
-  equations with their tests (08 to 12), the selection by tests, BIC and
-  bootstrap goodness of fit (16, 17). Every notebook carries the mathematics of
-  each step before the cell that runs it, and each Part II and Part III
-  notebook has a companion paper. Path: 04, 05, then Parts II and III in order.
-- **Everyone** needs the core: targets, marginals, copula, generator, and the
-  idea of a filter to an i.i.d. residual layer with an exact inverse from the
-  last observed state.
-
-## The series (new numbering)
-
-Every notebook has the same arc. Opening cell: the question, the answer in one
-paragraph, "what you need from earlier notebooks", "what this notebook adds".
-Each section: the reader's question in plain words, the idea in one sentence,
-the mathematics (already written), the code, how to read the output. Closing
-cell: what was learned, which notebook comes next and why. No object is named
-before the section that introduces it. Titles carry no em-dash: "01 Getting
-started".
-
-### Part I. The generator (everyone)
-
-| New | Old | Question | Introduces | Deliverable |
+| | Title | Motivation (the limitation found before) | Introduces | Ends by finding |
 |---|---|---|---|---|
-| 01 Getting started | 01 | I have a table of means, volatilities and correlations. How do I get scenarios consistent with it, with fat tails? | the problem; `Targets` as the table; the C-vine generator as a black box; `simulate`, `diagnostics`; one-period scenarios; `Paths` for i.i.d. periods; save/load | a 25,000-scenario set from four LTCMA rows, its diagnostics |
-| 02 One asset, one pair | 02 (+ the "skewness and kurtosis targets" section of old 01) | Why not a multivariate normal? What do fat tails and tail dependence mean for one asset and for a pair? | Johnson SU marginal; the copula of a pair; exceedance correlation; families and their tails; mixtures; adding skewness and kurtosis to the targets | the reader can read an exceedance curve and a family table |
-| 03 The Fleishman generator | 03 | Is there a faster way, and what does it give up? | `FleishmanMarket`; Gaussian dependence; the comparison of exceedance curves | the benchmark and its limits |
-| 04 Inside the C-vine generator | 04 | What happens between the targets and the scenarios? | the four algorithms on a known truth | trust in the black box of 01 |
-| 05 From scenarios to paths | new (concepts from old 07) | Scenarios are one period. How do I get paths, when returns are not independent over time? | the filter $\Psi$: a model with an invertible one-step conditional distribution; the residual layer; the generator on the residual layer; the inverse from the last observed state; the same construction at monthly (AR(1) on a yield) and daily (GARCH on an equity) frequency; the i.i.d. tests | the reader knows what "dynamics" means in every later notebook |
+| 01 | Matching moments and correlations | A history of a few assets is one sample; more data like it is needed | targets from a history (moments, correlations); the Fleishman generator; diagnostics; scenarios; a portfolio's distribution against the normal; i.i.d. paths; save | the empirical exceedance-correlation profile against the simulated one: the tails' dependence is missing |
+| 02 | Tail dependence | that plot | what tail dependence is for a pair (exceedance correlation, families, tail coefficients, mixtures); the C-vine generator with families selected from the history; the process again; the plot again; Fleishman kept as benchmark | many assets: pairwise calibration does not scale |
+| 03 | Many assets: factors | 100+ assets | the factor model (assets = betas on a few factors + residual); factor targets from history; both generators on the factors; assets mapped; a view as a shift of the factor targets | the factor histories are time series; one-period scenarios ignore that |
+| 04 | The time series of a factor | autocorrelation, ARCH, regimes in one factor, daily and monthly | tests (Ljung-Box, ARCH-LM); AR-GARCH family and the HMM as candidates, selection by tests and BIC, bootstrap GoF; the generalized error (standardized residual for GARCH, Rosenblatt uniform for the HMM), i.i.d.; paths by inversion from the last state | each factor now has its own dynamics; how do they go together? |
+| 05 | Integration | | factors with their dynamics, generalized errors joined by the C-vine or Fleishman, assets on the factors, paths at the horizon; checks against the history's dynamics and dependence | the principle behind it, and dynamics shared by a subset of variables |
+| 06 | The generalized-error principle | | statement of the principle (Thioub's master's thesis, SSRN 3347348; article 4): any dynamics, univariate or multivariate, produces i.i.d. generalized errors, the copula generator simulates those, the dynamics rebuild the paths; the VECM/VAR block as the multivariate case on a subset (nominal and real yields), rank and lags by tests, paths in levels | fixed income needs the curve, not one yield |
+| 07 | The yield curve and fixed income | yields are the first risk factor and bond returns are functions of the curve; coverage of every maturity; scenarios stated in yields; horizon; the curve as a state variable | Nelson-Siegel factors as a block (instance of 06); curves along paths; fixed income as a child computed by pricing (discount factors, par yields, constant-maturity and zero returns); the duration factor of 03 replaced by the priced return; historical priced returns against realized indices; a 100 bp level shock propagated by projection | variables that have causes |
+| 08 | Variables with causes | the exchange rate follows rates and oil, inflation follows oil, slack and expectations, output is quarterly | the structural layer (parents, children with their own generalized error, order); inflation, price level, real returns; the bridge to a quarterly series; one oil shock reaching all three | assembling everything |
+| 09 | One market | | the three layers (economy, factors filtered or priced or derived, assets on factors or priced) in one simulation; 24-month paths; the assets' moments against history; two propagated scenarios; a portfolio's nominal and real distribution | what the tail of that portfolio holds |
+| 10 | Tail risk and stress tests | the risk manager's question | VaR and expected shortfall on the market of 09 against the normal; P&L by position and by factor under the stresses; drawdowns along paths; reverse stress by conditional expectation | the daily reader's question |
+| 11 | Daily paths and backtesting | one history for a strategy | the daily market of 04 and 05 on several assets, a thousand synthetic years; a strategy as a weight function run on every year; Sharpe, drawdown and turnover distributions against the one history | path-dependent payoffs |
+| 12 | Structured payoffs | | payoff functions on paths (protected note, autocall, volatility target); their distribution and hedging cost under realistic dynamics against the lognormal | |
 
-### Part II. Portfolio construction (monthly)
+Readers' paths: asset managers 01-09; risk managers 01, 02, 06-10; traders and
+structurers 01, 02, 04, 11, 12; econometricians 01-08, 11.
 
-| New | Old | Question | Introduces | Deliverable |
-|---|---|---|---|---|
-| 06 Capital-market assumptions as targets | 05 | My assumptions are a published table. How do I use it, and where do the higher moments come from? | `Targets.from_ltcma` with a history for skewness and kurtosis; both generators on the same table; the choice between them | the LTCMA workflow |
-| 07 Targets from a history: macro factors | 06 | I have no table, I have data. | `Targets.from_history`; the seven factors built from public data; monthly to annual | a factor scenario set from history |
-| 08 Variables in levels: a block of yields | 10 | Yields are levels, not returns, and they move together. How are they filtered? | blocks (VECM/VAR), cointegration, paths in levels from the last observed values; the breakeven kept anchored | rates paths in levels |
-| 09 The yield curve and fixed income | 12 | I need the whole curve, and bond prices, not one yield. | Nelson-Siegel factors as a block; curves and bond returns along the paths | Treasury returns at any maturity, priced |
-| 10 A variable explained by others: the exchange rate | 11 | The Canadian dollar follows the rate differential and oil. | the structural layer (parents, children, order); scenarios on a parent | FX paths and a propagated oil scenario |
-| 11 Inflation and real returns | 13 | Real returns need inflation, and inflation has causes. | inflation as a child; price levels, year-on-year, `deflate`; `exclude` for one-off months | inflation paths, real returns |
-| 12 Output from a monthly market | 14 | I want GDP, which is quarterly. | the bridge equation; recession probabilities | GDP paths |
-| 13 Assets on factors | 08 | My assets are explained by a few factors. How do factor scenarios become asset scenarios, and how do I express a view? | `FactorModel` on the factors of the assembled market (Section below), including priced factors; views as location shifts | asset scenarios and paths from factor paths |
-| 14 One market: from the economy to the portfolio | new | Put it together: the economy, the market factors and my assets in one simulation, with scenarios that propagate. | the three-layer market (Section below); the assembly helper | 24-month asset paths, real returns, two propagated scenarios, a portfolio's distribution |
+## Mapping from the current notebooks
 
-| 15 Stress tests and tail risk of a portfolio | new | What can I lose, how, and which scenario does it? | value at risk and expected shortfall of a portfolio on the scenarios of the assembled market against the normal; the tail-dependence contribution to portfolio losses; the propagated stresses of 14 applied to the positions (P&L by position, by factor); the distribution of drawdowns along the paths; reverse stress, the conditional mean of every factor and economic variable given a portfolio loss beyond its 1 percent quantile | the risk manager's deliverable: a stress and tail-risk report on the same market as the portfolio team's |
+Current 01, 03 -> 01. Current 02, 04, 05 -> 02. Current 06, 08 -> 03 (factors),
+with the factor construction of 06 kept. Current 07, 09 -> 04 (and 11 for the
+backtest). Current 10 -> 06. Current 12 -> 07. Current 11, 13, 14 -> 08. New:
+05, 09, 10, 11, 12. The companion papers stay one per model and are the
+references; the notebooks are the course. Old notebooks are deleted as their
+content is absorbed; README, docs, badges and papers updated at each step.
 
-### Part III. Systematic strategies (daily)
+## Package additions (when the notebook needs them)
 
-| New | Old | Question | Introduces | Deliverable |
-|---|---|---|---|---|
-| 16 Daily dynamics chosen per asset | 07 | Daily returns cluster their variance and have regimes. Which model for each asset, chosen by the data? | GARCH family and HMM candidates; tests, BIC, bootstrap GoF; `dynamics='auto'`; 1,000 daily years | a fitted daily market, saved |
-| 17 Regimes | 09 | One asset with regimes, in depth. | `GaussianHMM`: probabilities, the Rosenblatt residual layer, the GoF test | regime paths |
-| 18 Backtesting on synthetic years | new | My strategy has one history. How does it do on a thousand? | the backtest helper: a strategy as a weight function of past returns, run on every path; the distribution of Sharpe ratio, drawdown and turnover against the one history | the trader's deliverable |
+- 03: `FactorModel.fit` on each asset's own sample.
+- 09: `assembly.py` (`Market` of the three layers, `simulate`, `scenario` with projection of a block's other innovations).
+- 10: `risk.py` (`var_es`, `drawdowns`, `reverse_stress`, `pnl_by_factor`).
+- 11: `backtest.py` (`run_strategy`, `sharpe`, `max_drawdown`, `turnover`, `summary`).
+- 12: `payoffs.py` (`protected_note`, `autocall`, `vol_target`, `lognormal_benchmark`).
 
-Renumbering map (old -> new): 01->01, 02->02, 03->03, 04->04, 05->06, 06->07,
-07->16, 08->13, 09->17, 10->08, 11->10, 12->09, 13->11, 14->12; new 05, 14, 15, 18.
-Files are renamed with `git mv`; Colab badges, README table, `docs/examples.rst`,
-the papers (`\package` notebook references), the Overleaf README and the
-memory notes are updated to the new numbers.
+## Execution
 
-## Notebook 14: the assembled market
-
-**Frequency and sample.** Monthly, October 1993 to the last complete quarter;
-assets with shorter histories (TIP 2003, EEM 2003, VNQ 2004, DBC 2006, HYG
-2007) are regressed on their own available sample.
-
-**Layer 1, the economy** (all in one `AssetDynamics`, one vine):
-
-| Variables | Model | Source |
-|---|---|---|
-| level, slope, curvature | block `'vecm(q=1)'` | Nelson-Siegel on DGS1..DGS30 (notebook 09) |
-| log_oil, unrate, mich | block `'vecm'` (rank by the test) | WTI, UNRATE, MICH |
-| d_payems, d_indpro | block `'var'` | PAYEMS, INDPRO growth |
-| rate_diff (US minus Canada 10-year) | `'ar1'` | DGS10, IRLTLT01CAM156N |
-| log_cpi | child `'ecm(log_oil, unrate, mich; lags=2)'` | CPIAUCSL; inflation = 1200 * d log_cpi, price level direct |
-| log_fx (USDCAD) | child `'ecm(rate_diff, log_oil)'` | DEXCAUS |
-| GDP growth (quarterly) | `Bridge(['d_payems', 'd_indpro', 'd_unrate'])`, `d_unrate` derived from the unrate path | GDPC1 |
-
-`exclude=['2020-03', ..., '2020-06']` on the residual layer.
-
-**Layer 2, the market factors**, in the same vine when filtered, priced from
-layer 1 when a pricing exists:
-
-| Factor | How |
-|---|---|
-| equity_dm (SPY), equity_em (EEM), commodities (DBC), gold (GLD) | filtered, `'ar1-garch'`, columns of the same market |
-| duration | priced: 10-year constant-maturity return from the simulated curve (`curve_returns`) |
-| credit | HYG return minus the 5-year constant-maturity return, filtered `'ar1-garch'` |
-| fx | derived: change of log_fx |
-| inflation | derived: 1200 * change of log_cpi |
-
-**Layer 3, the assets**: IWM, EFA, TLT, IEF, TIP, LQD, VNQ (plus the factor
-ETFs themselves as investable) through `FactorModel` on the eight factors;
-Treasuries alternatively priced directly from the curve (TLT as the 20-year
-constant-maturity par bond, IEF as the 7-year), the two shown side by side.
-
-**Outputs**: 24-month paths of every variable; the assets' simulated mean,
-volatility and correlation against their history; real cumulative returns at
-12 and 24 months; recession probability; two scenarios propagated through
-coefficients, the block innovations shifted by their projection on the shocked
-one: oil up 50 percent over six months (inflation, real returns, USDCAD,
-commodities, TIP against TLT) and the curve's level up 100 basis points over
-six months (every Treasury and the duration exposure of every asset); a 60/40
-portfolio's nominal and real distribution under baseline and scenarios.
-
-## Package additions
-
-- `cvinemarketgen/assembly.py`: `Market(core, derived=None, priced=None, factor_model=None, bridge=None)`:
-  `core` a fitted `CVineMarket` (layer 1 plus filtered factors); `derived` a
-  dict `name -> function(Paths) -> array (n, h)` (differences, inflation from
-  log CPI); `priced` a dict `name -> function(Paths) -> array` (curve returns);
-  `factor_model` a `FactorModel` whose factors are columns of the core, derived
-  or priced; `bridge` a `(Bridge, parents-as-derived-names, history)` triple.
-  `simulate(n, h, seed)` returns a `MarketPaths` object with `.economy`,
-  `.factors`, `.assets` (`Paths`) and `.gdp`; `scenario(shifts, months, projection=True)`
-  applies drifts to named innovations (in the variables' units), projecting the
-  other innovations of the same block when `projection=True`, and returns the
-  same object for baseline and scenario. Tests on a synthetic core.
-- `FactorModel.fit`: each asset regressed on the factors over its own
-  non-missing sample (currently a common sample); `report` gains `n_obs`.
-- `Structural`: `'ecm'` with `lags` on the child already exists; no change.
-- `cvinemarketgen/risk.py`: `var_es(returns, alpha)`, `drawdowns(paths)`, `reverse_stress(portfolio_returns, variables, alpha)` (conditional means of the variables on the paths where the portfolio loss exceeds its alpha quantile), `pnl_by_factor(fm, factor_paths, weights)`. Tests on synthetic paths.
-- `cvinemarketgen/backtest.py`: `run_strategy(paths, weights_fn, rebalance='M')`
-  (weights from past returns, returns per path), `sharpe`, `max_drawdown`,
-  `turnover`, `summary` (distribution across paths against the history's
-  values). Tests on synthetic paths.
-
-## Papers
-
-- Notebook references updated to the new numbers in every paper and in the
-  Overleaf README.
-- A new short paper for notebook 14, "One market: the economy, the factors and
-  the portfolio", stating the three-layer construction and its assumptions
-  (priced factors as deterministic children, factor-model residuals
-  independent, the bridge innovation independent), with the propagated
-  scenarios as the application.
-- A new short paper for notebook 15, "Stress tests and tail risk on a simulated market" (VaR and ES under the vine against the normal, propagated stresses, reverse stress by conditional expectation).
-- A new short paper for notebook 18, "Backtesting on synthetic years".
-- `article4-principle.tex` gains a section "Three layers" that states the
-  assembled market as the general case of the filters, blocks and children.
-
-## Execution phases (one plan each, inline, one commit per task)
-
-- A. Renumbering and references (mechanical, no content change).
-- B. Part I: rewrite 01 to 04 to the arc (01 rebuilt around the C-vine; 02
-  absorbs the higher-moment targets; 03 the benchmark), write 05, re-execute
-  01 to 05.
-- C. Package additions (`assembly.py`, `FactorModel` own-sample fit,
-  `backtest.py`) with tests.
-- D. Part II: rewrite the openings, transitions and closings of 06 to 12 to the
-  arc (markdown-only), rewrite 13 on the assembled market's factors and write
-  14 (both executed), the paper of 14.
-- E. Notebook 15 (risk) on the saved market of 14, its paper; Part III: rewrite 16 and 17 to the arc, write 18 (executed), the paper of 18.
-- F. Reading guide in README and docs (the three parts, the two readers, the
-  order), article-4 section, papers' references, Overleaf zip, upload staging.
-
-## Out of scope
-
-Intraday data; a second currency; credit curves; MIDAS; re-estimating the
-article-3 engine.
+One notebook at a time, in order: write, execute, check the numbers, delete the
+superseded notebooks, update README/docs, commit. Papers and article 4 updated
+at the end (article 4 gains the generalized-error section with the thesis
+citation and the three-layer market).
