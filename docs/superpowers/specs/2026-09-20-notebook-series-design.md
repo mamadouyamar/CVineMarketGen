@@ -15,17 +15,35 @@ earlier notebooks defined, and ending in a deliverable the reader can use.
 
 ## The readers
 
-- **Calibration and portfolio construction teams.** Monthly or annual data,
-  horizons of months to years. They want scenario sets consistent with their
+Five kinds of reader, one course. Each notebook is written for the reader who
+asks its question; the reading guide (README and docs) gives each reader an
+ordered path through the series.
+
+- **Asset managers and portfolio construction teams.** Monthly or annual data,
+  horizons of months to years. Scenario sets consistent with their
   capital-market assumptions, with realistic tails; views and stresses on the
   economy propagated to every asset class; fixed income repriced from the
-  curve; real returns.
-- **Traders and systematic strategy builders.** Daily data, horizons of days.
-  They want many synthetic years of daily paths with the right clustering,
-  tails and regimes, to backtest and stress a strategy beyond the one history.
-
-Both need the core: targets, marginals, copula, generator, and the idea of a
-filter to an i.i.d. residual layer with an exact inverse from the last state.
+  curve; real returns. Path: Part I, then Part II.
+- **Risk managers.** The same horizons, the opposite tail. Value at risk and
+  expected shortfall of a portfolio under fat tails and tail dependence, stress
+  scenarios that propagate through the economy to every position, the
+  distribution of drawdowns, and reverse stress: which factor moves explain the
+  worst losses. Path: Part I, Part II, and notebook 15.
+- **Traders and systematic strategy structurers.** Daily data, horizons of
+  days. Many synthetic years of daily paths with the right clustering, tails
+  and regimes; a strategy's distribution of Sharpe ratio, drawdown and turnover
+  across those years against the one history. Path: Part I (at least 01, 02,
+  05), then Part III.
+- **Econometricians.** The estimation and the tests behind every step: the
+  moment equations and the four algorithms of the generator (04), the filters
+  and the residual layer (05), the cointegration, structural and bridge
+  equations with their tests (08 to 12), the selection by tests, BIC and
+  bootstrap goodness of fit (16, 17). Every notebook carries the mathematics of
+  each step before the cell that runs it, and each Part II and Part III
+  notebook has a companion paper. Path: 04, 05, then Parts II and III in order.
+- **Everyone** needs the core: targets, marginals, copula, generator, and the
+  idea of a filter to an i.i.d. residual layer with an exact inverse from the
+  last observed state.
 
 ## The series (new numbering)
 
@@ -61,16 +79,18 @@ started".
 | 13 Assets on factors | 08 | My assets are explained by a few factors. How do factor scenarios become asset scenarios, and how do I express a view? | `FactorModel` on the factors of the assembled market (Section below), including priced factors; views as location shifts | asset scenarios and paths from factor paths |
 | 14 One market: from the economy to the portfolio | new | Put it together: the economy, the market factors and my assets in one simulation, with scenarios that propagate. | the three-layer market (Section below); the assembly helper | 24-month asset paths, real returns, two propagated scenarios, a portfolio's distribution |
 
+| 15 Stress tests and tail risk of a portfolio | new | What can I lose, how, and which scenario does it? | value at risk and expected shortfall of a portfolio on the scenarios of the assembled market against the normal; the tail-dependence contribution to portfolio losses; the propagated stresses of 14 applied to the positions (P&L by position, by factor); the distribution of drawdowns along the paths; reverse stress, the conditional mean of every factor and economic variable given a portfolio loss beyond its 1 percent quantile | the risk manager's deliverable: a stress and tail-risk report on the same market as the portfolio team's |
+
 ### Part III. Systematic strategies (daily)
 
 | New | Old | Question | Introduces | Deliverable |
 |---|---|---|---|---|
-| 15 Daily dynamics chosen per asset | 07 | Daily returns cluster their variance and have regimes. Which model for each asset, chosen by the data? | GARCH family and HMM candidates; tests, BIC, bootstrap GoF; `dynamics='auto'`; 1,000 daily years | a fitted daily market, saved |
-| 16 Regimes | 09 | One asset with regimes, in depth. | `GaussianHMM`: probabilities, the Rosenblatt residual layer, the GoF test | regime paths |
-| 17 Backtesting on synthetic years | new | My strategy has one history. How does it do on a thousand? | the backtest helper: a strategy as a weight function of past returns, run on every path; the distribution of Sharpe ratio, drawdown and turnover against the one history | the trader's deliverable |
+| 16 Daily dynamics chosen per asset | 07 | Daily returns cluster their variance and have regimes. Which model for each asset, chosen by the data? | GARCH family and HMM candidates; tests, BIC, bootstrap GoF; `dynamics='auto'`; 1,000 daily years | a fitted daily market, saved |
+| 17 Regimes | 09 | One asset with regimes, in depth. | `GaussianHMM`: probabilities, the Rosenblatt residual layer, the GoF test | regime paths |
+| 18 Backtesting on synthetic years | new | My strategy has one history. How does it do on a thousand? | the backtest helper: a strategy as a weight function of past returns, run on every path; the distribution of Sharpe ratio, drawdown and turnover against the one history | the trader's deliverable |
 
 Renumbering map (old -> new): 01->01, 02->02, 03->03, 04->04, 05->06, 06->07,
-07->15, 08->13, 09->16, 10->08, 11->10, 12->09, 13->11, 14->12; new 05, 14, 17.
+07->16, 08->13, 09->17, 10->08, 11->10, 12->09, 13->11, 14->12; new 05, 14, 15, 18.
 Files are renamed with `git mv`; Colab badges, README table, `docs/examples.rst`,
 the papers (`\package` notebook references), the Overleaf README and the
 memory notes are updated to the new numbers.
@@ -136,6 +156,7 @@ portfolio's nominal and real distribution under baseline and scenarios.
 - `FactorModel.fit`: each asset regressed on the factors over its own
   non-missing sample (currently a common sample); `report` gains `n_obs`.
 - `Structural`: `'ecm'` with `lags` on the child already exists; no change.
+- `cvinemarketgen/risk.py`: `var_es(returns, alpha)`, `drawdowns(paths)`, `reverse_stress(portfolio_returns, variables, alpha)` (conditional means of the variables on the paths where the portfolio loss exceeds its alpha quantile), `pnl_by_factor(fm, factor_paths, weights)`. Tests on synthetic paths.
 - `cvinemarketgen/backtest.py`: `run_strategy(paths, weights_fn, rebalance='M')`
   (weights from past returns, returns per path), `sharpe`, `max_drawdown`,
   `turnover`, `summary` (distribution across paths against the history's
@@ -150,7 +171,8 @@ portfolio's nominal and real distribution under baseline and scenarios.
   (priced factors as deterministic children, factor-model residuals
   independent, the bridge innovation independent), with the propagated
   scenarios as the application.
-- A new short paper for notebook 17, "Backtesting on synthetic years".
+- A new short paper for notebook 15, "Stress tests and tail risk on a simulated market" (VaR and ES under the vine against the normal, propagated stresses, reverse stress by conditional expectation).
+- A new short paper for notebook 18, "Backtesting on synthetic years".
 - `article4-principle.tex` gains a section "Three layers" that states the
   assembled market as the general case of the filters, blocks and children.
 
@@ -165,7 +187,7 @@ portfolio's nominal and real distribution under baseline and scenarios.
 - D. Part II: rewrite the openings, transitions and closings of 06 to 12 to the
   arc (markdown-only), rewrite 13 on the assembled market's factors and write
   14 (both executed), the paper of 14.
-- E. Part III: rewrite 15 and 16 to the arc, write 17 (executed), the paper of 17.
+- E. Notebook 15 (risk) on the saved market of 14, its paper; Part III: rewrite 16 and 17 to the arc, write 18 (executed), the paper of 18.
 - F. Reading guide in README and docs (the three parts, the two readers, the
   order), article-4 section, papers' references, Overleaf zip, upload staging.
 
