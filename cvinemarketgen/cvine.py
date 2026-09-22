@@ -62,7 +62,8 @@ class CVineGenerator(MomentMatch, CopulaTools):
     """
     _EarlyStopSLSQP = _EarlyStopSLSQP
     _FAMILY = {'gaussian': pv.BicopFamily.gaussian, 'clayton': pv.BicopFamily.clayton,
-               'gumbel': pv.BicopFamily.gumbel, 'joe': pv.BicopFamily.joe, 'frank': pv.BicopFamily.frank}
+               'gumbel': pv.BicopFamily.gumbel, 'joe': pv.BicopFamily.joe, 'frank': pv.BicopFamily.frank,
+               'student': pv.BicopFamily.student}
 
 
     def estimate_CVine_preselected_V2(
@@ -73,7 +74,10 @@ class CVineGenerator(MomentMatch, CopulaTools):
             use_ncs_on_firsttree=True,
             use_mixture_on_deepertrees=False,
             use_ncs_on_deepertrees=False,
-            force_try_ncscopula=False):
+            force_try_ncscopula=False,
+            symmetry_test=True,
+            symmetry_level=0.90,
+            symmetry_n_boot=500):
 
         ## ==================================================================================
         ## INITIALIZATION
@@ -96,6 +100,14 @@ class CVineGenerator(MomentMatch, CopulaTools):
         target_corr : pandas.DataFrame of shape (N, N)
             Target correlations, used only for the sign characteristic ``s``.
         use_mixture_on_firsttree, use_ncs_on_firsttree, use_mixture_on_deepertrees, use_ncs_on_deepertrees, force_try_ncscopula : bool
+        symmetry_test : bool, default True
+            Before classifying a pair, test whether its exceedance profile is
+            asymmetric beyond sampling noise (:meth:`tail_asymmetry_test`, a bootstrap
+            of the left-minus-right mean at level ``symmetry_level`` with
+            ``symmetry_n_boot`` resamples). A pair that is not is *symmetric*: its
+            candidates are the Gaussian and the Student t copulas, chosen by BIC, and
+            the ``(l, u, s, m)`` classification is not used. With ``False`` the
+            classification of the paper applies to every pair.
 
         Returns
         -------
@@ -172,7 +184,9 @@ class CVineGenerator(MomentMatch, CopulaTools):
                                                              columns=['lower_tail_dependence',
                                                                       'upper_tail_dependence',
                                                                       'target_correlation_sign',
-                                                                      'monotone_dependence'])
+                                                                      'monotone_dependence',
+                                                                      'symmetric', 'asymmetry',
+                                                                      'asymmetry_lower', 'asymmetry_upper'])
 
             ## Loop over each edge in the current tree.
             ## The pair under consideration is always (column 0, column i) of the previous tree's h-function output.
@@ -191,6 +205,7 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
                 t_copula_mix_bic, t_copulas_mixture_est, t_tt_nonmonotone = np.inf, None, None
                 i_keep_it = None
+                t_symmetric, t_asym = False, None
 
                 ## ==============================================================================
                 ## STEP 1 — EXCEEDANCE CORRELATION AND CLASSIFICATION
@@ -254,11 +269,35 @@ class CVineGenerator(MomentMatch, CopulaTools):
                                 t_target_correlation_sign = -11
 
                     ## ==============================================================================
+                    ## STEP 1b — SYMMETRY TEST
+                    ## The classification above reads the shape of an estimated profile. Before
+                    ## trusting it, test whether the left-minus-right difference is distinguishable
+                    ## from sampling noise. If it is not, the pair is symmetric: no (l, u, s, m)
+                    ## class, candidates Gaussian and Student t by BIC.
+                    ## ==============================================================================
+                    if symmetry_test:
+                        t_asym = self.tail_asymmetry_test(
+                            x=input_data[input_data.columns[0]] if isinstance(input_data, pd.DataFrame) else input_data[:, 0],
+                            y=input_data[input_data.columns[i]] if isinstance(input_data, pd.DataFrame) else input_data[:, i],
+                            n_boot=symmetry_n_boot, level=symmetry_level, inputs_are_obs=True)
+                        t_symmetric = t_asym['symmetric']
+                    if t_symmetric:
+                        t_lower_tail_dependence, t_upper_tail_dependence = False, False
+                        t_target_correlation_sign, t_monotone_dependence = -11, 1
+                        t_copulas_est = self.select_best_preselected_bivariate_copula(
+                            trees_hfunc[str(tree - 1)].iloc[:, [0, i]],
+                            families_and_rotations=self.get_copulas_specifications_symmetric())
+                        t_copulas = t_copulas_est['copula']
+                        t_copulas_bic = t_copulas_est['best_bic']
+
+                    ## ==============================================================================
                     ## STEP 2 — CANDIDATE PRE-SELECTION AND FITTING (TREE 1)
                     ## Query the lookup table for copula families matching (ℓ, u, s, m).
                     ## If matches exist → fit the best among them by BIC.
                     ## If no matches (non-monotone pair) → try mixture and/or NCS copulas.
                     ## ==============================================================================
+                    if t_symmetric:
+                        t_matching_index = []          # decided above
                     t_target_specs = [t_lower_tail_dependence,
                                       t_upper_tail_dependence,
                                       t_target_correlation_sign,
@@ -266,9 +305,11 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
                     ## Query the ordinary copula lookup table for exact (ℓ, u, s, m) match
                     t_mask = copulas_specifications.eq(t_target_specs).all(axis=1)
-                    t_matching_index = list(copulas_specifications.index[t_mask])
+                    t_matching_index = [] if t_symmetric else list(copulas_specifications.index[t_mask])
 
-                    if (isinstance(t_matching_index, list) and len(t_matching_index) >= 1):
+                    if t_symmetric:
+                        pass
+                    elif (isinstance(t_matching_index, list) and len(t_matching_index) >= 1):
                         ## We found preselected copulas — fit the best among them by BIC
                         t_copulas_est = self.select_best_preselected_bivariate_copula(
                             trees_hfunc[str(tree - 1)].iloc[:, [0, i]],
@@ -368,6 +409,20 @@ class CVineGenerator(MomentMatch, CopulaTools):
                             else:
                                 t_target_correlation_sign = -11
 
+                    if symmetry_test:
+                        t_asym = self.tail_asymmetry_test(x=trees_hfunc[str(tree - 1)].iloc[:, 0],
+                                                          y=trees_hfunc[str(tree - 1)].iloc[:, i],
+                                                          n_boot=symmetry_n_boot, level=symmetry_level, inputs_are_obs=False)
+                        t_symmetric = t_asym['symmetric']
+                    if t_symmetric:
+                        t_lower_tail_dependence, t_upper_tail_dependence = False, False
+                        t_target_correlation_sign, t_monotone_dependence = -11, 1
+                        t_copulas_est = self.select_best_preselected_bivariate_copula(
+                            trees_hfunc[str(tree - 1)].iloc[:, [0, i]],
+                            families_and_rotations=self.get_copulas_specifications_symmetric())
+                        t_copulas = t_copulas_est['copula']
+                        t_copulas_bic = t_copulas_est['best_bic']
+
                     ## For deeper trees: try NCS if non-monotone and flag is on
                     if t_monotone_dependence == -1 and use_ncs_on_deepertrees:
                         t_copulas_ncs_est = self.select_best_bivariate_ncscopula(
@@ -392,7 +447,7 @@ class CVineGenerator(MomentMatch, CopulaTools):
                         t_copula_mix_bic = t_copulas_mixture_est['best_bic']
 
                     ## If neither NCS nor mixture was tried, fall back to unrestricted ordinary MLE
-                    if not (t_monotone_dependence == -1 and use_ncs_on_deepertrees) and \
+                    if not t_symmetric and not (t_monotone_dependence == -1 and use_ncs_on_deepertrees) and \
                             not (t_monotone_dependence == -1 and use_mixture_on_deepertrees):
                         t_copulas_est = self.select_best_bivariate_copula(trees_hfunc[str(tree - 1)].iloc[:, [0, i]])
                         t_copulas = t_copulas_est['copula']
@@ -414,6 +469,10 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
                 trees_prespecification[str(tree)].loc[trees_prespecification[str(tree)].index[i - 1],
                 'monotone_dependence'] = t_monotone_dependence
+                trees_prespecification[str(tree)].loc[trees_prespecification[str(tree)].index[i - 1],
+                ['symmetric', 'asymmetry', 'asymmetry_lower', 'asymmetry_upper']] = \
+                    [t_symmetric if symmetry_test else np.nan] + \
+                    ([t_asym['difference'], t_asym['lower'], t_asym['upper']] if t_asym is not None else [np.nan] * 3)
 
                 ## ==============================================================================
                 ## STEP 3 — BUILD FALLBACK LISTS
@@ -842,7 +901,7 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
     def __init__(self, tol_opt, n_samples, use_ncs_on_deepertrees, use_ncs_on_firsttree,
                  use_mixture_on_firsttree, use_mixture_on_deepertrees, force_try_ncscopula,
-                 tol_for_optimization_func=5e-8):
+                 tol_for_optimization_func=5e-8, symmetry_test=True, symmetry_level=0.90, symmetry_n_boot=500):
         """
         See the class docstring for the parameters.
         """
@@ -856,6 +915,7 @@ class CVineGenerator(MomentMatch, CopulaTools):
         self.use_mixture_on_firsttree = use_mixture_on_firsttree
         self.tol_for_optimization_func = tol_for_optimization_func  # paper value: 5e-8
         self.force_try_ncscopula = force_try_ncscopula
+        self.symmetry_test, self.symmetry_level, self.symmetry_n_boot = bool(symmetry_test), float(symmetry_level), int(symmetry_n_boot)
 
     def _fit_jsu_parameters(self, targeted_mom3, targeted_mom4):
         """
@@ -933,7 +993,8 @@ class CVineGenerator(MomentMatch, CopulaTools):
             use_ncs_on_firsttree=self.use_ncs_on_firsttree,
             use_mixture_on_deepertrees=self.use_mixture_on_deepertrees,
             use_mixture_on_firsttree=self.use_mixture_on_firsttree,
-            force_try_ncscopula=self.force_try_ncscopula)
+            force_try_ncscopula=self.force_try_ncscopula,
+            symmetry_test=self.symmetry_test, symmetry_level=self.symmetry_level, symmetry_n_boot=self.symmetry_n_boot)
 
         fams_cops = out_CVine['fams_cops'].copy()
         fams_cops_name = np.zeros(fams_cops.shape, dtype=object) * np.nan
@@ -1822,8 +1883,9 @@ class CVineGenerator(MomentMatch, CopulaTools):
             :math:`C_{ik|1:k-1}` of the paper (tree ``k``, variable ``i``). Every pair
             must be present. ``spec`` is ``(family, rotation, theta)`` for a single
             family, or ``('mixture', [(fam1, rot1, th1), (fam2, rot2, th2)], w)`` for a
-            two-component mixture with weight ``w`` on the first component. Families:
-            ``'gaussian'``, ``'clayton'``, ``'gumbel'``, ``'joe'``, ``'frank'``.
+            two-component mixture with weight ``w`` on the first component, or
+            ``('student', 0, rho, df)`` for the Student t (two parameters). Families:
+            ``'gaussian'``, ``'clayton'``, ``'gumbel'``, ``'joe'``, ``'frank'``, ``'student'``.
 
         Returns
         -------
@@ -1852,8 +1914,10 @@ class CVineGenerator(MomentMatch, CopulaTools):
                 mix[r, c] = True
                 status[r, c] = 'mixture'
             else:
-                fam, rot, th = spec
+                fam, rot, th = spec[0], spec[1], spec[2]
                 thetas_1p[r, c] = float(th)
+                if len(spec) > 3:
+                    thetas_2p[r, c] = float(spec[3])
                 fams[r, c] = self._FAMILY[fam]
                 rots[r, c] = int(rot)
                 status[r, c] = 'ordinary'
@@ -1927,7 +1991,8 @@ class CVineGenerator(MomentMatch, CopulaTools):
         fams = CVinefitresults['fams_cops']
         rots = CVinefitresults['fams_rots']
         status = CVinefitresults['fams_status']
-        th = (vine_results if vine_results is not None else CVinefitresults)['thetas_final_1p']
+        src = vine_results if vine_results is not None else CVinefitresults
+        th, th2 = src['thetas_final_1p'], src['thetas_final_2p']
         rows = []
         d = len(asset_order)
         for k in range(1, d):
@@ -1936,6 +2001,8 @@ class CVineGenerator(MomentMatch, CopulaTools):
                 s = status[r, c]
                 if s == 'ordinary':
                     fam, par = f"{fams[r, c].name} {int(rots[r, c])}°", f"theta={float(th[r, c]):.3f}"
+                    if fams[r, c] == pv.BicopFamily.student and np.isfinite(float(th2[r, c])):
+                        par = f"rho={float(th[r, c]):.3f}, df={float(th2[r, c]):.1f}"
                 elif s == 'mixture':
                     p = np.asarray(th[r, c], float)
                     fam = ' + '.join(f"{b.family.name} {int(b.rotation)}°" for b in fams[r, c])

@@ -146,17 +146,45 @@ def classify_pair(x, y, target_corr=None, z_lb=-0.5, z_ub=0.5):
     return {'l': int(l), 'u': int(u), 's': s, 'm': m, 'metrics': met, 'curve': curve}
 
 
-def select_family(x, y, target_corr=None, mixtures=True):
+def tail_asymmetry_test(x, y, n_boot=500, level=0.90, seed=0):
     """
-    Family selection of Algorithm 3 for one pair: classify, restrict the catalog, fit, keep the best BIC.
+    Is the exceedance-correlation profile of ``(x, y)`` asymmetric beyond sampling noise?
+
+    The statistic is the mean of the profile for ``z < 0`` minus its mean for
+    ``z > 0`` (thresholds from -0.5 to 0.5 standard deviations, the range of the
+    classification); its distribution is bootstrapped by resampling the
+    observations. Returns a dict with ``difference``, ``lower``, ``upper`` (the
+    central ``level`` interval), ``symmetric`` (True when the interval contains
+    zero), ``level`` and ``n_boot``.
+    """
+    return _ct.tail_asymmetry_test(np.asarray(x, float), np.asarray(y, float), n_boot=n_boot, level=level, seed=seed)
+
+
+def select_family(x, y, target_corr=None, mixtures=True, symmetry_test=True):
+    """
+    Family selection of Algorithm 3 for one pair, with the symmetry test first.
+
+    With ``symmetry_test`` (default), :func:`tail_asymmetry_test` decides whether
+    the profile is asymmetric beyond sampling noise; a symmetric pair gets the
+    Gaussian or the Student t copula by BIC. An asymmetric pair (or every pair
+    when ``symmetry_test=False``) is classified, the catalog restricted to its
+    class, the candidates fitted and the best BIC kept, as in the paper.
 
     Returns a dict with ``status`` (``'ordinary'`` or ``'mixture'``), ``family``
     (name, or the two component names), ``rotation`` (or the two rotations),
-    ``parameters``, ``bic`` (per observation) and ``classification``.
+    ``parameters``, ``bic`` (per observation), ``symmetric``, ``asymmetry`` (the
+    test) and ``classification``.
     """
     import pyvinecopulib as pv
     cls = classify_pair(x, y, target_corr)
     data = pv.to_pseudo_obs(np.column_stack([np.asarray(x, float), np.asarray(y, float)]))
+    asym = tail_asymmetry_test(x, y) if symmetry_test else None
+    if asym is not None and asym['symmetric']:
+        est = _ct.select_best_preselected_bivariate_copula(data, families_and_rotations=_ct.get_copulas_specifications_symmetric())
+        cop = est['copula']
+        return {'status': 'ordinary', 'family': cop.family.name, 'rotation': int(cop.rotation),
+                'parameters': cop.parameters.ravel().tolist(), 'bic': float(est['best_bic']),
+                'symmetric': True, 'asymmetry': asym, 'classification': cls}
     spec = _ct.get_copulas_specifications()
     mask = spec.eq([bool(cls['l']), bool(cls['u']), cls['s'], cls['m']]).all(axis=1)
     candidates = list(spec.index[mask])
@@ -164,7 +192,8 @@ def select_family(x, y, target_corr=None, mixtures=True):
         est = _ct.select_best_preselected_bivariate_copula(data, families_and_rotations=candidates)
         cop = est['copula']
         return {'status': 'ordinary', 'family': cop.family.name, 'rotation': int(cop.rotation),
-                'parameters': cop.parameters.ravel().tolist(), 'bic': float(est['best_bic']), 'classification': cls}
+                'parameters': cop.parameters.ravel().tolist(), 'bic': float(est['best_bic']),
+                'symmetric': False, 'asymmetry': asym, 'classification': cls}
     if cls['m'] == -1 and mixtures:
         mspec = _ct.get_copulas_mixture_specifications()
         mmask = mspec.eq([bool(cls['l']), bool(cls['u'])]).all(axis=1)
@@ -172,8 +201,10 @@ def select_family(x, y, target_corr=None, mixtures=True):
         est = _ct.select_best_preselected_mixture_copula(data=data, list_of_copulas_families=cands)
         comps = est['best_copula']
         return {'status': 'mixture', 'family': [b.family.name for b in comps], 'rotation': [int(b.rotation) for b in comps],
-                'parameters': [float(v) for v in est['best_params']], 'bic': float(est['best_bic']), 'classification': cls}
+                'parameters': [float(v) for v in est['best_params']], 'bic': float(est['best_bic']),
+                'symmetric': False, 'asymmetry': asym, 'classification': cls}
     est = _ct.select_best_bivariate_copula(data)
     cop = est['copula']
     return {'status': 'ordinary', 'family': cop.family.name, 'rotation': int(cop.rotation),
-            'parameters': cop.parameters.ravel().tolist(), 'bic': float(est['best_bic']), 'classification': cls}
+            'parameters': cop.parameters.ravel().tolist(), 'bic': float(est['best_bic']),
+                'symmetric': False, 'asymmetry': asym, 'classification': cls}

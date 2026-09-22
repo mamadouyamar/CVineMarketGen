@@ -2,6 +2,15 @@
 
 ## 0.4.0 (unreleased)
 
+- Family selection: a symmetry test before the classification of Algorithm 3.
+  The left-minus-right mean of a pair's exceedance profile is bootstrapped; a
+  pair whose asymmetry is not distinguishable from sampling noise gets the
+  Gaussian or the Student t copula by BIC (the Student t is a new candidate and
+  a new family in the `families` dict, `('student', 0, rho, df)`); asymmetric
+  pairs follow the paper's rule. On Gaussian pairs of 260 observations the old
+  rule chose a tail-dependent family or a mixture most of the time.
+  `CVineMarket(symmetry_test=True)` (default), `cv.classification`,
+  `tail_asymmetry_test`, `select_family(symmetry_test=...)`.
 - Block filters: `BlockVECM` (cointegration rank by the Johansen trace test, lags
   by BIC) and `BlockVAR` filter a block of variables jointly; a tuple key in
   `dynamics` declares the block, `dynamics={('DGS10', 'DFII10'): 'vecm', 'SPY': 'ar1-garch'}`;

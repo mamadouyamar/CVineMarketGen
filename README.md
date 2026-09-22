@@ -66,6 +66,7 @@ Families chosen by hand, one entry per pair, the rest Gaussian:
 families = {('Bonds', 'Equity'): ('mixture', [('clayton', 270), ('gumbel', 0)], 0.6),   # sign-changing dependence
             ('Gold', 'Equity'): ('gumbel', 180)}                                         # lower-tail dependence
 cv = CVineMarket(t, families=families).fit()
+cv.classification            # with families='auto': the symmetry test per pair, then the class of the asymmetric ones
 ```
 
 ## From a history, with dynamics, to daily paths

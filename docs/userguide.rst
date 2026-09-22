@@ -66,10 +66,13 @@ Copula families
 ``CVineMarket(t, families=...)`` accepts three things:
 
 ``'auto'``
-   Selected from the history by the paper's Algorithm 3: each pair is
-   classified from its exceedance-correlation curve, the admissible families
-   are fitted, the best BIC is kept; non-monotone pairs get a mixture. Needs a
-   history in the targets.
+   Selected from the history by the paper's Algorithm 3 with a symmetry test
+   first: a pair whose exceedance-correlation profile is not asymmetric beyond
+   sampling noise (bootstrap, 90 percent) gets the Gaussian or the Student t
+   copula by BIC; the others are classified from the profile, the admissible
+   families fitted, the best BIC kept, non-monotone pairs get a mixture. Needs a
+   history in the targets. ``cv.classification`` shows the test per pair;
+   ``symmetry_test=False`` reproduces the paper's rule on every pair.
 
 ``'gaussian'``
    Gaussian pair copulas everywhere, initialised at the partial correlations of
@@ -84,9 +87,11 @@ a dict, one entry per pair you want to set
                   ('Gold', 'Bonds'): ('gaussian', 0, 0.3)}
 
    ``(family, rotation)``, optionally with a starting parameter; a mixture is
-   ``('mixture', [(fam1, rot1), (fam2, rot2)], weight_on_first)``. Pairs not
+   ``('mixture', [(fam1, rot1), (fam2, rot2)], weight_on_first)``; the Student t
+   is ``('student', 0, rho, df)`` (``df`` 4 by default), symmetric tail
+   dependence for pairs whose large moves coincide in both directions. Pairs not
    listed are Gaussian. Families: ``gaussian``, ``clayton``, ``gumbel``,
-   ``joe``, ``frank``; rotations 0, 90, 180, 270. Clayton has lower-tail
+   ``joe``, ``frank``, ``student``; rotations 0, 90, 180, 270. Clayton has lower-tail
    dependence, Gumbel upper-tail; a 180° rotation swaps the tail; 90° and 270°
    give negative dependence. Choosing a mixture without a history to check it
    against is expert use.

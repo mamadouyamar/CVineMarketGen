@@ -1007,6 +1007,45 @@ class CopulaTools:
         out[good] = 0.5 * (lo_g + hi_g)
         return out
 
+    def tail_asymmetry_test(self, x, y, z_lb=-0.5, z_ub=0.5, n_boot=500, level=0.90, seed=0, inputs_are_obs=True):
+        r"""
+        Is the exceedance-correlation profile of a pair asymmetric beyond sampling noise?
+
+        The statistic is the mean of the profile on the left side (:math:`z < 0`, the
+        bad months of ``x``) minus its mean on the right side (:math:`z > 0`), on the
+        grid of the classification (step 0.02 from ``z_lb`` to ``z_ub``). Its
+        sampling distribution is obtained by resampling the observations with
+        replacement ``n_boot`` times; the pair is declared symmetric when zero lies
+        inside the central ``level`` interval of the bootstrap distribution.
+
+        Returns a dict: ``difference``, ``lower``, ``upper`` (the interval),
+        ``symmetric`` (bool), ``level``, ``n_boot``.
+        """
+        x = np.asarray(x, float); y = np.asarray(y, float)
+        if not inputs_are_obs:
+            x = norm.ppf(x); y = norm.ppf(y)
+        z = np.arange(z_lb, z_ub, 0.02)
+        left, right = z < 0, z > 0
+
+        def stat(xx, yy):
+            c = self.exceedance_correlation(xx, yy, z)
+            return np.nanmean(c[left]) - np.nanmean(c[right])
+
+        d = stat(x, y)
+        rng = np.random.default_rng(seed)
+        n = len(x)
+        boot = np.empty(int(n_boot))
+        for b in range(int(n_boot)):
+            idx = rng.integers(0, n, n)
+            boot[b] = stat(x[idx], y[idx])
+        lo, hi = np.nanquantile(boot, [(1 - level) / 2, 1 - (1 - level) / 2])
+        return {'difference': float(d), 'lower': float(lo), 'upper': float(hi),
+                'symmetric': bool(lo <= 0.0 <= hi), 'level': float(level), 'n_boot': int(n_boot)}
+
+    def get_copulas_specifications_symmetric(self):
+        """Candidates of a pair whose profile is not significantly asymmetric: Gaussian and Student t, rotation 0."""
+        return [(pv.BicopFamily.gaussian, 0), (pv.BicopFamily.student, 0)]
+
     def get_condcorrelation_metrics(self, condcorr):
         r"""
         Summary statistics of an exceedance-correlation curve (equations C.2 to C.5).

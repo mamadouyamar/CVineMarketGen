@@ -136,6 +136,24 @@ families whose signature matches :math:`(\ell, u, s)` when :math:`m = +1`, and
 the mixtures matching :math:`(\ell, u)` when :math:`m = -1`. The retained
 family is the admissible one with the lowest BIC.
 
+A symmetry test before the classification (added in 0.4.0). The classification
+reads the shape of an estimated profile, and on a few hundred observations that
+shape wobbles: on pairs simulated from a Gaussian copula with 260 observations,
+the rule above selects a tail-dependent family or a mixture most of the time
+(73 percent of the pairs flagged as sign-changing at correlation -0.09, 80
+percent given a Gumbel or a Clayton at correlation 0.6). The test statistic is
+the mean of the profile on the left side (:math:`z < 0`) minus its mean on the
+right side (:math:`z > 0`); its sampling distribution is bootstrapped by
+resampling the observations (500 resamples), and the pair is *symmetric* when
+zero lies inside the central 90 percent interval. A symmetric pair is given the
+Gaussian or the Student t copula, whichever has the lower BIC: the Student t
+adds symmetric tail dependence, large moves that coincide in both directions,
+which equity and Treasuries show (co-kurtosis 1.75 against the Gaussian's 1.02
+on SPY and TLT since 2005) and no one-parameter family of the catalog provides.
+An asymmetric pair follows the classification unchanged. The test applies in
+every tree; ``symmetry_test=False`` reproduces the paper's rule, and
+``CVineMarket.classification`` reports the test per pair of the first tree.
+
 :meth:`CVineGenerator.selected_edge_table <cvinemarketgen.cvine.CVineGenerator.selected_edge_table>`
 prints the result edge by edge.
 

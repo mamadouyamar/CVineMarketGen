@@ -41,7 +41,8 @@ def _floor_residual_kurtosis(ft):
 from .paths import Paths
 from .functions import exceedance_curve
 
-_FAMILY_DEFAULT_THETA = {'gaussian': 0.0, 'clayton': 1.0, 'gumbel': 1.5, 'joe': 1.5, 'frank': 2.0}
+_FAMILY_DEFAULT_THETA = {'gaussian': 0.0, 'clayton': 1.0, 'gumbel': 1.5, 'joe': 1.5, 'frank': 2.0, 'student': 0.0}
+_STUDENT_DEFAULT_DF = 4.0
 
 
 def _quiet():
@@ -358,8 +359,16 @@ class CVineMarket(_Market):
         correlations of the target matrix, then calibrated.
         dict ``{(asset_i, asset_k): spec}``: chosen per pair, unspecified pairs
         Gaussian. ``spec`` is ``(family, rotation)``, ``(family, rotation, theta)``,
-        or ``('mixture', [(fam1, rot1[, th1]), (fam2, rot2[, th2])], w)``.
-        Families: ``'gaussian'``, ``'clayton'``, ``'gumbel'``, ``'joe'``, ``'frank'``.
+        ``('student', 0[, rho[, df]])`` (default ``df`` 4), or
+        ``('mixture', [(fam1, rot1[, th1]), (fam2, rot2[, th2])], w)``.
+        Families: ``'gaussian'``, ``'clayton'``, ``'gumbel'``, ``'joe'``, ``'frank'``, ``'student'``.
+    symmetry_test : bool, default True
+        With ``families='auto'``: before classifying a pair from the shape of its
+        exceedance profile, test whether the profile is asymmetric beyond sampling
+        noise (bootstrap of the left-minus-right mean, 90 percent level). Pairs that
+        are not are given a Gaussian or a Student t copula, chosen by BIC; the
+        others follow the classification of the paper. ``classification`` reports
+        the test per pair of the first tree. ``False`` reproduces the paper's rule.
     mixtures : bool, default True
         With ``'auto'``, allow mixture copulas on non-monotone pairs of the first tree.
     mixtures_deeper_trees : bool, default False
@@ -395,8 +404,10 @@ class CVineMarket(_Market):
     """
 
     def __init__(self, targets, central=None, families='auto', mixtures=True, mixtures_deeper_trees=False,
-                 n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None, dynamics_kwargs=None, exclude=None):
+                 n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None, dynamics_kwargs=None, exclude=None,
+                 symmetry_test=True):
         super().__init__(targets, dynamics, dynamics_kwargs, exclude)
+        self.symmetry_test = bool(symmetry_test)
         self.central = central or targets.assets[0]
         if self.central not in targets.assets:
             raise ValueError(f'central asset {self.central!r} not in targets')
@@ -411,7 +422,8 @@ class CVineMarket(_Market):
                                      use_ncs_on_deepertrees=False, use_ncs_on_firsttree=False,
                                      use_mixture_on_firsttree=bool(mixtures),
                                      use_mixture_on_deepertrees=bool(mixtures_deeper_trees),
-                                     force_try_ncscopula=False, tol_for_optimization_func=tol_func)
+                                     force_try_ncscopula=False, tol_for_optimization_func=tol_func,
+                                     symmetry_test=bool(symmetry_test))
 
     # ---- specification of user-chosen families -------------------------------
     def _spec_from_families(self, t):
@@ -433,8 +445,12 @@ class CVineMarket(_Market):
                 edges[(i, k)] = ('mixture', comps, float(spec[2]))
             else:
                 fam, rot = spec[0], int(spec[1])
-                th = spec[2] if len(spec) > 2 else (pc[(i, k)] if fam == 'gaussian' else _FAMILY_DEFAULT_THETA[fam])
-                edges[(i, k)] = (fam, rot, float(th))
+                th = spec[2] if len(spec) > 2 else (pc[(i, k)] if fam in ('gaussian', 'student') else _FAMILY_DEFAULT_THETA[fam])
+                if fam == 'student':
+                    df = spec[3] if len(spec) > 3 else _STUDENT_DEFAULT_DF
+                    edges[(i, k)] = (fam, rot, float(th), float(df))
+                else:
+                    edges[(i, k)] = (fam, rot, float(th))
         N = len(order)
         for k in range(1, N):
             for i in range(k + 1, N + 1):
@@ -463,6 +479,25 @@ class CVineMarket(_Market):
         return self
 
     # ---- views ------------------------------------------------------------------
+    @property
+    def classification(self):
+        """
+        The pairs of the first tree (central asset against each other asset) after
+        ``fit`` with ``families='auto'``: the symmetry test (``symmetric``, the
+        left-minus-right ``asymmetry`` of the exceedance profile and its bootstrap
+        interval) and, for asymmetric pairs, the classification ``(l, u, s, m)``.
+        """
+        self._check_fitted()
+        pre = self.fit_results.get('trees_prespecification', {})
+        if '1' not in pre:
+            return None
+        d = pre['1'].copy()
+        d.index = self.order[1:]
+        d.index.name = f'pair with {self.central}'
+        cols = ['symmetric', 'asymmetry', 'asymmetry_lower', 'asymmetry_upper',
+                'lower_tail_dependence', 'upper_tail_dependence', 'target_correlation_sign', 'monotone_dependence']
+        return d[[c for c in cols if c in d.columns]]
+
     @property
     def marginals(self):
         """Johnson SU parameters per asset (standardized), with the mean and volatility applied afterwards."""
@@ -518,8 +553,11 @@ class CVineMarket(_Market):
                 r, c = k - 1, i - 2
                 st = vr['fams_status'][r, c]
                 if st == 'ordinary':
+                    params = [float(vr['thetas_final_1p'][r, c])]
+                    if np.isfinite(float(vr['thetas_final_2p'][r, c])):
+                        params.append(float(vr['thetas_final_2p'][r, c]))
                     recs.append({'i': i, 'k': k, 'status': st, 'family': vr['fams_cops'][r, c].name,
-                                 'rotation': int(vr['fams_rots'][r, c]), 'params': [float(vr['thetas_final_1p'][r, c])]})
+                                 'rotation': int(vr['fams_rots'][r, c]), 'params': params})
                 elif st == 'mixture':
                     comps = vr['fams_cops'][r, c]
                     recs.append({'i': i, 'k': k, 'status': st, 'family': [b.family.name for b in comps],
@@ -536,7 +574,8 @@ class CVineMarket(_Market):
              'targets': self.targets.to_dict(), 'fit_targets': self.fit_targets.to_dict(),
              'settings': {'central': self.central, 'families': 'auto' if self.families == 'auto' else 'given',
                           'mixtures': self.mixtures, 'mixtures_deeper_trees': self.mixtures_deeper_trees,
-                          'n_opt': self.n_opt, 'corr_tol': self.corr_tol, 'tol_func': self.tol_func, 'exclude': self.exclude},
+                          'n_opt': self.n_opt, 'corr_tol': self.corr_tol, 'tol_func': self.tol_func, 'exclude': self.exclude,
+                          'symmetry_test': self.symmetry_test},
              'order': self.order,
              'marginals': self.setup['optimal_params'][['a', 'b', 'c', 'd', 'fun']].astype(float).to_dict(orient='index'),
              'edges': self._edge_records(),
@@ -553,7 +592,8 @@ class CVineMarket(_Market):
         s = d['settings']
         m = cls(t, central=s['central'], families='gaussian' if s['families'] == 'given' else 'auto',
                 mixtures=s['mixtures'], mixtures_deeper_trees=s['mixtures_deeper_trees'],
-                n_opt=s['n_opt'], corr_tol=s['corr_tol'], tol_func=s['tol_func'], exclude=s.get('exclude'))
+                n_opt=s['n_opt'], corr_tol=s['corr_tol'], tol_func=s['tol_func'], exclude=s.get('exclude'),
+                symmetry_test=s.get('symmetry_test', True))
         m.families = s['families']
         m.fit_targets = _reorder(Targets.from_dict(d['fit_targets']), d['order'])
         m.order = d['order']
@@ -562,7 +602,7 @@ class CVineMarket(_Market):
         edges = {}
         for e in d['edges']:
             if e['status'] == 'ordinary':
-                edges[(e['i'], e['k'])] = (e['family'], e['rotation'], e['params'][0])
+                edges[(e['i'], e['k'])] = (e['family'], e['rotation'], *e['params'])
             else:
                 edges[(e['i'], e['k'])] = ('mixture', [(f, r, th) for f, r, th in zip(e['family'], e['rotation'], e['params'][1:])], e['params'][0])
         spec = m.engine.make_vine_spec(m.order, edges)
