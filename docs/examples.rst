@@ -1,7 +1,7 @@
 Examples
 ========
 
-Thirteen executed notebooks, in order: a course in which each notebook is
+Twelve executed notebooks, in order: a course in which each notebook is
 motivated by what the previous one could not do. Start with 01. Every notebook carries a Colab
 badge.
 
@@ -9,8 +9,7 @@ badge.
    :maxdepth: 1
 
    examples/01_matching_moments_and_correlations
-   examples/02_bivariate_copulas_and_tails
-   examples/04_cvine_step_by_step
+   examples/02_tail_dependence
    examples/05_ltcma_targeting
    examples/06_macro_factors
    examples/07_daily_paths_for_backtesting

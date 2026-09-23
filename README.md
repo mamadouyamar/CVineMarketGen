@@ -154,7 +154,7 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Thirteen tutorials in [`examples/`](examples/), a course in which each notebook is
+Twelve tutorials in [`examples/`](examples/), a course in which each notebook is
 motivated by what the previous one could not do, all executed, each with a
 Colab badge. Start with the first. (The series is being rebuilt notebook by
 notebook; the early numbers follow the new course, the later ones the previous
@@ -163,8 +163,7 @@ series until they are absorbed.)
 | | Notebook | What it shows |
 |---|---|---|
 | 01 | [`01_matching_moments_and_correlations`](examples/01_matching_moments_and_correlations.ipynb) | targets, fit, check, use: the moments and correlations of six ETFs matched by the Fleishman generator, a portfolio's tail against the normal, a change of one target, paths, and the exceedance profile that shows what is missing |
-| 02 | [`02_bivariate_copulas_and_tails`](examples/02_bivariate_copulas_and_tails.ipynb) | a marginal, a pair, its exceedance curve, classification, family selection, a mixture |
-| 04 | [`04_cvine_step_by_step`](examples/04_cvine_step_by_step.ipynb) | the four algorithms of the paper one at a time, on a synthetic history with known families |
+| 02 | [`02_tail_dependence`](examples/02_tail_dependence.ipynb) | copula versus marginals, tail dependence with a direction (Clayton, Gumbel) and without (Student t), the exceedance profile, the noise in the family classification and the symmetry test, the C-vine generator on the same six ETFs, the two portfolios of 01 with their tails recovered where the data identify them |
 | 05 | [`05_ltcma_targeting`](examples/05_ltcma_targeting.ipynb) | complete workflow with J.P. Morgan's 2024 assumptions as targets |
 | 06 | [`06_macro_factors`](examples/06_macro_factors.ipynb) | seven macro factors built from public market data, targets from the sample |
 | 07 | [`07_daily_paths_for_backtesting`](examples/07_daily_paths_for_backtesting.ipynb) | daily ETF returns, dynamics chosen per asset (GARCH family or HMM) by i.i.d. tests, BIC and a bootstrap test, 1,000 one-year paths |
