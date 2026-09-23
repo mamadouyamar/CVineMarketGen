@@ -1026,10 +1026,28 @@ class CopulaTools:
             x = norm.ppf(x); y = norm.ppf(y)
         z = np.arange(z_lb, z_ub, 0.02)
         left, right = z < 0, z > 0
+        min_obs = 10
 
         def stat(xx, yy):
-            c = self.exceedance_correlation(xx, yy, z)
-            return np.nanmean(c[left]) - np.nanmean(c[right])
+            # the same conditional correlations as exceedance_correlation, from prefix and suffix sums
+            xx = (xx - xx.mean()) / xx.std(); yy = (yy - yy.mean()) / yy.std()
+            o = np.argsort(xx, kind='mergesort'); xs, ys = xx[o], yy[o]
+            n = len(xs)
+            cs = lambda v: np.concatenate([[0.0], np.cumsum(v)])
+            Sx, Sy, Sxx, Syy, Sxy = cs(xs), cs(ys), cs(xs * xs), cs(ys * ys), cs(xs * ys)
+            def corr_from(a, b):                       # correlation of the block of sorted indices [a, b)
+                m = b - a
+                with np.errstate(invalid='ignore', divide='ignore'):
+                    sx, sy = Sx[b] - Sx[a], Sy[b] - Sy[a]
+                    vx, vy = (Sxx[b] - Sxx[a]) - sx * sx / m, (Syy[b] - Syy[a]) - sy * sy / m
+                    cxy = (Sxy[b] - Sxy[a]) - sx * sy / m
+                    r = cxy / np.sqrt(vx * vy)
+                return np.where(m >= min_obs, r, np.nan)
+            kl = np.searchsorted(xs, z[left], side='left')          # x < z: sorted indices [0, kl)
+            kr = np.searchsorted(xs, z[right], side='left')         # x >= z: sorted indices [kr, n)
+            cl = corr_from(np.zeros_like(kl), kl)
+            cr = corr_from(kr, np.full_like(kr, n))
+            return np.nanmean(cl) - np.nanmean(cr)
 
         d = stat(x, y)
         rng = np.random.default_rng(seed)

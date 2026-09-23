@@ -78,3 +78,12 @@ def test_auto_selection_reports_the_symmetry_test():
             assert fams[a].split()[0] in ('gaussian', 'student')
     cv0 = CVineMarket(t, central='A', families='auto', n_opt=2000, symmetry_test=False).fit()
     assert cv0.classification['symmetric'].isna().all()
+
+
+def test_student_hinv1_closed_form_matches_pyvinecopulib():
+    from cvinemarketgen.cvine import CVineGenerator
+    W = np.random.default_rng(5).uniform(size=(2000, 2))
+    for rho, nu in [(0.3, 4.0), (-0.6, 2.8), (0.9, 12.0)]:
+        ref = pv.Bicop(pv.BicopFamily.student, 0, parameters=np.array([[rho], [nu]])).hinv1(W)
+        mine = CVineGenerator.student_hinv1(W[:, 0], W[:, 1], rho, nu)
+        assert np.abs(ref - mine).max() < 1e-7

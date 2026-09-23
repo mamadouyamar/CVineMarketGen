@@ -785,6 +785,23 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
         return U
 
+    @staticmethod
+    def student_hinv1(u1, p, rho, nu):
+        r"""
+        Inverse of the Student t copula's :math:`h`-function in closed form: the
+        :math:`p`-quantile of :math:`U_2` given :math:`U_1 = u_1`. With
+        :math:`x_1 = t_\nu^{-1}(u_1)`, the conditional law of :math:`X_2` is Student
+        with :math:`\nu + 1` degrees of freedom, location :math:`\rho x_1` and scale
+        :math:`\sqrt{(\nu + x_1^2)(1 - \rho^2) / (\nu + 1)}`. pyvinecopulib inverts
+        this numerically, about fifteen times slower, which the calibration cannot afford.
+        """
+        from scipy.stats import t as _t
+        eps = 1e-10
+        x1 = _t.ppf(np.clip(np.asarray(u1, float), eps, 1 - eps), nu)
+        q = _t.ppf(np.clip(np.asarray(p, float), eps, 1 - eps), nu + 1)
+        x2 = rho * x1 + np.sqrt((nu + x1 ** 2) * (1.0 - rho ** 2) / (nu + 1.0)) * q
+        return np.clip(_t.cdf(x2, nu), eps, 1 - eps)
+
     def U_last(self, temp_W, temp_rots, temp_fams, temp_theta_final_1p, temp_theta_final_2p
                # , temp_a1_final, temp_a2_final, temp_ncsstatus, temp_mixturestatus
               , temp_familystatus):
@@ -809,10 +826,8 @@ class CVineGenerator(MomentMatch, CopulaTools):
                                       ).hinv1(np.array([temp_W[:, kk - 1], temp_U]).T)
 
                 elif temp_fams[kk - 1] == pv.BicopFamily.student:
-                    temp_U = pv.Bicop(family=temp_fams[kk - 1],
-                                      rotation=int(temp_rots[kk - 1]),
-                                      parameters=bicop_params(temp_theta_final_1p[kk - 1], temp_theta_final_2p[kk - 1])
-                                      ).hinv1(np.array([temp_W[:, kk - 1], temp_U]).T)
+                    temp_U = self.student_hinv1(temp_W[:, kk - 1], temp_U,
+                                                float(temp_theta_final_1p[kk - 1]), float(temp_theta_final_2p[kk - 1]))
 
             elif temp_familystatus[kk - 1] == 'ncscopula':
                 temp_U = self.hinv1_ncs_general_vec_fast(
