@@ -31,6 +31,15 @@
   could fail silently for a fat-tailed target and fill the column with NaN;
   `simulate` and `simulate_paths` now fall back to Nelder-Mead and then to the
   calibrated parameters.
+- Calibration speed: closed-form inverse h-functions for the Gaussian and the
+  Student t copulas in the vine sampler (pyvinecopulib's Gaussian inverse is a
+  hundred times slower than Clayton's and dominated the calibration once the
+  symmetry test made most edges Gaussian or Student); Student t fitted by tau
+  inversion; vectorized bootstrap in the symmetry test.
+- The Johnson SU kurtosis floor (`3.1 + 2 skew^2`) now also applies to the
+  targets of a `CVineMarket` without dynamics (a long-short factor such as SMB
+  has kurtosis near 3), on a copy of the targets, the exact normal excepted;
+  the engine's marginal fit uses the multi-start `fit_johnson_su`.
 - `exclude=[...]` on the markets: periods left out of the residual layer before
   the marginals and the vine are fitted (known one-off interventions, such as
   the pandemic months for the unemployment rate); saved with the model.

@@ -9,6 +9,7 @@ Both take a :class:`~cvinemarketgen.targets.Targets`, expose ``fit``,
 :class:`~cvinemarketgen.fleishman.FleishmanGenerator`), which is left unchanged.
 """
 import contextlib
+import copy
 import io
 import json
 import warnings
@@ -23,19 +24,20 @@ from .fleishman import FleishmanGenerator
 from .dynamics import make_dynamics, dynamics_from_dict, AR1, AR1GARCH, AssetDynamics
 
 
-def _floor_residual_kurtosis(ft):
+def _floor_residual_kurtosis(ft, layer='residual'):
     """
-    The Johnson SU marginal cannot be lighter-tailed than the normal: a residual
-    layer with kurtosis at or below 3 (near-normal residuals, e.g. of an HMM)
-    would leave the marginal fit with a mismatch and the acceptance loop of
-    ``simulate`` without an acceptable draw. Floor it at ``3.1 + 2 skew^2``,
-    just above the family's boundary, with a warning.
+    The Johnson SU marginal cannot be lighter-tailed than the normal: a layer with
+    kurtosis at or below ``3 + 2 skew^2`` (near-normal residuals of an HMM, a
+    long-short factor such as SMB) would leave the marginal fit with a mismatch
+    and the acceptance loop of ``simulate`` without an acceptable draw. Floor it
+    at ``3.1 + 2 skew^2``, just above the family's boundary, with a warning.
     """
     floor = 3.1 + 2.0 * ft.skew ** 2
-    low = ft.kurt < floor
+    exact_normal = (ft.skew.abs() < 1e-9) & ((ft.kurt - 3.0).abs() < 1e-9)   # the engine uses the normal limit there
+    low = (ft.kurt < floor) & ~exact_normal
     if low.any():
-        warnings.warn(f'residual kurtosis below the Johnson SU range for {list(ft.kurt.index[low])} '
-                      f'(near-normal residuals): floored at 3.1 + 2 skew^2 for the marginal fit')
+        warnings.warn(f'{layer} kurtosis below the Johnson SU range for {list(ft.kurt.index[low])} '
+                      f'(near-normal): floored at 3.1 + 2 skew^2 for the marginal fit')
         ft.kurt = ft.kurt.where(~low, floor)
     return ft
 from .paths import Paths
@@ -130,7 +132,7 @@ class _Market:
     def _prepare_layer(self):
         t = self.targets
         if self.dynamics is None:
-            self.fit_targets = t
+            self.fit_targets = _floor_residual_kurtosis(copy.deepcopy(t), layer='target') if isinstance(self, CVineMarket) else t
             return
         if t.history is None:
             raise ValueError('dynamics need a history in the targets')

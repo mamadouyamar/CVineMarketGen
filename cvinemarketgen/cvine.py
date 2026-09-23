@@ -786,6 +786,16 @@ class CVineGenerator(MomentMatch, CopulaTools):
         return U
 
     @staticmethod
+    def gaussian_hinv1(u1, p, rho):
+        """Inverse :math:`h`-function of the Gaussian copula in closed form:
+        :math:`\Phi(\rho\,\Phi^{-1}(u_1) + \sqrt{1-\rho^2}\,\Phi^{-1}(p))`. pyvinecopulib's is
+        a hundred times slower than Clayton's and dominated the calibration."""
+        from scipy.special import ndtr, ndtri
+        eps = 1e-10
+        x1 = ndtri(np.clip(np.asarray(u1, float), eps, 1 - eps)); q = ndtri(np.clip(np.asarray(p, float), eps, 1 - eps))
+        return np.clip(ndtr(rho * x1 + np.sqrt(1.0 - rho ** 2) * q), eps, 1 - eps)
+
+    @staticmethod
     def student_hinv1(u1, p, rho, nu):
         r"""
         Inverse of the Student t copula's :math:`h`-function in closed form: the
@@ -795,12 +805,12 @@ class CVineGenerator(MomentMatch, CopulaTools):
         :math:`\sqrt{(\nu + x_1^2)(1 - \rho^2) / (\nu + 1)}`. pyvinecopulib inverts
         this numerically, about fifteen times slower, which the calibration cannot afford.
         """
-        from scipy.stats import t as _t
+        from scipy.special import stdtr, stdtrit
         eps = 1e-10
-        x1 = _t.ppf(np.clip(np.asarray(u1, float), eps, 1 - eps), nu)
-        q = _t.ppf(np.clip(np.asarray(p, float), eps, 1 - eps), nu + 1)
+        x1 = stdtrit(nu, np.clip(np.asarray(u1, float), eps, 1 - eps))
+        q = stdtrit(nu + 1.0, np.clip(np.asarray(p, float), eps, 1 - eps))
         x2 = rho * x1 + np.sqrt((nu + x1 ** 2) * (1.0 - rho ** 2) / (nu + 1.0)) * q
-        return np.clip(_t.cdf(x2, nu), eps, 1 - eps)
+        return np.clip(stdtr(nu, x2), eps, 1 - eps)
 
     def U_last(self, temp_W, temp_rots, temp_fams, temp_theta_final_1p, temp_theta_final_2p
                # , temp_a1_final, temp_a2_final, temp_ncsstatus, temp_mixturestatus
@@ -819,7 +829,9 @@ class CVineGenerator(MomentMatch, CopulaTools):
             kk = len(temp_theta_final_1p) - ii
 
             if temp_familystatus[kk - 1] == 'ordinary':
-                if temp_fams[kk - 1] != pv.BicopFamily.student:
+                if temp_fams[kk - 1] == pv.BicopFamily.gaussian:
+                    temp_U = self.gaussian_hinv1(temp_W[:, kk - 1], temp_U, float(temp_theta_final_1p[kk - 1]))
+                elif temp_fams[kk - 1] != pv.BicopFamily.student:
                     temp_U = pv.Bicop(family=temp_fams[kk - 1],
                                       rotation=int(temp_rots[kk - 1]),
                                       parameters=bicop_params(temp_theta_final_1p[kk - 1])
@@ -954,17 +966,14 @@ class CVineGenerator(MomentMatch, CopulaTools):
                 optimal_params.iloc[i, -1] = 'JSU'
                 continue
             try:
-                params, res = self.find_params_for_moments_matching_JSU(
-                    [0, 1, targeted_mom3.loc[asset], targeted_mom4.loc[asset] - 3],
-                    x0=[0, 1, 1.5, 1],
-                    method='Nelder-Mead'
-                )
-                optimal_params.iloc[i, :-2] = params
-                optimal_params.iloc[i, -2] = res.fun
+                from .functions import fit_johnson_su            # multi-start with a moment check
+                p = fit_johnson_su(float(targeted_mom3.loc[asset]), float(targeted_mom4.loc[asset]))
+                optimal_params.iloc[i, :-2] = [p['gamma'], p['xi'], p['delta'], p['lambda']]
+                optimal_params.iloc[i, -2] = p['residual']
                 optimal_params.iloc[i, -1] = 'JSU'
 
-                if res.fun > 1e-5:
-                    print(f"Warning: Poor fit for {asset}, fun = {res.fun}")
+                if p['residual'] > 1e-5:
+                    print(f"Warning: Poor fit for {asset}, fun = {p['residual']}")
 
             except Exception as e:
                 print(f"Error fitting {asset}: {e}")
