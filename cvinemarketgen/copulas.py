@@ -1060,7 +1060,7 @@ class CopulaTools:
         return {'difference': float(d), 'lower': float(lo), 'upper': float(hi),
                 'symmetric': bool(lo <= 0.0 <= hi), 'level': float(level), 'n_boot': int(n_boot)}
 
-    def fit_student_itau(self, data, nu_bounds=(2.05, 60.0)):
+    def fit_student_itau(self, data, nu_bounds=(2.05, 49.9)):
         r"""
         Student t copula fitted by tau inversion: :math:`\rho = \sin(\pi \tau / 2)` from
         Kendall's tau, then the degrees of freedom :math:`\nu` by maximizing the
