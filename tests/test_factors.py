@@ -82,3 +82,25 @@ def test_a_priori_exposures():
     assert back.exposures == {'stock': ['eq'], 'bond': ['rates']} and np.allclose(back.beta.values, fm.beta.values)
     with pytest.raises(ValueError):
         FactorModel(R, F, exposures={'stock': ['nope']})
+
+
+def test_with_targets_hits_mean_and_vol():
+    rng = np.random.default_rng(7)
+    idx = pd.period_range('2000-01', periods=400, freq='M')
+    F = pd.DataFrame(rng.standard_normal((400, 2)) * 0.03, index=idx, columns=['eq', 'rates'])
+    R = pd.DataFrame({'a': 0.8 * F['eq'] + 0.02 * rng.standard_normal(400), 'b': -1.0 * F['rates'] + 0.01 * rng.standard_normal(400)}, index=idx)
+    fm = FactorModel(R, F).fit()
+    sys_a = float(np.sqrt(fm.beta.loc['a'].values @ F.cov().values @ fm.beta.loc['a'].values))
+    fm2 = fm.with_targets({'a': {'mean': 0.06, 'vol': 0.25}, 'b': {'mean': 0.03}}, annualized=True)
+    rep = fm2.target_report
+    assert abs(rep.loc['a', 'target mean'] - 0.06 / 12) < 1e-12 and abs(rep.loc['a', 'target vol'] - 0.25 / np.sqrt(12)) < 1e-12
+    assert abs(rep.loc['a', 'systematic vol'] - sys_a) < 1e-12 and not np.isnan(rep.loc['b', 'target vol'])
+    assert fm2.beta.equals(fm.beta) and fm2.alpha['a'] != fm.alpha['a'] and fm2.resid_vol['b'] == fm.resid_vol['b']
+    X = fm2.simulate(pd.DataFrame(rng.multivariate_normal(F.mean(), F.cov(), size=200000), columns=F.columns), seed=3)
+    assert abs(X['a'].mean() * 12 - 0.06) < 0.01 and abs(X['a'].std() * np.sqrt(12) - 0.25) < 0.01 and abs(X['b'].mean() * 12 - 0.03) < 0.005
+    with pytest.raises(ValueError):
+        fm.with_targets({'a': {'vol': 0.5 * sys_a}}, annualized=False)
+    tab = pd.DataFrame({'mean': [0.05, np.nan], 'vol': [np.nan, 0.20]}, index=['a', 'b'])
+    fm3 = fm.with_targets(tab)
+    assert fm3.resid_vol['a'] == fm.resid_vol['a'] and fm3.alpha['b'] == fm.alpha['b']
+    assert fm.alpha['a'] == FactorModel(R, F).fit().alpha['a']                   # the original is untouched

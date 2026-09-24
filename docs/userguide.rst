@@ -323,6 +323,12 @@ Assets on factors
    X0 = fm.simulate(F, residuals=False)        # factor exposure only
    fm.implied_mean(view_on_factor_means)       # expected asset returns under a view on the factors
 
+``fm.with_targets({'SPY': {'mean': 0.07, 'vol': 0.17}})`` (annual, or a table
+read from a spreadsheet) returns a copy whose listed assets hit the given mean
+through their alpha and the given volatility through their residual scale,
+the betas kept; a volatility below the systematic volatility the betas imply
+is refused. ``FactorModel(..., exposures={asset: [factors]})`` restricts each
+asset to the factors its characteristics justify.
 A ``Paths`` object of factor paths gives a ``Paths`` of asset paths. Residuals
 are independent across assets and of the factors; drop them to study the
 factor exposure alone. ``load_etf_monthly`` fetches monthly ETF returns to

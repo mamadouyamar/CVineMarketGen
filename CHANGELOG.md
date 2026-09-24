@@ -31,6 +31,11 @@
   could fail silently for a fat-tailed target and fill the column with NaN;
   `simulate` and `simulate_paths` now fall back to Nelder-Mead and then to the
   calibrated parameters.
+- `FactorModel.with_targets(table)`: a copy of the model whose listed assets hit
+  a target mean (through the alpha) and volatility (through the residual scale,
+  feasible when the target is at least the systematic volatility), from a
+  dictionary or a spreadsheet table in annual terms; `target_report` per asset.
+- `CVineMarket(symmetry_level=0.90)`: the confidence level of the symmetry test.
 - `FactorModel(..., exposures={asset: [factors]})`: a priori exposures, each asset
   regressed on the factors its characteristics justify, the other betas zero.
 - Calibration speed: closed-form inverse h-functions for the Gaussian and the

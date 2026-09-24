@@ -371,6 +371,9 @@ class CVineMarket(_Market):
         are not are given a Gaussian or a Student t copula, chosen by BIC; the
         others follow the classification of the paper. ``classification`` reports
         the test per pair of the first tree. ``False`` reproduces the paper's rule.
+    symmetry_level : float, default 0.90
+        Confidence level of the bootstrap interval. Lower it (0.80) to let weaker
+        asymmetries through on short samples, at the price of more false ones.
     mixtures : bool, default True
         With ``'auto'``, allow mixture copulas on non-monotone pairs of the first tree.
     mixtures_deeper_trees : bool, default False
@@ -407,9 +410,10 @@ class CVineMarket(_Market):
 
     def __init__(self, targets, central=None, families='auto', mixtures=True, mixtures_deeper_trees=False,
                  n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None, dynamics_kwargs=None, exclude=None,
-                 symmetry_test=True):
+                 symmetry_test=True, symmetry_level=0.90):
         super().__init__(targets, dynamics, dynamics_kwargs, exclude)
         self.symmetry_test = bool(symmetry_test)
+        self.symmetry_level = float(symmetry_level)
         self.central = central or targets.assets[0]
         if self.central not in targets.assets:
             raise ValueError(f'central asset {self.central!r} not in targets')
@@ -425,7 +429,7 @@ class CVineMarket(_Market):
                                      use_mixture_on_firsttree=bool(mixtures),
                                      use_mixture_on_deepertrees=bool(mixtures_deeper_trees),
                                      force_try_ncscopula=False, tol_for_optimization_func=tol_func,
-                                     symmetry_test=bool(symmetry_test))
+                                     symmetry_test=bool(symmetry_test), symmetry_level=float(symmetry_level))
 
     # ---- specification of user-chosen families -------------------------------
     def _spec_from_families(self, t):
@@ -577,7 +581,7 @@ class CVineMarket(_Market):
              'settings': {'central': self.central, 'families': 'auto' if self.families == 'auto' else 'given',
                           'mixtures': self.mixtures, 'mixtures_deeper_trees': self.mixtures_deeper_trees,
                           'n_opt': self.n_opt, 'corr_tol': self.corr_tol, 'tol_func': self.tol_func, 'exclude': self.exclude,
-                          'symmetry_test': self.symmetry_test},
+                          'symmetry_test': self.symmetry_test, 'symmetry_level': self.symmetry_level},
              'order': self.order,
              'marginals': self.setup['optimal_params'][['a', 'b', 'c', 'd', 'fun']].astype(float).to_dict(orient='index'),
              'edges': self._edge_records(),
@@ -595,7 +599,7 @@ class CVineMarket(_Market):
         m = cls(t, central=s['central'], families='gaussian' if s['families'] == 'given' else 'auto',
                 mixtures=s['mixtures'], mixtures_deeper_trees=s['mixtures_deeper_trees'],
                 n_opt=s['n_opt'], corr_tol=s['corr_tol'], tol_func=s['tol_func'], exclude=s.get('exclude'),
-                symmetry_test=s.get('symmetry_test', True))
+                symmetry_test=s.get('symmetry_test', True), symmetry_level=s.get('symmetry_level', 0.90))
         m.families = s['families']
         m.fit_targets = _reorder(Targets.from_dict(d['fit_targets']), d['order'])
         m.order = d['order']

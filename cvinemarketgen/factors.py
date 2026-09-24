@@ -117,6 +117,78 @@ class FactorModel:
         self.fitted = True
         return self
 
+    def with_targets(self, targets, factor_targets=None, annualized=True, periods=12):
+        """
+        A copy of the fitted model whose listed assets hit a target mean and/or volatility.
+
+        ``targets`` is ``{asset: {'mean': m, 'vol': v}}`` (either key may be
+        absent) or a DataFrame with one row per asset and columns ``mean`` and
+        ``vol`` (NaN to keep the sample value), for example read from Excel or CSV.
+        In annual terms by default (mean times ``periods``, volatility times
+        ``sqrt(periods)``), converted to the data's frequency.
+
+        The betas are kept. The mean is hit through the alpha,
+        ``alpha* = m - beta' mu_f``; the volatility through the residual scale,
+        ``sigma_e*^2 = v^2 - beta' Sigma_f beta``, feasible only when ``v`` is at
+        least the systematic volatility ``sqrt(beta' Sigma_f beta)``; an infeasible
+        target raises ``ValueError`` and names the floor. ``mu_f`` and ``Sigma_f``
+        are the sample moments of the factors, or those of ``factor_targets`` (a
+        :class:`~cvinemarketgen.targets.Targets`) when the factors themselves carry
+        a view. The residual keeps its skewness and kurtosis. The copy carries a
+        ``target_report`` DataFrame with, per listed asset, the target and sample
+        mean, the new alpha, the target and sample volatility, the systematic
+        volatility and the new residual volatility.
+        """
+        self._check()
+        import copy as _copy
+        if isinstance(targets, pd.DataFrame):
+            T = targets.copy()
+        else:
+            T = pd.DataFrame({a: dict(v) for a, v in dict(targets).items()}).T
+        for c in ('mean', 'vol'):
+            if c not in T.columns:
+                T[c] = np.nan
+        T = T[['mean', 'vol']].astype(float)
+        bad = [a for a in T.index if a not in self.assets]
+        if bad:
+            raise ValueError(f'with_targets: unknown assets {bad}')
+        if annualized:
+            T['mean'] = T['mean'] / periods
+            T['vol'] = T['vol'] / np.sqrt(periods)
+        if factor_targets is None:
+            mu_f = self.F.mean().loc[self.factors].values
+            Sigma_f = self.F.cov().loc[self.factors, self.factors].values
+        else:
+            mu_f = factor_targets.mean.loc[self.factors].values
+            vol_f = factor_targets.vol.loc[self.factors].values
+            Sigma_f = np.outer(vol_f, vol_f) * factor_targets.corr.loc[self.factors, self.factors].values
+        new = _copy.deepcopy(self)
+        rows = {}
+        for a in T.index:
+            b = self.beta.loc[a].values
+            sys_var = float(b @ Sigma_f @ b)
+            m_old = float(self.alpha[a] + b @ mu_f)
+            v_old = float(np.sqrt(sys_var + self.resid_vol[a] ** 2))
+            m_new, v_new = T.loc[a, 'mean'], T.loc[a, 'vol']
+            alpha_new = self.alpha[a] if np.isnan(m_new) else float(m_new - b @ mu_f)
+            if np.isnan(v_new):
+                resid_new = float(self.resid_vol[a])
+            else:
+                if v_new ** 2 < sys_var:
+                    raise ValueError(f'with_targets: {a}: target volatility {v_new:.4f} is below the systematic volatility '
+                                     f'{np.sqrt(sys_var):.4f} implied by its betas; raise the target or change the exposures')
+                resid_new = float(np.sqrt(v_new ** 2 - sys_var))
+            new.alpha[a] = alpha_new
+            new.resid_vol[a] = resid_new
+            p = self.resid_params.loc[a].to_dict(); p['vol'] = resid_new
+            new.resid_params.loc[a] = pd.Series(p)
+            rows[a] = {'target mean': m_new if not np.isnan(m_new) else m_old, 'sample mean': m_old, 'alpha': alpha_new,
+                       'target vol': v_new if not np.isnan(v_new) else v_old, 'sample vol': v_old,
+                       'systematic vol': float(np.sqrt(sys_var)), 'sample resid vol': float(self.resid_vol[a]), 'new resid vol': resid_new}
+        new.report = new.report.copy(); new.report['alpha'] = new.alpha; new.report['resid vol'] = new.resid_vol
+        new.target_report = pd.DataFrame(rows).T
+        return new
+
     def implied_mean(self, factor_mean):
         """``alpha + beta @ factor_mean``: expected asset returns for a view on the factors."""
         self._check()
