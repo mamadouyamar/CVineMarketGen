@@ -42,6 +42,11 @@ class FactorModel:
         One column per factor, same frequency; aligned on the common index.
     nw_lags : int, optional
         Newey-West lags for the standard errors; default ``floor(4 (n/100)^(2/9))``.
+    exposures : dict, optional
+        A priori exposures, ``{asset: [factors it may load on]}``: each asset is
+        regressed on its own factors only and its other betas are zero (their
+        standard errors and t-statistics are NaN). Assets absent from the dict
+        load on every factor. A view of what an asset is, stated before the data.
 
     Notes
     -----
@@ -51,7 +56,7 @@ class FactorModel:
     (Johnson SU per asset, mean zero) and ``report`` (one table).
     """
 
-    def __init__(self, asset_returns, factor_returns, nw_lags=None):
+    def __init__(self, asset_returns, factor_returns, nw_lags=None, exposures=None):
         R = pd.DataFrame(asset_returns).astype(float)
         F = pd.DataFrame(factor_returns).astype(float)
         idx = R.index.intersection(F.index)
@@ -63,22 +68,41 @@ class FactorModel:
         self.factors = list(self.F.columns)
         self.n_obs = len(idx)
         self.nw_lags = int(np.floor(4 * (self.n_obs / 100.0) ** (2.0 / 9.0))) if nw_lags is None else int(nw_lags)
+        self.exposures = None
+        if exposures is not None:
+            self.exposures = {}
+            for a, fs in dict(exposures).items():
+                if a not in self.assets:
+                    raise ValueError(f'exposures: unknown asset {a!r}')
+                fs = [fs] if isinstance(fs, str) else list(fs)
+                bad = [f for f in fs if f not in self.factors]
+                if bad:
+                    raise ValueError(f'exposures of {a!r}: unknown factors {bad}')
+                self.exposures[a] = fs
         self.fitted = False
 
     def fit(self):
-        X = np.column_stack([np.ones(self.n_obs), self.F.values])
-        coef, *_ = np.linalg.lstsq(X, self.R.values, rcond=None)      # (K+1, N)
-        E = self.R.values - X @ coef
-        cols = ['alpha'] + self.factors
+        K = len(self.factors); cols = ['alpha'] + self.factors
+        coef = np.zeros((K + 1, len(self.assets))); se = np.full((K + 1, len(self.assets)), np.nan)
+        E = np.empty((self.n_obs, len(self.assets))); dof = np.empty(len(self.assets))
+        for j, a in enumerate(self.assets):
+            fs = self.factors if self.exposures is None or a not in self.exposures else self.exposures[a]
+            pos = [0] + [1 + self.factors.index(f) for f in fs]
+            X = np.column_stack([np.ones(self.n_obs), self.F[fs].values])
+            c, *_ = np.linalg.lstsq(X, self.R[a].values, rcond=None)
+            E[:, j] = self.R[a].values - X @ c
+            coef[pos, j] = c
+            se[pos, j] = _newey_west_se(X, E[:, j], self.nw_lags)
+            dof[j] = X.shape[1]
         self.alpha = pd.Series(coef[0], index=self.assets)
         self.beta = pd.DataFrame(coef[1:].T, index=self.assets, columns=self.factors)
-        se = np.vstack([_newey_west_se(X, E[:, j], self.nw_lags) for j in range(len(self.assets))])
-        self.se = pd.DataFrame(se, index=self.assets, columns=cols)
-        self.tstat = pd.DataFrame(coef.T / se, index=self.assets, columns=cols)
+        self.se = pd.DataFrame(se.T, index=self.assets, columns=cols)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            self.tstat = pd.DataFrame(coef.T / se.T, index=self.assets, columns=cols)
         tss = ((self.R.values - self.R.values.mean(0)) ** 2).sum(0)
         self.r2 = pd.Series(1.0 - (E ** 2).sum(0) / tss, index=self.assets)
         self.resid = pd.DataFrame(E, index=self.R.index, columns=self.assets)
-        self.resid_vol = self.resid.std(ddof=X.shape[1])
+        self.resid_vol = pd.Series(np.sqrt((E ** 2).sum(0) / (self.n_obs - dof)), index=self.assets)
         rows = {}
         for a in self.assets:
             e = self.resid[a]
@@ -123,7 +147,7 @@ class FactorModel:
         """Save the fitted model to JSON (coefficients, statistics, residual parameters, report)."""
         self._check()
         d = {'kind': 'FactorModel', 'assets': self.assets, 'factors': self.factors, 'n_obs': self.n_obs,
-             'nw_lags': self.nw_lags, 'alpha': self.alpha.to_dict(), 'beta': self.beta.to_dict(orient='index'),
+             'nw_lags': self.nw_lags, 'exposures': self.exposures, 'alpha': self.alpha.to_dict(), 'beta': self.beta.to_dict(orient='index'),
              'se': self.se.to_dict(orient='index'), 'tstat': self.tstat.to_dict(orient='index'),
              'r2': self.r2.to_dict(), 'resid_vol': self.resid_vol.to_dict(),
              'resid_params': self.resid_params.to_dict(orient='index'), 'report': self.report.to_dict(orient='index')}
@@ -137,6 +161,7 @@ class FactorModel:
             d = json.load(f)
         m = cls.__new__(cls)
         m.assets, m.factors, m.n_obs, m.nw_lags = d['assets'], d['factors'], d['n_obs'], d['nw_lags']
+        m.exposures = d.get('exposures')
         m.R = m.F = m.resid = None
         m.alpha = pd.Series(d['alpha']).loc[m.assets]
         m.beta = pd.DataFrame(d['beta']).T.loc[m.assets, m.factors]

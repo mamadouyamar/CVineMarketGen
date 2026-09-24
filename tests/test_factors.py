@@ -61,3 +61,24 @@ def test_fit_johnson_su_heavy_tailed_residual_is_not_degenerate():
     assert p['lambda'] > 0.1 and p['residual'] < 1e-6
     m = johnson_su_moments(p)
     assert abs(m[2] - 1.5634625201637253) < 1e-4 and abs(m[3] - 12.453695663202758) < 1e-3
+
+
+def test_a_priori_exposures():
+    rng = np.random.default_rng(4)
+    idx = pd.period_range('2000-01', periods=300, freq='M')
+    F = pd.DataFrame(rng.standard_normal((300, 3)) * 0.03, index=idx, columns=['eq', 'rates', 'cmd'])
+    R = pd.DataFrame({'stock': 0.9 * F['eq'] + 0.01 * rng.standard_normal(300),
+                      'bond': -1.5 * F['rates'] + 0.005 * rng.standard_normal(300),
+                      'oil': 0.3 * F['eq'] + 1.0 * F['cmd'] + 0.02 * rng.standard_normal(300)}, index=idx)
+    fm = FactorModel(R, F, exposures={'stock': ['eq'], 'bond': 'rates'}).fit()      # oil loads on everything
+    assert fm.beta.loc['stock', ['rates', 'cmd']].eq(0).all() and fm.beta.loc['bond', ['eq', 'cmd']].eq(0).all()
+    assert np.isnan(fm.tstat.loc['stock', 'rates']) and np.isfinite(fm.tstat.loc['stock', 'eq'])
+    assert abs(fm.beta.loc['stock', 'eq'] - 0.9) < 0.05 and abs(fm.beta.loc['bond', 'rates'] + 1.5) < 0.05
+    assert abs(fm.beta.loc['oil', 'cmd'] - 1.0) < 0.1 and fm.r2['stock'] > 0.8
+    X = fm.simulate(F.iloc[:10], residuals=False)
+    assert np.allclose(X['stock'].values, fm.alpha['stock'] + 0.9 * F['eq'].iloc[:10].values, atol=0.05)
+    import tempfile, os
+    p = os.path.join(tempfile.mkdtemp(), 'fm.json'); fm.save(p); back = FactorModel.load(p)
+    assert back.exposures == {'stock': ['eq'], 'bond': ['rates']} and np.allclose(back.beta.values, fm.beta.values)
+    with pytest.raises(ValueError):
+        FactorModel(R, F, exposures={'stock': ['nope']})

@@ -31,6 +31,8 @@
   could fail silently for a fat-tailed target and fill the column with NaN;
   `simulate` and `simulate_paths` now fall back to Nelder-Mead and then to the
   calibrated parameters.
+- `FactorModel(..., exposures={asset: [factors]})`: a priori exposures, each asset
+  regressed on the factors its characteristics justify, the other betas zero.
 - Calibration speed: closed-form inverse h-functions for the Gaussian and the
   Student t copulas in the vine sampler (pyvinecopulib's Gaussian inverse is a
   hundred times slower than Clayton's and dominated the calibration once the
