@@ -166,8 +166,8 @@ def tail_asymmetry_test(x, y, n_boot=500, level=0.90, seed=0, copula_scale=True)
     Is the exceedance-correlation profile of ``(x, y)`` asymmetric beyond sampling noise?
 
     The statistic is the mean of the profile for ``z < 0`` minus its mean for
-    ``z > 0`` (thresholds from -0.5 to 0.5 standard deviations, the range of the
-    classification), computed on the normal scores of the two series (the copula
+    ``z > 0`` (thresholds from -1 to 1 standard deviations, the range the paper
+    plots), computed on the normal scores of the two series (the copula
     scale; ``copula_scale=False`` for the standardized returns); its distribution
     is bootstrapped by resampling the observations. Returns a dict with
     ``difference``, ``lower``, ``upper`` (the central ``level`` interval),

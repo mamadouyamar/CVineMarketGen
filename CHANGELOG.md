@@ -42,6 +42,11 @@
   feasible when the target is at least the systematic volatility), from a
   dictionary or a spreadsheet table in annual terms; `target_report` per asset.
 - `CVineMarket(symmetry_level=0.90)`: the confidence level of the symmetry test.
+- `CVineMarket(families='auto', overrides={(a, b): spec})`: automatic selection
+  with named pairs imposed by the user and kept through the calibration.
+- The symmetry test's window is -1 to 1 standard deviations (the classification's
+  -0.5 to 0.5 gave 22 percent false asymmetries at a nominal 10 on Gaussian
+  pairs of 230 months; -1 to 1 gives 8).
 - `FactorModel(..., exposures={asset: [factors]})`: a priori exposures, each asset
   regressed on the factors its characteristics justify, the other betas zero.
 - Calibration speed: closed-form inverse h-functions for the Gaussian and the

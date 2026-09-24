@@ -72,7 +72,9 @@ Copula families
    copula by BIC; the others are classified from the profile, the admissible
    families fitted, the best BIC kept, non-monotone pairs get a mixture. Needs a
    history in the targets. ``cv.classification`` shows the test per pair;
-   ``symmetry_test=False`` reproduces the paper's rule on every pair.
+   ``symmetry_test=False`` reproduces the paper's rule on every pair;
+   ``overrides={('Commodity', 'Equity DM'): ('gumbel', 180)}`` imposes a pair's
+   copula and lets the selection run on the others.
 
 ``'gaussian'``
    Gaussian pair copulas everywhere, initialised at the partial correlations of

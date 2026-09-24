@@ -4,6 +4,7 @@ import os
 import numpy as np
 import pandas as pd
 import pyvinecopulib as pv
+import pytest
 
 from cvinemarketgen import Targets, CVineMarket, tail_asymmetry_test, select_family
 
@@ -87,3 +88,21 @@ def test_student_hinv1_closed_form_matches_pyvinecopulib():
         ref = pv.Bicop(pv.BicopFamily.student, 0, parameters=np.array([[rho], [nu]])).hinv1(W)
         mine = CVineGenerator.student_hinv1(W[:, 0], W[:, 1], rho, nu)
         assert np.abs(ref - mine).max() < 1e-7
+
+
+def test_overrides_impose_a_pair_and_keep_the_rest_automatic(tmp_path):
+    rng = np.random.default_rng(11)
+    idx = pd.period_range('1995-01', periods=300, freq='M')
+    Z = rng.multivariate_normal([0, 0, 0], [[1, .5, .1], [.5, 1, .2], [.1, .2, 1]], size=300) * 0.04
+    t = Targets.from_history(pd.DataFrame(Z, index=idx, columns=['A', 'B', 'C']))
+    cv = CVineMarket(t, central='A', families='auto', n_opt=2000, overrides={('B', 'A'): ('gumbel', 180), ('C', 'A'): ('student', 0, 0.1, 5.0)}).fit()
+    e = cv.edges.set_index('edge')
+    assert e.loc['B , A', 'selected family'] == 'gumbel 180°' and e.loc['C , A', 'selected family'] == 'student 0°' and 'df=5.0' in e.loc['C , A', 'parameters']
+    assert cv.classification is not None                        # the selection still ran on the others
+    X = cv.simulate(500, seed=1, accept=False)
+    assert np.all(np.isfinite(X.values))
+    p = tmp_path / 'o.json'; cv.save(str(p))
+    d = json.load(open(p)); assert d['settings']['overrides'][0][0] == ['B', 'A']
+    back = CVineMarket.load(str(p)); assert back.edges.equals(cv.edges)
+    with pytest.raises(ValueError):
+        CVineMarket(t, central='A', families='auto', n_opt=2000, overrides={('B', 'Z'): ('gumbel', 180)}).fit()

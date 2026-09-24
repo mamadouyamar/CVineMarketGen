@@ -143,7 +143,10 @@ the rule above selects a tail-dependent family or a mixture most of the time
 (73 percent of the pairs flagged as sign-changing at correlation -0.09, 80
 percent given a Gumbel or a Clayton at correlation 0.6). The test statistic is
 the mean of the profile on the left side (:math:`z < 0`) minus its mean on the
-right side (:math:`z > 0`); its sampling distribution is bootstrapped by
+right side (:math:`z > 0`), on thresholds from -1 to 1 standard deviations (the
+classification's own window, -0.5 to 0.5, gave the test 22 percent false
+asymmetries at a nominal 10 on Gaussian pairs of 230 months; -1 to 1 gives 8);
+its sampling distribution is bootstrapped by
 resampling the observations (500 resamples), and the pair is *symmetric* when
 zero lies inside the central 90 percent interval. A symmetric pair is given the
 Gaussian or the Student t copula, whichever has the lower BIC: the Student t

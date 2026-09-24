@@ -1007,13 +1007,16 @@ class CopulaTools:
         out[good] = 0.5 * (lo_g + hi_g)
         return out
 
-    def tail_asymmetry_test(self, x, y, z_lb=-0.5, z_ub=0.5, n_boot=500, level=0.90, seed=0, inputs_are_obs=True):
+    def tail_asymmetry_test(self, x, y, z_lb=-1.0, z_ub=1.0, n_boot=500, level=0.90, seed=0, inputs_are_obs=True):
         r"""
         Is the exceedance-correlation profile of a pair asymmetric beyond sampling noise?
 
         The statistic is the mean of the profile on the left side (:math:`z < 0`, the
-        bad months of ``x``) minus its mean on the right side (:math:`z > 0`), on the
-        grid of the classification (step 0.02 from ``z_lb`` to ``z_ub``). Its
+        bad months of ``x``) minus its mean on the right side (:math:`z > 0`), on a
+        grid of step 0.02 from ``z_lb`` to ``z_ub``, by default -1 to 1 standard
+        deviations, the range the paper plots (the classification's own window,
+        -0.5 to 0.5, gave the test 22 percent false asymmetries at a nominal 10 on
+        Gaussian pairs of 230 observations; -1 to 1 gives 8). Its
         sampling distribution is obtained by resampling the observations with
         replacement ``n_boot`` times; the pair is declared symmetric when zero lies
         inside the central ``level`` interval of the bootstrap distribution.

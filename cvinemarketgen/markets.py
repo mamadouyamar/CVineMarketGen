@@ -374,6 +374,12 @@ class CVineMarket(_Market):
     symmetry_level : float, default 0.90
         Confidence level of the bootstrap interval. Lower it (0.80) to let weaker
         asymmetries through on short samples, at the price of more false ones.
+    overrides : dict, optional
+        With ``families='auto'``: pairs whose copula the user imposes,
+        ``{(asset_i, asset_k): spec}`` with ``spec`` as in the ``families`` dict
+        (``('gumbel', 180)``, ``('student', 0, rho, df)``, a mixture...). The
+        selection runs on every other pair; the imposed families are kept through
+        the calibration. The manager's call where the data cannot settle a pair.
     mixtures : bool, default True
         With ``'auto'``, allow mixture copulas on non-monotone pairs of the first tree.
     mixtures_deeper_trees : bool, default False
@@ -410,10 +416,11 @@ class CVineMarket(_Market):
 
     def __init__(self, targets, central=None, families='auto', mixtures=True, mixtures_deeper_trees=False,
                  n_opt=10000, corr_tol=0.05, tol_func=1e-6, dynamics=None, dynamics_kwargs=None, exclude=None,
-                 symmetry_test=True, symmetry_level=0.90):
+                 symmetry_test=True, symmetry_level=0.90, overrides=None):
         super().__init__(targets, dynamics, dynamics_kwargs, exclude)
         self.symmetry_test = bool(symmetry_test)
         self.symmetry_level = float(symmetry_level)
+        self.overrides = None if overrides is None else dict(overrides)
         self.central = central or targets.assets[0]
         if self.central not in targets.assets:
             raise ValueError(f'central asset {self.central!r} not in targets')
@@ -432,6 +439,39 @@ class CVineMarket(_Market):
                                      symmetry_test=bool(symmetry_test), symmetry_level=float(symmetry_level))
 
     # ---- specification of user-chosen families -------------------------------
+    def _apply_overrides(self, t):
+        """Replace the selected copula of each pair in ``overrides`` in ``fit_results`` and pin it for the calibration."""
+        import pyvinecopulib as pv
+        fr = self.fit_results
+        idx = {a: j + 1 for j, a in enumerate(self.order)}
+        pc = partial_correlations(t.corr, self.order)
+        for (a, b), spec in self.overrides.items():
+            if a not in idx or b not in idx:
+                raise ValueError(f'overrides: unknown asset in pair {(a, b)}')
+            i, k = max(idx[a], idx[b]), min(idx[a], idx[b])
+            r, c = k - 1, i - 2
+            fr['thetas_final_2p'][r, c] = np.nan
+            fr['a1_final'][r, c] = np.nan; fr['a2_final'][r, c] = np.nan
+            fr['fams_ncscops_status'][r, c] = False
+            if spec[0] == 'mixture':
+                comps = [pv.Bicop(self.engine._FAMILY[f], int(rot)) for f, rot, *_ in spec[1]]
+                ths = [float(cc[2]) if len(cc) > 2 else _FAMILY_DEFAULT_THETA[cc[0]] for cc in spec[1]]
+                fr['thetas_final_1p'][r, c] = np.array([float(spec[2])] + ths, float)
+                fr['fams_cops'][r, c] = comps; fr['fams_rots'][r, c] = 0
+                fr['fams_mixture_status'][r, c] = True; fr['fams_status'][r, c] = 'mixture'
+                fr['fams_cops_name'][r, c] = [cc[0] for cc in spec[1]]
+            else:
+                fam, rot = spec[0], int(spec[1])
+                th = float(spec[2]) if len(spec) > 2 else (pc[(i, k)] if fam in ('gaussian', 'student') else _FAMILY_DEFAULT_THETA[fam])
+                fr['thetas_final_1p'][r, c] = th
+                if fam == 'student':
+                    fr['thetas_final_2p'][r, c] = float(spec[3]) if len(spec) > 3 else _STUDENT_DEFAULT_DF
+                fr['fams_cops'][r, c] = self.engine._FAMILY[fam]; fr['fams_rots'][r, c] = rot
+                fr['fams_mixture_status'][r, c] = False; fr['fams_status'][r, c] = 'ordinary'
+                fr['fams_cops_name'][r, c] = fam
+            fr['testable_copulas'][r, c] = []                 # the calibration keeps the imposed family
+            fr['testable_copulas_only_tail'][r, c] = []
+
     def _spec_from_families(self, t):
         order = self.order
         idx = {a: j + 1 for j, a in enumerate(order)}
@@ -477,6 +517,8 @@ class CVineMarket(_Market):
                                                          higher_moments=t.higher_moments_frame())
             if self.families == 'auto':
                 self.fit_results = self.engine.fit_and_structure_CVine(self.setup)
+                if self.overrides:
+                    self._apply_overrides(t)
             else:
                 spec = self._spec_from_families(t)
                 self.fit_results = self.engine.fit_results_from_spec(spec, self.order, t.corr)
@@ -581,7 +623,8 @@ class CVineMarket(_Market):
              'settings': {'central': self.central, 'families': 'auto' if self.families == 'auto' else 'given',
                           'mixtures': self.mixtures, 'mixtures_deeper_trees': self.mixtures_deeper_trees,
                           'n_opt': self.n_opt, 'corr_tol': self.corr_tol, 'tol_func': self.tol_func, 'exclude': self.exclude,
-                          'symmetry_test': self.symmetry_test, 'symmetry_level': self.symmetry_level},
+                          'symmetry_test': self.symmetry_test, 'symmetry_level': self.symmetry_level,
+                          'overrides': None if not self.overrides else [[list(k), list(v) if v[0] != 'mixture' else ['mixture', [list(c) for c in v[1]], v[2]]] for k, v in self.overrides.items()]},
              'order': self.order,
              'marginals': self.setup['optimal_params'][['a', 'b', 'c', 'd', 'fun']].astype(float).to_dict(orient='index'),
              'edges': self._edge_records(),
