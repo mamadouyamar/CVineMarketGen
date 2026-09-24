@@ -29,3 +29,19 @@ asymmetry) the rule selected a mixture 73 percent of the time at correlation
 
 The paper's rule is the special case of a test that always rejects; every
 result of article 3 stands. The paragraph for the paper is in `docs/method.rst`.
+
+## Addendum 2026-09-23: the first tree on the copula scale
+
+The paper computes the first tree's exceedance profile on the standardized
+returns (article-3.tex, "obtained from the raw returns when k = 1") and the
+deeper trees' on Phi^{-1} of the h-function values. On returns the profile
+slopes with the skewness of the conditioning variable whatever the copula, so
+marginal skewness was read as copula asymmetry (SPY/EFA: 0.19 on returns, 0.10
+on normal scores; on the copula scale the pair is symmetric and Gaussian by BIC).
+Change: tree 1 classifies and tests on the pseudo-observations through
+Phi^{-1}, like the deeper trees; `classify_pair`, `select_family`,
+`tail_asymmetry_test` take `copula_scale=True` by default. Reported profiles in
+notebooks and papers stay on returns (the paper's definition). Sentence to amend
+in article 3, Algorithm 3, step "Empirical tail signature": "obtained from
+Phi^{-1} of the pseudo-observations when k = 1 and from Phi^{-1}(H^{(k-1)}) when
+k >= 2".

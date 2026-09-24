@@ -214,19 +214,19 @@ class CVineGenerator(MomentMatch, CopulaTools):
                 ## This determines which copula families are admissible before any statistical fitting.
                 ## ==============================================================================
                 if tree == 1:
-                    ## Tree 1: use raw observations directly (inputs_are_obs=True).
-                    ## The pair is (asset 1, asset i+1) from the original return data.
+                    ## Tree 1: the pseudo-observations (ranks) through the normal quantile, the
+                    ## copula scale, exactly as the deeper trees receive their h-function values.
+                    ## The returns' own skewness then cannot be read as copula asymmetry.
+                    ## (Before 0.4.0 the raw returns were used here, as in the paper's text.)
                     t_condcorr = self.draw_cond_corr(
-                        x=input_data[input_data.columns[0]] if isinstance(input_data, pd.DataFrame) \
-                            else input_data[:, 0],
-                        y=input_data[input_data.columns[i]] if isinstance(input_data, pd.DataFrame) \
-                            else input_data[:, i],
+                        x=data.iloc[:, 0],
+                        y=data.iloc[:, i],
                         figsize=(6, 6),
                         thetas_lb=-0.5,
                         thetas_ub=0.5,
                         names=['asset1', 'asset2'],
                         return_values=True,
-                        inputs_are_obs=True,
+                        inputs_are_obs=False,
                         show_plot=False)
 
                     ## Extract summary statistics from the exceedance correlation curve
@@ -276,10 +276,8 @@ class CVineGenerator(MomentMatch, CopulaTools):
                     ## class, candidates Gaussian and Student t by BIC.
                     ## ==============================================================================
                     if symmetry_test:
-                        t_asym = self.tail_asymmetry_test(
-                            x=input_data[input_data.columns[0]] if isinstance(input_data, pd.DataFrame) else input_data[:, 0],
-                            y=input_data[input_data.columns[i]] if isinstance(input_data, pd.DataFrame) else input_data[:, i],
-                            n_boot=symmetry_n_boot, level=symmetry_level, inputs_are_obs=True)
+                        t_asym = self.tail_asymmetry_test(x=data.iloc[:, 0], y=data.iloc[:, i],
+                                                          n_boot=symmetry_n_boot, level=symmetry_level, inputs_are_obs=False)
                         t_symmetric = t_asym['symmetric']
                     if t_symmetric:
                         t_lower_tail_dependence, t_upper_tail_dependence = False, False

@@ -101,7 +101,14 @@ def exceedance_curve(x, y, z=None):
     return pd.Series(_ct.exceedance_correlation(np.asarray(x, float), np.asarray(y, float), z), index=z, name='exceedance corr')
 
 
-def classify_pair(x, y, target_corr=None, z_lb=-0.5, z_ub=0.5):
+def _normal_scores(v):
+    """Normal scores ``Phi^{-1}(rank / (n + 1))``: the copula scale, marginals removed."""
+    from scipy.stats import norm, rankdata
+    v = np.asarray(v, float)
+    return norm.ppf(rankdata(v) / (len(v) + 1.0))
+
+
+def classify_pair(x, y, target_corr=None, z_lb=-0.5, z_ub=0.5, copula_scale=True):
     """
     The four characteristics ``(l, u, s, m)`` of Algorithm 3 for one pair, from its exceedance curve.
 
@@ -113,6 +120,11 @@ def classify_pair(x, y, target_corr=None, z_lb=-0.5, z_ub=0.5):
         Sign of the target correlation (``s``); the sample correlation if omitted.
     z_lb, z_ub : float
         Threshold range used by the paper's classification (−0.5 to 0.5).
+    copula_scale : bool, default True
+        Classify on the normal scores of the two series (the copula scale, as the
+        vine's deeper trees do) rather than on the standardized returns, whose
+        skewness would otherwise be read as copula asymmetry. ``False`` gives the
+        paper's original first-tree rule.
 
     Returns
     -------
@@ -122,12 +134,15 @@ def classify_pair(x, y, target_corr=None, z_lb=-0.5, z_ub=0.5):
         ``metrics`` (the summary statistics) and ``curve`` (the Series).
     """
     x = np.asarray(x, float); y = np.asarray(y, float)
+    rho_sign_src = (x, y)
+    if copula_scale:
+        x, y = _normal_scores(x), _normal_scores(y)
     curve = _ct.draw_cond_corr(x=x, y=y, thetas_lb=z_lb, thetas_ub=z_ub, return_values=True,
                                inputs_are_obs=True, show_plot=False)
     met = _ct.get_condcorrelation_metrics(curve)
     l = bool(met['mean_leftside'] > met['halfway_from_jump'] and met['max_rightside'] < met['halfway_from_jump'])
     u = bool(met['mean_rightside'] > met['halfway_from_jump'] and met['max_leftside'] < met['halfway_from_jump'])
-    rho = float(np.corrcoef(x, y)[0, 1]) if target_corr is None else float(target_corr)
+    rho = float(np.corrcoef(*rho_sign_src)[0, 1]) if target_corr is None else float(target_corr)
     s = int(np.sign(rho))
     m = int(np.sign(curve.min() * curve.max()))
     if not l and not u:
@@ -146,21 +161,25 @@ def classify_pair(x, y, target_corr=None, z_lb=-0.5, z_ub=0.5):
     return {'l': int(l), 'u': int(u), 's': s, 'm': m, 'metrics': met, 'curve': curve}
 
 
-def tail_asymmetry_test(x, y, n_boot=500, level=0.90, seed=0):
+def tail_asymmetry_test(x, y, n_boot=500, level=0.90, seed=0, copula_scale=True):
     """
     Is the exceedance-correlation profile of ``(x, y)`` asymmetric beyond sampling noise?
 
     The statistic is the mean of the profile for ``z < 0`` minus its mean for
     ``z > 0`` (thresholds from -0.5 to 0.5 standard deviations, the range of the
-    classification); its distribution is bootstrapped by resampling the
-    observations. Returns a dict with ``difference``, ``lower``, ``upper`` (the
-    central ``level`` interval), ``symmetric`` (True when the interval contains
-    zero), ``level`` and ``n_boot``.
+    classification), computed on the normal scores of the two series (the copula
+    scale; ``copula_scale=False`` for the standardized returns); its distribution
+    is bootstrapped by resampling the observations. Returns a dict with
+    ``difference``, ``lower``, ``upper`` (the central ``level`` interval),
+    ``symmetric`` (True when the interval contains zero), ``level`` and ``n_boot``.
     """
-    return _ct.tail_asymmetry_test(np.asarray(x, float), np.asarray(y, float), n_boot=n_boot, level=level, seed=seed)
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    if copula_scale:
+        x, y = _normal_scores(x), _normal_scores(y)
+    return _ct.tail_asymmetry_test(x, y, n_boot=n_boot, level=level, seed=seed)
 
 
-def select_family(x, y, target_corr=None, mixtures=True, symmetry_test=True):
+def select_family(x, y, target_corr=None, mixtures=True, symmetry_test=True, copula_scale=True):
     """
     Family selection of Algorithm 3 for one pair, with the symmetry test first.
 
@@ -176,9 +195,9 @@ def select_family(x, y, target_corr=None, mixtures=True, symmetry_test=True):
     test) and ``classification``.
     """
     import pyvinecopulib as pv
-    cls = classify_pair(x, y, target_corr)
+    cls = classify_pair(x, y, target_corr, copula_scale=copula_scale)
     data = pv.to_pseudo_obs(np.column_stack([np.asarray(x, float), np.asarray(y, float)]))
-    asym = tail_asymmetry_test(x, y) if symmetry_test else None
+    asym = tail_asymmetry_test(x, y, copula_scale=copula_scale) if symmetry_test else None
     if asym is not None and asym['symmetric']:
         est = _ct.select_best_preselected_bivariate_copula(data, families_and_rotations=_ct.get_copulas_specifications_symmetric())
         cop = est['copula']

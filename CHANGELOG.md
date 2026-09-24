@@ -2,6 +2,12 @@
 
 ## 0.4.0 (unreleased)
 
+- Family selection, first tree on the copula scale: the exceedance profile that
+  classifies (and now tests) each first-tree pair is computed on the
+  pseudo-observations through the normal quantile, as the deeper trees already
+  did, instead of on the standardized returns, whose skewness was read as copula
+  asymmetry (SPY against EFA: 0.19 on returns, 0.10 on normal scores).
+  `classify_pair`, `select_family`, `tail_asymmetry_test` take `copula_scale`.
 - Family selection: a symmetry test before the classification of Algorithm 3.
   The left-minus-right mean of a pair's exceedance profile is bootstrapped; a
   pair whose asymmetry is not distinguishable from sampling noise gets the

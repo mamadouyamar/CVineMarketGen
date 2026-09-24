@@ -154,6 +154,21 @@ An asymmetric pair follows the classification unchanged. The test applies in
 every tree; ``symmetry_test=False`` reproduces the paper's rule, and
 ``CVineMarket.classification`` reports the test per pair of the first tree.
 
+The scale of the first tree (changed in 0.4.0). The paper's Algorithm 3
+computes the first tree's exceedance profile on the standardized returns and
+the deeper trees' on :math:`\Phi^{-1}` of the h-function values, the copula
+scale. On returns, the profile of a pair slopes with the skewness of the
+conditioning variable whatever the copula (a longer left tail has a larger
+conditional variance, hence a higher correlation with anything the variable
+co-moves with), so the first tree read marginal skewness as copula asymmetry:
+on the six ETFs of the notebooks, SPY against EFA has an asymmetry of 0.19 on
+returns and 0.10 on normal scores. The first tree now classifies and tests on
+the pseudo-observations through :math:`\Phi^{-1}`, like the deeper trees;
+``classify_pair``, ``select_family`` and ``tail_asymmetry_test`` do the same by
+default (``copula_scale=False`` for the paper's rule). The exceedance profiles
+*reported* in the notebooks and papers stay on returns, the paper's
+definition, and the notebooks show both scales side by side.
+
 :meth:`CVineGenerator.selected_edge_table <cvinemarketgen.cvine.CVineGenerator.selected_edge_table>`
 prints the result edge by edge.
 
