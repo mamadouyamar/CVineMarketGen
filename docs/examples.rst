@@ -1,7 +1,7 @@
 Examples
 ========
 
-Eleven executed notebooks, in order: a course in which each notebook is
+Ten executed notebooks, in order: a course in which each notebook is
 motivated by what the previous one could not do. Start with 01. Every notebook carries a Colab
 badge.
 
@@ -11,9 +11,8 @@ badge.
    examples/01_matching_moments_and_correlations
    examples/02_tail_dependence
    examples/03_many_assets_factors
+   examples/04_time_series_of_a_factor
    examples/05_ltcma_targeting
-   examples/07_daily_paths_for_backtesting
-   examples/09_hmm_dynamics
    examples/10_block_filters_vecm
    examples/11_structural_layer_fx
    examples/12_yield_curve_fixed_income

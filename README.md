@@ -154,7 +154,7 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Eleven tutorials in [`examples/`](examples/), a course in which each notebook is
+Ten tutorials in [`examples/`](examples/), a course in which each notebook is
 motivated by what the previous one could not do, all executed, each with a
 Colab badge. Start with the first. (The series is being rebuilt notebook by
 notebook; the early numbers follow the new course, the later ones the previous
@@ -165,9 +165,8 @@ series until they are absorbed.)
 | 01 | [`01_matching_moments_and_correlations`](examples/01_matching_moments_and_correlations.ipynb) | targets, fit, check, use: the moments and correlations of six ETFs matched by the Fleishman generator, a portfolio's tail against the normal, a change of one target, paths, and the exceedance profile that shows what is missing |
 | 02 | [`02_tail_dependence`](examples/02_tail_dependence.ipynb) | copula versus marginals, tail dependence with a direction (Clayton, Gumbel) and without (Student t), the exceedance profile, the noise in the family classification and the symmetry test, the C-vine generator on the same six ETFs, the two portfolios of 01 with their tails recovered where the data identify them |
 | 03 | [`03_many_assets_factors`](examples/03_many_assets_factors.ipynb) | a universe of 73 ETFs: the seven factors built from public data, the factor model and its independence assumption checked (near-duplicate funds fail it), both generators on the factors, asset scenarios by exposures, a view on one factor reaching every asset, and the time-series tests that motivate the dynamics |
+| 04 | [`04_time_series_of_a_factor`](examples/04_time_series_of_a_factor.ipynb) | one factor as a time series: the tests of independence over time, the GARCH family and the hidden Markov model as invertible filters to an i.i.d. generalized error, selection among 28 candidates, the bootstrap goodness-of-fit test, paths from the last observed state, monthly and daily |
 | 05 | [`05_ltcma_targeting`](examples/05_ltcma_targeting.ipynb) | complete workflow with J.P. Morgan's 2024 assumptions as targets |
-| 07 | [`07_daily_paths_for_backtesting`](examples/07_daily_paths_for_backtesting.ipynb) | daily ETF returns, dynamics chosen per asset (GARCH family or HMM) by i.i.d. tests, BIC and a bootstrap test, 1,000 one-year paths |
-| 09 | [`09_hmm_dynamics`](examples/09_hmm_dynamics.ipynb) | Gaussian HMM for one asset: regimes, the Rosenblatt residual layer, the bootstrap goodness-of-fit test, a simulated year |
 | 10 | [`10_block_filters_vecm`](examples/10_block_filters_vecm.ipynb) | a VECM on the nominal and real 10-year yields as one block of the residual layer, paths in levels, the breakeven kept anchored |
 | 11 | [`11_structural_layer_fx`](examples/11_structural_layer_fx.ipynb) | USDCAD on the U.S. minus Canada 10-year differential and oil: the structural layer, a parent scenario, paths in levels |
 | 12 | [`12_yield_curve_fixed_income`](examples/12_yield_curve_fixed_income.ipynb) | the Treasury curve as Nelson-Siegel level, slope and curvature (PCA as benchmark), the factors filtered as a block, simulated curves, constant-maturity bond returns priced along the paths |
