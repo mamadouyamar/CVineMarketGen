@@ -57,7 +57,47 @@ def _reorder(targets, order):
                 skew=targets.skew.loc[order], kurt=targets.kurt.loc[order], assets=list(order),
                 history=None if targets.history is None else targets.history.loc[:, order])
     t.layer, t.freq, t.higher_moments_source = targets.layer, targets.freq, targets.higher_moments_source
+    t.synthetic = [a for a in targets.synthetic if a in order]
+    t.completion_report = targets.completion_report
     return t
+
+
+def _attach_synthetic(X, targets, hist, seed):
+    """
+    Append the ``targets.synthetic`` columns to the simulated cross-section ``X`` (columns
+    ``hist``) by a Gaussian conditional draw on the normal scale: normal scores of the
+    simulated historical columns, ``z_s = c' z_h + sqrt(1 - r' R^-1 r) eps`` with
+    ``c = R^-1 r`` from the target correlations, then the Johnson SU quantile of the
+    synthetic asset. ``r`` is corrected once (ratio target / measured on the same draw)
+    so the linear correlations of the returns land on target.
+    """
+    from scipy.stats import norm, rankdata
+    from .functions import fit_johnson_su, johnson_su_from_normal
+    rng = np.random.default_rng(seed)
+    X = X.copy(); n = len(X)
+    Z = pd.DataFrame({a: norm.ppf(rankdata(X[a].values) / (n + 1.0)) for a in hist})
+    R = targets.corr.loc[hist, hist].values
+    for sname in targets.synthetic:
+        r_target = targets.corr.loc[sname, hist].values.astype(float)
+        p = fit_johnson_su(float(targets.skew[sname]), float(targets.kurt[sname]), mean=float(targets.mean[sname]), vol=float(targets.vol[sname]))
+        eps = rng.standard_normal(n); r = r_target.copy()
+        for _ in range(2):
+            c = np.linalg.solve(R, r); s2 = max(1.0 - float(r @ c), 1e-6)
+            z = Z.values @ c + np.sqrt(s2) * eps
+            x = johnson_su_from_normal(p, (z - z.mean()) / z.std())
+            measured = np.array([np.corrcoef(x, X[a].values)[0, 1] for a in hist])
+            with np.errstate(divide='ignore', invalid='ignore'):
+                ratio = np.where(np.abs(measured) > 1e-3, r_target / measured, 1.0)
+            r = np.clip(r * np.clip(ratio, 0.5, 2.0), -0.999, 0.999)
+            if float(r @ np.linalg.solve(R, r)) >= 0.999:
+                r = r_target.copy(); break
+        c = np.linalg.solve(R, r); s2 = max(1.0 - float(r @ c), 1e-6)
+        z = Z.values @ c + np.sqrt(s2) * eps
+        X[sname] = johnson_su_from_normal(p, (z - z.mean()) / z.std())
+        Z[sname] = (z - z.mean()) / z.std()
+        hist = list(hist) + [sname]
+        R = np.corrcoef(Z.values.T)          # the next synthetic asset conditions on this one too
+    return X.loc[:, targets.assets]
 
 
 def partial_correlations(corr, order):
@@ -205,7 +245,8 @@ class _Market:
 
     def diagnostics(self, X):
         """Compare a simulated cross-section with the targets of its layer."""
-        return Diagnostics(self.fit_targets if self.fit_targets is not None else self.targets, X)
+        st = getattr(self, '_synthetic_targets', None)
+        return Diagnostics(st if st is not None else (self.fit_targets if self.fit_targets is not None else self.targets), X)
 
     def plot_exceedance(self, X, base=None, pairs=None, zlim=1.0, history=True, ncols=3, ax=None):
         """
@@ -430,7 +471,9 @@ class CVineMarket(_Market):
         self.n_opt = int(n_opt)
         self.corr_tol = corr_tol
         self.tol_func = tol_func
-        self.order = [self.central] + [a for a in targets.assets if a != self.central]
+        if self.central in targets.synthetic:
+            raise ValueError(f'central asset {self.central!r} has no history; choose a historical asset')
+        self.order = [self.central] + [a for a in targets.historical if a != self.central]
         self.engine = CVineGenerator(tol_opt=1e-10, n_samples=self.n_opt,
                                      use_ncs_on_deepertrees=False, use_ncs_on_firsttree=False,
                                      use_mixture_on_firsttree=bool(mixtures),
@@ -507,7 +550,10 @@ class CVineMarket(_Market):
     def fit(self, verbose=False):
         """Select (or set) the families and calibrate the vine to the targets. Returns self."""
         self._prepare_layer()
-        t = _reorder(self.fit_targets, self.order)
+        if self.fit_targets.synthetic and self.dynamics is not None:
+            raise ValueError('assets without a history (add_factor) are not supported together with dynamics')
+        t = _reorder(self.fit_targets, self.order)          # the vine is fitted on the assets with a history
+        self._synthetic_targets = self.fit_targets if self.fit_targets.synthetic else None
         self.fit_targets = t
         if self.families == 'auto' and t.history is None:
             raise ValueError("families='auto' needs a history in the targets; use 'gaussian' or a dict of families")
@@ -569,13 +615,20 @@ class CVineMarket(_Market):
         return self.engine.selected_edge_table(self.order, self.fit_results)
 
     def _draw(self, n, seed, corr_tol, accept=True):
+        X = self._draw_vine(n, seed, corr_tol, accept)
+        st = getattr(self, '_synthetic_targets', None)
+        if st is not None:
+            X = _attach_synthetic(X, st, self.order, None if seed is None else int(seed) + 7919)
+        return X
+
+    def _draw_vine(self, n, seed, corr_tol, accept=True):
         if seed is not None:
             np.random.seed(seed)
         if accept:
             with _quiet():
                 sims, _, _ = self.engine.run_multi_year_simulation(
                     self.vine_results, n_year=1, n_per_year=n, corr_tol=self.corr_tol if corr_tol is None else corr_tol)
-            return sims[0].loc[:, self.targets.assets]
+            return sims[0].loc[:, self.order]
         # direct draw: one sample from the calibrated vine, marginals re-fitted on it (Steps 1 to 3 of Algorithm 5)
         vr = self.vine_results
         U = self.engine.simulate_CVine(thetas_1p=vr['thetas_final_1p'], thetas_2p=vr['thetas_final_2p'],
@@ -589,7 +642,7 @@ class CVineMarket(_Market):
             target = [0, 1, vr['targeted_mom3'][a], vr['targeted_mom4'][a] - 3]
             x = _jsu_on_draw(self.engine, target, x0, U[:, j])
             out[a] = vr['targeted_mom1'][a] + x * vr['targeted_mom2'][a] ** 0.5
-        return out.loc[:, self.targets.assets]
+        return out.loc[:, self.order]
 
     # ---- save / load ---------------------------------------------------------------
     def _edge_records(self):
@@ -646,6 +699,7 @@ class CVineMarket(_Market):
         m.families = s['families']
         m.fit_targets = _reorder(Targets.from_dict(d['fit_targets']), d['order'])
         m.order = d['order']
+        m._synthetic_targets = _floor_residual_kurtosis(copy.deepcopy(t), layer='target') if t.synthetic else None
         if d['dynamics'] is not None:
             m.dynamics = dynamics_from_dict(d['dynamics'])
         edges = {}

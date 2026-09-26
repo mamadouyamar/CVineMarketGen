@@ -15,6 +15,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
 
 def _as_series(x, assets, name):
@@ -71,6 +72,72 @@ def nearest_positive_definite(corr, epsilon=1e-8):
     C2 = (C2 + C2.T) / 2.0
     np.fill_diagonal(C2, 1.0)
     return pd.DataFrame(C2, index=corr.index, columns=corr.columns), True
+
+
+def complete_correlation(corr, given):
+    """
+    Maximum-determinant completion of a partially specified correlation matrix.
+
+    ``corr`` is a square DataFrame whose entries flagged ``True`` in the boolean
+    DataFrame ``given`` (same shape; the diagonal counts as given) are kept, and
+    whose other entries are chosen to maximize ``log det``. The result is the
+    unique valid completion in which every unspecified pair has zero partial
+    correlation given the specified entries: nothing is assumed beyond what was
+    given. For one new variable with specified set S and unspecified set U it is
+    the closed form ``r_U = R_US R_SS^-1 r_S``; the general case is solved by
+    maximizing the concave ``log det`` over the free entries from that start.
+
+    Returns the completed DataFrame. Raises ``ValueError`` when the given
+    entries admit no valid completion.
+    """
+    C = np.array(corr.values, float); G = np.array(given.values, bool)
+    n = C.shape[0]; np.fill_diagonal(G, True); G = G | G.T; C = (C + C.T) / 2
+    free = [(i, j) for i in range(n) for j in range(i + 1, n) if not G[i, j]]
+    if not free:
+        return corr.copy()
+    # start: closed form, one incomplete row at a time, earlier completions treated as given
+    X = C.copy(); done = G.copy()
+    for i in range(n):
+        U = [j for j in range(n) if not done[i, j]]
+        if not U:
+            continue
+        S = [j for j in range(n) if done[i, j] and j != i]
+        if S:
+            RSS = X[np.ix_(S, S)]; rS = X[i, S]
+            q = float(rS @ np.linalg.solve(RSS, rS))
+            if q >= 1.0:
+                raise ValueError(f'complete_correlation: the given correlations of {corr.index[i]!r} admit no valid '
+                                 f'completion (r\' R^-1 r = {q:.3f} >= 1)')
+            X[i, U] = X[np.ix_(U, S)] @ np.linalg.solve(RSS, rS)
+        else:
+            X[i, U] = 0.0
+        X[U, i] = X[i, U]; done[i, U] = done[U, i] = True
+    x0 = np.array([X[i, j] for i, j in free])
+
+    def build(x):
+        M = C.copy()
+        for k, (i, j) in enumerate(free):
+            M[i, j] = M[j, i] = x[k]
+        return M
+
+    def f(x):
+        M = build(x); w = np.linalg.eigvalsh(M)
+        if w.min() <= 1e-12:
+            return 1e6
+        return -float(np.sum(np.log(w)))
+
+    def grad(x):
+        M = build(x); w = np.linalg.eigvalsh(M)
+        if w.min() <= 1e-12:
+            return np.zeros_like(x)
+        Mi = np.linalg.inv(M)
+        return np.array([-2.0 * Mi[i, j] for i, j in free])
+
+    res = minimize(f, x0, jac=grad, method='L-BFGS-B', bounds=[(-0.999, 0.999)] * len(free), options={'maxiter': 500, 'gtol': 1e-10})
+    M = build(res.x if res.fun < f(x0) + 1e-12 else x0)
+    if np.linalg.eigvalsh(M).min() <= 0:
+        raise ValueError('complete_correlation: the given correlations admit no valid completion')
+    return pd.DataFrame(M, index=corr.index, columns=corr.columns)
 
 
 class Targets:
@@ -157,6 +224,8 @@ class Targets:
         if bad.any():
             raise ValueError(f'kurt must be >= skew**2 + 1; violated for {list(self.kurt.index[bad])}')
         self.layer = 'returns'
+        self.synthetic = []                 # assets without a history, added by add_factor
+        self.completion_report = None       # given / completed correlations of the synthetic assets
         self.freq = None
         if self.history is not None and isinstance(self.history.index, (pd.DatetimeIndex, pd.PeriodIndex)):
             try:
@@ -199,6 +268,58 @@ class Targets:
         corr = df.loc[assets, assets]
         return cls(mean=df[mean_col], vol=df[vol_col], corr=corr, skew=skew, kurt=kurt, history=history, assets=list(assets))
 
+    def add_factor(self, name, mean, vol, corr, skew=0.0, kurt=3.0, annualized=True, periods=12):
+        """
+        A copy with one more asset that has no history: a factor (or asset) known only
+        by its mean, volatility, and correlation with *some* of the existing assets.
+
+        ``corr`` is ``{existing asset: correlation}``; the correlations not given are
+        filled by :func:`complete_correlation` (maximum determinant: the new asset
+        relates to the unnamed ones only through the named ones). ``mean`` and ``vol``
+        are annual by default and converted to the frequency of the other targets;
+        ``skew`` and ``kurt`` default to the normal. The copy has ``synthetic``
+        extended with ``name``, the same history (the new column has none), and a
+        ``completion_report`` with one row per existing asset: correlation and
+        ``source`` (``given`` or ``completed``). :class:`~cvinemarketgen.markets.CVineMarket`
+        attaches such an asset to the fitted vine by a Gaussian conditional draw;
+        :class:`~cvinemarketgen.markets.FleishmanMarket` needs nothing more.
+        """
+        name = str(name)
+        if name in self.assets:
+            raise ValueError(f'add_factor: {name!r} already in the targets')
+        corr = {str(k): float(v) for k, v in dict(corr).items()}
+        bad = [k for k in corr if k not in self.assets]
+        if bad:
+            raise ValueError(f'add_factor: unknown assets in corr {bad}')
+        if any(abs(v) >= 1 for v in corr.values()):
+            raise ValueError('add_factor: correlations must lie strictly inside (-1, 1)')
+        assets = self.assets + [name]
+        C = pd.DataFrame(np.eye(len(assets)), index=assets, columns=assets)
+        C.loc[self.assets, self.assets] = self.corr.values
+        G = pd.DataFrame(True, index=assets, columns=assets)
+        G.loc[name, :] = False; G.loc[:, name] = False; G.loc[name, name] = True
+        for k, v in corr.items():
+            C.loc[name, k] = C.loc[k, name] = v; G.loc[name, k] = G.loc[k, name] = True
+        C = complete_correlation(C, G)
+        m = float(mean) / periods if annualized else float(mean)
+        v = float(vol) / np.sqrt(periods) if annualized else float(vol)
+        t = Targets(mean=pd.concat([self.mean, pd.Series({name: m})]), vol=pd.concat([self.vol, pd.Series({name: v})]),
+                    corr=C, skew=pd.concat([self.skew, pd.Series({name: float(skew)})]),
+                    kurt=pd.concat([self.kurt, pd.Series({name: float(kurt)})]), assets=assets)
+        t.history = None if self.history is None else self.history.copy()
+        t.layer, t.freq, t.higher_moments_source = self.layer, self.freq, self.higher_moments_source
+        t.synthetic = list(self.synthetic) + [name]
+        rep = pd.DataFrame({'correlation': C.loc[name, self.assets],
+                            'source': ['given' if a in corr else 'completed' for a in self.assets]})
+        rep.index = pd.MultiIndex.from_product([[name], self.assets], names=['new', 'with'])
+        t.completion_report = rep if self.completion_report is None else pd.concat([self.completion_report, rep])
+        return t
+
+    @property
+    def historical(self):
+        """The assets that have a history (all but ``synthetic``)."""
+        return [a for a in self.assets if a not in self.synthetic]
+
     # ------------------------------------------------------------------ views
     @property
     def moments(self):
@@ -236,7 +357,11 @@ class Targets:
         """JSON-serializable representation (history excluded)."""
         return {'assets': self.assets, 'mean': self.mean.tolist(), 'vol': self.vol.tolist(),
                 'skew': self.skew.tolist(), 'kurt': self.kurt.tolist(), 'corr': self.corr.values.tolist(),
-                'layer': self.layer, 'freq': self.freq, 'higher_moments_source': self.higher_moments_source}
+                'layer': self.layer, 'freq': self.freq, 'higher_moments_source': self.higher_moments_source,
+                'synthetic': list(self.synthetic),
+                'completion_report': None if self.completion_report is None else
+                {'index': [list(i) for i in self.completion_report.index], 'correlation': self.completion_report['correlation'].tolist(),
+                 'source': self.completion_report['source'].tolist()}}
 
     @classmethod
     def from_dict(cls, d):
@@ -244,6 +369,11 @@ class Targets:
         t.layer = d.get('layer', 'returns')
         t.freq = d.get('freq')
         t.higher_moments_source = d.get('higher_moments_source', 'given')
+        t.synthetic = list(d.get('synthetic', []))
+        cr = d.get('completion_report')
+        if cr:
+            t.completion_report = pd.DataFrame({'correlation': cr['correlation'], 'source': cr['source']},
+                                               index=pd.MultiIndex.from_tuples([tuple(i) for i in cr['index']], names=['new', 'with']))
         return t
 
     def __repr__(self):

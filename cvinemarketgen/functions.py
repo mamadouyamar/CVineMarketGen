@@ -69,6 +69,15 @@ def johnson_su_cdf(params, x):
     return norm.cdf(z)
 
 
+def johnson_su_from_normal(params, z):
+    """The Johnson SU of :func:`fit_johnson_su` evaluated at the standard-normal draw ``z``:
+    ``mean + vol * (xi + lambda * sinh((z - gamma) / delta))``, the inverse of :func:`johnson_su_cdf`.
+    Feeding correlated normals gives a Gaussian copula with Johnson SU marginals."""
+    z = np.asarray(z, float)
+    x = params['xi'] + params['lambda'] * np.sinh((z - params['gamma']) / params['delta'])
+    return params.get('mean', 0.0) + params.get('vol', 1.0) * x
+
+
 def johnson_su_sample(params, n, seed=None):
     """Draw ``n`` values from the Johnson SU of :func:`fit_johnson_su`, rescaled by its mean and vol."""
     rng = np.random.default_rng(seed)
