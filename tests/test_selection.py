@@ -27,7 +27,7 @@ def test_cvm_statistic_uniform_is_small():
 def test_selector_picks_garch_family_and_passes():
     pytest.importorskip('arch')
     y = _garch_series().to_frame()
-    ad = select_dynamics(y, candidates=('const', 'garch', 'gjr'), pq=(1, 1), gof=False, verbose=False)
+    ad = select_dynamics(y, candidates=('const', 'garch', 'gjr'), pq=(1, 1), criterion='iid', verbose=False)
     r = ad.report.iloc[0]
     assert r['vol'] in ('garch', 'gjr') and r['passed'] and r['n_candidates'] == 6
     assert set(ad.candidates.columns) >= {'asset', 'model', 'bic', 'lb_z', 'lb_z2', 'arch_lm', 'passed'}
@@ -61,3 +61,20 @@ def test_default_candidate_set_has_28_models():
     ms = candidate_models()
     assert len(ms) == 28 and sum(m.name.startswith('HMM') for m in ms) == 2
     assert {(m.p, m.q) for m in ms if m.kind == 'garch' and m.vol != 'const'} == {(1, 1), (1, 2), (2, 1), (2, 2)}
+
+
+def test_gof_bootstrap_jsu_innovation_and_gof_criterion():
+    pytest.importorskip('arch')
+    from cvinemarketgen.dynamics import parse_spec
+    from cvinemarketgen.functions import johnson_su_cdf, fit_johnson_su
+    p = fit_johnson_su(-0.5, 5.0); x = np.linspace(-3, 3, 7)
+    u = johnson_su_cdf(p, x); assert np.all(np.diff(u) > 0) and 0 < u[0] < u[-1] < 1
+    y = _garch_series(n=600)
+    m = parse_spec('const-garch(1,1)').fit(y)
+    g = gof_bootstrap(m, y, B=6, seed=0)
+    assert g['innovation'] == 'jsu' and len(g['stats']) == 6 and np.isfinite(g['stats']).all() and 0 <= g['pvalue'] <= 1
+    g2 = gof_bootstrap(m, y, B=4, seed=0, innovation='gaussian'); assert g2['innovation'] == 'gaussian'
+    ad = select_dynamics(y.to_frame(), candidates=('const', 'garch'), means=('const',), pq=(1, 1), B=6, verbose=False)
+    c = ad.candidates
+    assert {'cvm', 'gof_pvalue', 'passed'} <= set(c.columns) and c['gof_pvalue'].notna().all() and len(c) == 2
+    assert ad.report.iloc[0]['n_candidates'] == 2

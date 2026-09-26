@@ -89,7 +89,10 @@ the pipeline and leave it unchanged.
 
 * Daily dynamics: :func:`~cvinemarketgen.selection.select_dynamics` chooses a
   model per asset among the GARCH family and a Gaussian hidden Markov model,
-  by i.i.d. tests on the residual layer, BIC among the candidates that pass,
+  by the parametric-bootstrap Cramér-von Mises goodness-of-fit test on every
+  candidate (Johnson SU innovation for the GARCH family, Rosenblatt uniforms
+  for the HMM), then BIC among the candidates that pass; the i.i.d. tests on
+  the residual layer are diagnostics,
   and a parametric-bootstrap Cramér-von Mises test of the selected model;
   :class:`~cvinemarketgen.hmm.GaussianHMM` is estimated by GenHMM1d and uses the
   Rosenblatt uniforms of the predictive mixture as its residual layer, and their

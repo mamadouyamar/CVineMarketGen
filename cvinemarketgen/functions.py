@@ -61,6 +61,14 @@ def johnson_su_moments(params):
     return _mm.moments_JSU(p)
 
 
+def johnson_su_cdf(params, x):
+    """Distribution function of the Johnson SU of :func:`fit_johnson_su` (dict with ``mean`` and ``vol``) at ``x``."""
+    from scipy.stats import norm
+    q = (np.asarray(x, float) - params.get('mean', 0.0)) / params.get('vol', 1.0)
+    z = params['gamma'] + params['delta'] * np.arcsinh((q - params['xi']) / params['lambda'])
+    return norm.cdf(z)
+
+
 def johnson_su_sample(params, n, seed=None):
     """Draw ``n`` values from the Johnson SU of :func:`fit_johnson_su`, rescaled by its mean and vol."""
     rng = np.random.default_rng(seed)

@@ -96,7 +96,7 @@ def test_selector_picks_hmm_on_hmm_data():
     from cvinemarketgen.selection import select_dynamics
     ref = _hmm_ref()
     y = pd.DataFrame({'H': ref['y']})
-    ad = select_dynamics(y, candidates=('const', 'hmm'), states=(2, 3), gof=False, verbose=False)
+    ad = select_dynamics(y, candidates=('const', 'hmm'), states=(2, 3), criterion='iid', verbose=False)
     assert ad.report.loc['H', 'model'] in ('HMM(2)', 'HMM(3)')
 
 

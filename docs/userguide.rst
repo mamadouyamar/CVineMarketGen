@@ -181,21 +181,21 @@ Choosing the dynamics
 
 For each asset the candidates are a constant or AR(1) mean with a constant,
 GARCH(p,q), GJR(p,q) or EGARCH(p,q) variance (``p, q`` up to 2 by default),
-plus a Gaussian hidden Markov model with 2 or 3 regimes. Each candidate's
-residual layer (standardized residuals, or the normal scores of the
-Rosenblatt uniforms for the HMM) is tested for the absence of autocorrelation
-(Ljung-Box) and of remaining ARCH (Ljung-Box on the squares, ARCH-LM); among
-the candidates that pass at 5 percent the lowest BIC is kept, otherwise the
-lowest BIC overall with a warning. The selected model is then checked by a
-parametric-bootstrap Cramér-von Mises test on its Rosenblatt uniforms
-(``gof_pvalue``), as in GenHMM1d, which also estimates the HMM candidates.
+plus a Gaussian hidden Markov model with 2 or 3 regimes. Every candidate is
+put through the parametric-bootstrap Cramér-von Mises goodness-of-fit test
+(``B`` simulated series from the fitted model, each refitted; for the GARCH
+family the innovation is a Johnson SU fitted to the residual and refitted with
+the model, for the HMM the Rosenblatt uniforms); among the candidates whose
+p-value is at least 5 percent the lowest BIC is kept, otherwise the lowest BIC
+overall with a warning. The Ljung-Box and ARCH-LM tests on the residual layer
+are reported as diagnostics (``criterion='iid'`` makes them the rule instead).
 
 Options through ``dynamics_kwargs``: ``candidates``, ``means``, ``pq``,
-``states``, ``alpha``, ``lags``, ``gof``, ``B``, ``seed``, ``verbose``. To
+``states``, ``criterion``, ``alpha``, ``lags``, ``B``, ``seed``, ``verbose``. To
 force a model per asset give a dict:
 ``dynamics={'SPY': 'ar1-gjr(1,1)', 'TLT': 'hmm(2)', 'GLD': 'const-garch(1,1)'}``.
-Cost: about 28 fits per asset (seconds each) and one bootstrap of ``B``
-refits per asset. The pieces are available on their own:
+Cost: 28 candidates times ``B`` refits per asset, about two minutes on a
+monthly series and an hour on a daily one (the HMM refits dominate). The pieces are available on their own:
 :func:`~cvinemarketgen.selection.select_dynamics`,
 :func:`~cvinemarketgen.selection.iid_tests`,
 :func:`~cvinemarketgen.selection.gof_bootstrap`,

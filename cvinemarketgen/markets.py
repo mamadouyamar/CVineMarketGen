@@ -270,7 +270,7 @@ class FleishmanMarket(_Market):
         carry. The filters are still estimated on the full history and paths start
         from the last observed state.
     dynamics_kwargs : dict, optional
-        Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``gof``, ``B``).
+        Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``criterion``, ``B``).
         A block of variables filtered jointly is given as a tuple key,
         ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
         in the units of the history (levels for a VECM).
@@ -399,7 +399,7 @@ class CVineMarket(_Market):
         per asset (``'ar1-garch(1,1)'``, ``'const-gjr'``, ``'hmm(2)'``); read
         ``dynamics_report`` after ``fit``.
     dynamics_kwargs : dict, optional
-        Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``gof``, ``B``).
+        Options of ``select_dynamics`` for ``'auto'`` (candidates, ``pq``, ``states``, ``criterion``, ``B``).
         A block of variables filtered jointly is given as a tuple key,
         ``dynamics={('DGS2', 'DGS10'): 'vecm', 'SPY': 'ar1-garch'}``; its columns are simulated
         in the units of the history (levels for a VECM).

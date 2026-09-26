@@ -2,6 +2,15 @@
 
 ## 0.4.0 (unreleased)
 
+- Dynamics selection by goodness of fit: `select_dynamics(criterion='gof')`
+  (default) runs the parametric-bootstrap Cramér-von Mises test on every
+  candidate and keeps the lowest BIC among those with a p-value of at least 5
+  percent, the rule of the master's thesis; the Ljung-Box and ARCH-LM tests are
+  reported as diagnostics (`criterion='iid'` keeps the 0.3.0 rule). For the
+  GARCH family the bootstrap uses a Johnson SU innovation fitted to the
+  residual (`gof_bootstrap(innovation='jsu')`, refitting model and marginal on
+  each simulated series), which tests what the generator simulates; the Gaussian
+  version rejected every GARCH whose only defect was a skewed error. `johnson_su_cdf`.
 - Family selection, first tree on the copula scale: the exceedance profile that
   classifies (and now tests) each first-tree pair is computed on the
   pseudo-observations through the normal quantile, as the deeper trees already
