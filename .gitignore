@@ -9,7 +9,7 @@ data/factors_cache.csv
 examples/data/
 docs/_build/
 docs/examples/
-data/daily_cache.csv
+data/daily_cache*.csv
 data/etf_cache*.csv
 examples/*.json
 data/fred_cache*.csv
