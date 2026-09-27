@@ -176,20 +176,11 @@ def show_sheet(df, title, max_rows=16):
 md(r"""
 ## What you have
 
-The first question the simulator asks. Before any step, list what you know
-about each asset and each factor you want in the scenarios. Four kinds of
-knowledge, any combination:
-
-| Knowledge | Asset | Factor |
-|---|---|---|
-| a return history | yes / no | yes / no |
-| moments: mean, volatility, and if you have them skewness and kurtosis | yes / no | yes / no |
-| exposures to the factors: which factors it may load on (the a-priori table), and/or the values of some betas, or a correlation with a factor | yes / no | not applicable |
-| correlations | with a named asset | with some factors |
-
-**The workbook.** This knowledge goes in one Excel workbook, six sheets, that
-the simulator reads in one call. The Python-fluent analyst builds the same six
-tables in code.
+The first question the simulator asks. Whatever you know about each asset and
+each factor goes in one Excel workbook, six sheets, that the simulator reads
+in one call: a return history for the objects that have one, and, in the
+sheets below, the moments, exposures and correlations you want to impose. The
+Python-fluent analyst builds the same six tables in code.
 
 | Sheet | Columns | What a row says |
 |---|---|---|
@@ -200,11 +191,16 @@ tables in code.
 | `factors` | factor, mean, vol, skew, kurt | a factor and any moment you impose (annual); a factor with no history must be here with mean and vol |
 | `factor_corr` | factor_1, factor_2, corr | a correlation you impose between two factors, or give for a factor without a history |
 
-**The empty-cell rule.** An empty cell is filled from the history when the
-object has one, and otherwise by a stated fallback: skewness 0 and kurtosis 3;
-mean and volatility have none, the simulator stops and names the object. A
-ticker or a factor has a history if it is a column of the return file. An
-empty `tags` cell is zero; `fit` without a history is refused. Absent
+**The empty-cell rule.** A filled cell is a target; an empty cell is estimated
+from the history, and from a stated fallback when there is none. For a factor,
+estimated means its sample moment. For an asset it means the model's own
+quantity, the beta, the alpha, the residual's volatility and the residual's
+shape, so that the asset's moments follow the factors and a view on a factor
+reaches it (the four questions below say this precisely). The fallbacks
+without a history: skewness 0 and kurtosis 3; mean and volatility have none,
+and the simulator stops and names the object. A ticker or a factor has a
+history if it is a column of the return file. An empty `tags` cell is zero;
+`fit` without a history is refused. Absent
 optional sheets impose nothing. The specification report then says, for every
 value used, whether it came from the workbook, the history or a fallback.
 
