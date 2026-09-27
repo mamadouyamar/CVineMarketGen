@@ -157,3 +157,14 @@ def test_add_edits_a_row_in_place_and_keeps_its_cells():
     sp5 = sp4.add('exposures', pd.DataFrame({'ticker': ['A'], 'factor': ['eq'], 'beta': [0.8]}))
     sp5 = sp5.add('exposures', pd.DataFrame({'ticker': ['A'], 'factor': ['eq'], 'beta': [1.0]}))
     assert len(sp5.exposures) == 1 and sp5.exposures.loc[0, 'beta'] == 1.0      # the same pair is one row, edited
+
+
+def test_a_factor_correlation_is_solved_against_the_asset_own_volatility():
+    R, F = _universe()
+    sp = MarketSpec(exposures=pd.DataFrame({'ticker': ['A'], 'factor': ['credit'], 'beta': [np.nan], 'corr': [0.55]}))
+    m = FactorMarket(R, F, spec=sp, generator='fleishman').fit()
+    X = m.simulate(60000, seed=1)
+    assert abs(X['A'].corr(m.last_factors['credit']) - 0.55) < 0.02          # delivered at the volatility the asset ends up with
+    sp2 = MarketSpec(exposures=pd.DataFrame({'ticker': ['A'], 'factor': ['credit'], 'beta': [np.nan], 'corr': [0.99]}))
+    with pytest.raises(ValueError, match='not attainable while its volatility cell is empty'):
+        FactorMarket(R, F, spec=sp2, generator='fleishman').fit()

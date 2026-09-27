@@ -375,7 +375,7 @@ class FactorMarket:
                 b[factors.index(f)] = x
             fixed_idx = [factors.index(f) for f in list(value) + list(corr_g)]
             fit_idx = [factors.index(f) for f in fit]
-            for _ in range(3 if corr_g else 1):
+            for _ in range(8 if corr_g else 1):
                 if fit_idx:
                     y = self.R[a].values - self.F[[factors[i] for i in fixed_idx if factors[i] in self.F.columns]].values @ b[[i for i in fixed_idx if factors[i] in self.F.columns]]
                     X = np.column_stack([np.ones(n_obs)] + [self.F[factors[i]].values for i in fit_idx])
@@ -383,9 +383,21 @@ class FactorMarket:
                     e = y - X @ c; c0 = c[0]; b[fit_idx] = c[1:]
                     s_[[0] + [1 + i for i in fit_idx]] = _newey_west_se(X, e, nw)
                 if corr_g:
+                    if 'vol' not in gm and e is not None:
+                        # a correlation fixes a ratio, not a scale: solve it against the volatility the asset ends up with
+                        v_ref = float(np.sqrt(float(b @ Sigma_f @ b) + np.var(e, ddof=1)))
                     Kc = [factors.index(f) for f in corr_g]; others = [i for i in range(K) if i not in Kc]
                     rhs = np.array([corr_g[factors[i]] * v_ref * sigma_f[i] for i in Kc]) - Sigma_f[np.ix_(Kc, others)] @ b[others]
                     b[Kc] = np.linalg.solve(Sigma_f[np.ix_(Kc, Kc)], rhs)
+            if corr_g:                                                 # a correlation is a ratio: check the betas deliver it at the volatility the asset ends up with
+                v_now = gm['vol'] if 'vol' in gm else float(np.sqrt(float(b @ Sigma_f @ b) + (np.var(e, ddof=1) if e is not None else 0.0)))
+                for f, rho in corr_g.items():
+                    got = float((b @ Sigma_f)[factors.index(f)] / (v_now * sigma_f[factors.index(f)]))
+                    if abs(got - rho) > 0.02:
+                        raise ValueError(f'asset {a!r}: a correlation of {rho:.2f} with {f!r} is not attainable while its volatility cell is empty. '
+                                         f'The beta it would need is far from what the history supports, so the asset\'s own residual grows with it and '
+                                         f'the correlation settles at {got:.2f}. Give the asset a volatility in the assets sheet, which pins the residual '
+                                         f'and makes any correlation up to the feasibility bound attainable, or ask for one near {got:.2f}.')
             if has_hist:
                 if e is None:                                              # nothing regressed: the remainder is the residual, its mean the alpha
                     y = self.R[a].values - self.F[[f for f in factors if f in self.F.columns]].values @ b[[i for i, f in enumerate(factors) if f in self.F.columns]]
