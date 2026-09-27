@@ -109,6 +109,7 @@ def test_workbook_roundtrip_and_persistence():
     assert X3.shape == (2000, 5) and list(m3.last_factors.columns) == ['eq', 'credit', 'cmd', 'illiq']
     P = m3.simulate_paths(50, 12, seed=2)
     assert P.array.shape == (50, 12, 5)
+    assert m3.simulate(3, seed=2).shape == (3, 5)                                           # a tiny draw must not loop on the acceptance test
 
 
 def test_cvine_generator_with_a_synthetic_factor():

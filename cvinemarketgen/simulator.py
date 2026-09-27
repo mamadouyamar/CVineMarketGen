@@ -501,10 +501,17 @@ class FactorMarket:
             return new
         return new.fit()
 
-    def simulate(self, n, seed=None):
-        """``n`` scenario months, one column per asset; the factor months are in ``last_factors``."""
+    def simulate(self, n, seed=None, accept=None):
+        """
+        ``n`` scenario months, one column per asset; the factor months are in ``last_factors``.
+        ``accept`` (the generator's accept-reject on moments and correlations) defaults to
+        True for 2,000 months or more and False below, where a correlation tolerance is not
+        attainable and the loop would not end.
+        """
         self._check()
-        Fs = self.market.simulate(int(n), seed=seed)
+        if accept is None:
+            accept = int(n) >= 2000
+        Fs = self.market.simulate(int(n), seed=seed, accept=accept)
         self.last_factors = Fs
         return self.model.simulate(Fs, seed=seed)
 
