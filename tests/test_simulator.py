@@ -36,12 +36,12 @@ def _spec():
 def test_minimum_input_reproduces_the_sample_moments():
     R, F = _universe()
     m = FactorMarket(R, F, generator='fleishman').fit()
-    assert (m.report['fit'] == 3).all() and (m.report['mean source'] == 'history').all() and m.report['history'].all()
+    assert (m.report['fit'] == 3).all() and (m.report['mean source'] == 'history (alpha)').all() and m.report['history'].all()
     X = m.simulate(60000, seed=1); chk = m.check(X)
     a = chk['assets']
     assert (np.abs(a['mean simulated'] - a['mean target']) < 3 * a['mean MC error']).all()
     assert (np.abs(a['vol simulated'] - a['vol target']) / a['vol target'] < 0.01).all()
-    assert (np.abs(a['skew simulated'] - a['skew target']) < 0.06).all()          # the cumulant rule carries the sample shape
+    assert (np.abs(a['skew simulated'] - a['skew sample']) < 0.3).all()           # residual shape from the history (a sample skewness on 400 months has an error of about 0.12)
     assert chk['factors'].attrs['max_abs_corr_error'] < 0.02 and chk['pairs'] is None
 
 
@@ -53,7 +53,7 @@ def test_workbook_every_lever():
     assert fr.loc['eq', 'mean source'] == 'workbook' and fr.loc['eq', 'vol source'] == 'history' and fr.loc['illiq', 'corr completed'] == 2
     assert abs(m.targets.mean['eq'] - 0.06 / 12) < 1e-12 and abs(m.targets.corr.loc['eq', 'credit'] - 0.3) < 1e-9
     assert rep.loc['A', ['value', 'fit', 'zero']].tolist() == [1, 1, 2] and m.model.beta.loc['A', 'credit'] == 0.5      # tag: value + fit
-    assert rep.loc['B', 'corr'] == 1 and rep.loc['B', 'mean source'] == 'workbook' and rep.loc['B', 'vol source'] == 'history'
+    assert rep.loc['B', 'corr'] == 1 and rep.loc['B', 'mean source'] == 'workbook' and rep.loc['B', 'vol source'] == 'history (residual)'
     assert rep.loc['C', 'vol source'] == 'workbook' and rep.loc['C', 'skew source'] == 'workbook'
     assert not rep.loc['PC', 'history'] and rep.loc['PC', 'value'] == 3 and m.model.beta.loc['PC', 'illiq'] == 0.5
     assert rep.loc['Cash', 'zero'] == 4 and rep.loc['Cash', 'skew source'] == 'normal'
@@ -88,11 +88,21 @@ def test_refusals_name_the_cause():
         FactorMarket(R, F, spec=sp, generator='fleishman').fit()
 
 
-def test_shape_floor_is_flagged_not_refused_for_sample_shapes():
+def test_platykurtic_residual_is_floored_with_a_flag():
     R, F = _universe()
     R = R.copy(); R['C'] = 0.9 * F['eq'] + 0.02 * np.random.default_rng(3).uniform(-1.7, 1.7, len(F))   # platykurtic residual
     m = FactorMarket(R, F, generator='fleishman').fit()
     assert 'raised to the floor' in m.report.loc['C', 'flags']
+
+
+def test_a_factor_view_reaches_the_assets_with_a_history():
+    R, F = _universe()
+    m0 = FactorMarket(R, F, generator='fleishman').fit()
+    sp = MarketSpec(factors=pd.DataFrame({'factor': ['eq'], 'mean': [F['eq'].mean() * 12 - 0.03]}))     # equity premium 3 points lower
+    m1 = m0.with_spec(sp)
+    d = (m1.model.alpha + m1.model.beta @ m1.targets.mean.loc[m1.model.factors]) - (m0.model.alpha + m0.model.beta @ m0.targets.mean.loc[m0.model.factors])
+    assert np.allclose(d.values * 12, -0.03 * m0.model.beta['eq'].values, atol=1e-9)                     # every asset moves by beta times the change
+    assert m1.model.alpha.equals(m0.model.alpha)                                                          # the alphas did not absorb it
 
 
 def test_workbook_roundtrip_and_persistence():
@@ -120,13 +130,15 @@ def test_cvine_generator_with_a_synthetic_factor():
     assert abs(m.last_factors['illiq'].corr(m.last_factors['eq']) - 0.35) < 0.03
 
 
-def test_factor_view_that_exceeds_a_sample_volatility_is_flagged_not_refused():
+def test_a_correlation_view_moves_the_volatility_of_a_history_asset():
     R, F = _universe()
     R = R.copy(); R['D'] = 1.0 * F['eq'] - 1.0 * F['credit'] + 0.005 * np.random.default_rng(5).standard_normal(len(F))   # long eq, short credit
-    sp = MarketSpec(factor_corr=pd.DataFrame({'factor_1': ['eq'], 'factor_2': ['credit'], 'corr': [-0.6]}))          # a view that raises D's systematic variance
-    m = FactorMarket(R, F, spec=sp, generator='fleishman').fit()
-    assert 'volatility raised' in m.report.loc['D', 'flags'] and m.report.loc['D', 'vol source'] == 'systematic'
+    m0 = FactorMarket(R, F, generator='fleishman').fit()
+    sp = MarketSpec(factor_corr=pd.DataFrame({'factor_1': ['eq'], 'factor_2': ['credit'], 'corr': [-0.6]}))
+    m1 = m0.with_spec(sp)
+    v0 = np.sqrt(m0.model.implied_covariance().loc['D', 'D']); v1 = np.sqrt(m1.model.implied_covariance().loc['D', 'D'])
+    assert v1 > v0 * 1.1 and 'volatility' not in m1.report.loc['D', 'flags']                             # the residual is the history's, the asset's volatility follows the view
     sp2 = MarketSpec(assets=pd.DataFrame({'ticker': ['D'], 'vol': [R['D'].std() * np.sqrt(12)]}),
                      factor_corr=pd.DataFrame({'factor_1': ['eq'], 'factor_2': ['credit'], 'corr': [-0.6]}))
-    with pytest.raises(ValueError, match='betas alone'):                                                              # the same volatility, given: refused
+    with pytest.raises(ValueError, match='betas alone'):                                                 # the same volatility, given: refused
         FactorMarket(R, F, spec=sp2, generator='fleishman').fit()

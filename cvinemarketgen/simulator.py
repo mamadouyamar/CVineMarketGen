@@ -334,18 +334,14 @@ class FactorMarket:
             states, tag = sp.asset_states(a, factors, has_hist)
             given = sp.asset_moments(a)
             flags = []
-            # ---- target moments of the asset (monthly) and their sources
-            mom, msrc = {}, {}
-            for m in _MOMENTS:
-                if m in given:
-                    mom[m] = given[m] / per if m == 'mean' else given[m] / np.sqrt(per) if m == 'vol' else given[m]; msrc[m] = 'workbook'
-                elif has_hist:
-                    x = self.R[a]
-                    mom[m] = {'mean': x.mean(), 'vol': x.std(ddof=1), 'skew': x.skew(), 'kurt': x.kurtosis() + 3.0}[m]; msrc[m] = 'history'
-                elif m in ('skew', 'kurt'):
-                    mom[m] = 0.0 if m == 'skew' else 3.0; msrc[m] = 'normal'
-                else:
-                    raise ValueError(f'asset {a!r} has no history: give its mean and vol in the assets sheet')
+            # ---- what the workbook gives (monthly), and the sample moments of the asset for the conversions and the report
+            gm = {m: (given[m] / per if m == 'mean' else given[m] / np.sqrt(per) if m == 'vol' else given[m]) for m in _MOMENTS if m in given}
+            samp = {}
+            if has_hist:
+                x = self.R[a]; samp = {'mean': x.mean(), 'vol': x.std(ddof=1), 'skew': x.skew(), 'kurt': x.kurtosis() + 3.0}
+            if not has_hist and ('mean' not in gm or 'vol' not in gm):
+                raise ValueError(f'asset {a!r} has no history: give its mean and vol in the assets sheet')
+            v_ref = gm.get('vol', samp.get('vol'))                          # the asset volatility used to turn a correlation into a beta
             # ---- step 1: betas
             value = {f: x[1] for f, x in states.items() if x[0] == 'value'}
             corr_g = {f: x[1] for f, x in states.items() if x[0] == 'corr'}
@@ -367,60 +363,58 @@ class FactorMarket:
                     s_[[0] + [1 + i for i in fit_idx]] = _newey_west_se(X, e, nw)
                 if corr_g:
                     Kc = [factors.index(f) for f in corr_g]; others = [i for i in range(K) if i not in Kc]
-                    rhs = np.array([corr_g[factors[i]] * mom['vol'] * sigma_f[i] for i in Kc]) - Sigma_f[np.ix_(Kc, others)] @ b[others]
+                    rhs = np.array([corr_g[factors[i]] * v_ref * sigma_f[i] for i in Kc]) - Sigma_f[np.ix_(Kc, others)] @ b[others]
                     b[Kc] = np.linalg.solve(Sigma_f[np.ix_(Kc, Kc)], rhs)
             if has_hist:
-                if e is None:
-                    e = self.R[a].values - self.F[[f for f in factors if f in self.F.columns]].values @ b[[i for i, f in enumerate(factors) if f in self.F.columns]]
-                    e = e - e.mean()
+                if e is None:                                              # nothing regressed: the remainder is the residual, its mean the alpha
+                    y = self.R[a].values - self.F[[f for f in factors if f in self.F.columns]].values @ b[[i for i, f in enumerate(factors) if f in self.F.columns]]
+                    c0 = float(y.mean()); e = y - c0
                 tss = ((self.R[a].values - self.R[a].values.mean()) ** 2).sum(); R2 = 1.0 - (e ** 2).sum() / tss
                 resid[a] = e; samp_rvol[a] = float(np.std(e, ddof=1))
-            # ---- step 2: volatility
-            sys_var = float(b @ Sigma_f @ b); v = mom['vol']
-            if v ** 2 <= sys_var * (1 + 1e-9):
-                contrib = pd.Series(b ** 2 * np.diag(Sigma_f), index=factors).sort_values(ascending=False)
-                top = ', '.join(f'{f} (beta {b[factors.index(f)]:.2f})' for f in contrib.index[:2] if contrib[f] > 0)
-                if msrc['vol'] == 'workbook':
+            sys_var = float(b @ Sigma_f @ b)
+            msrc = {}
+            # ---- step 2: volatility. Given: the residual gets the rest. Empty: the history gives the residual's volatility and the asset's follows
+            if 'vol' in gm:
+                v = gm['vol']
+                if v ** 2 <= sys_var * (1 + 1e-9):
+                    contrib = pd.Series(b ** 2 * np.diag(Sigma_f), index=factors).sort_values(ascending=False)
+                    top = ', '.join(f'{f} (beta {b[factors.index(f)]:.2f})' for f in contrib.index[:2] if contrib[f] > 0)
                     raise ValueError(f'asset {a!r}: the betas alone give a volatility of {np.sqrt(sys_var) * np.sqrt(per) * 100:.1f}% a year, '
                                      f'above the target {v * np.sqrt(per) * 100:.1f}%; largest contributors {top}. Lower them or raise the volatility')
-                # the sample volatility is a fallback, not a target: the factor targets (a view on a correlation, on a volatility)
-                # can push the systematic variance above it; the asset then takes the systematic volatility, with a small residual, and a flag
-                v_new = float(np.sqrt(sys_var) * 1.02)
-                flags.append(f'volatility raised from the sample {v * np.sqrt(per) * 100:.1f}% to the systematic {v_new * np.sqrt(per) * 100:.1f}% a year '
-                             f'implied by the betas and the factor targets ({top})')
-                mom['vol'] = v = v_new; msrc['vol'] = 'systematic'
-            sig_e = float(np.sqrt(v ** 2 - sys_var))
-            # ---- step 3: shape by the cumulant rule
+                sig_e = float(np.sqrt(v ** 2 - sys_var)); msrc['vol'] = 'workbook'
+            else:
+                sig_e = samp_rvol[a]; v = float(np.sqrt(sys_var + sig_e ** 2)); msrc['vol'] = 'history (residual)'
+            share = sig_e ** 2 / v ** 2                                    # unexplained share of the variance
+            # ---- step 3: shape. Given: the cumulant rule, the residual carries what the factors do not. Empty: the residual's own shape from the history
             sysr = P @ b; sd_s = sysr.std()
             k3_sys = float(stats.skew(sysr) * sd_s ** 3) if sd_s > 0 else 0.0
             k4_sys = float(stats.kurtosis(sysr) * sd_s ** 4) if sd_s > 0 else 0.0
-            k3_e = mom['skew'] * v ** 3 - k3_sys; k4_e = (mom['kurt'] - 3.0) * v ** 4 - k4_sys
-            skew_e = k3_e / sig_e ** 3; kurt_e = 3.0 + k4_e / sig_e ** 4
-            share = sig_e ** 2 / v ** 2                                   # unexplained share of the variance
-            exact_normal = abs(skew_e) < 1e-9 and abs(kurt_e - 3.0) < 1e-9
-            feasible = lambda sk, ku: abs(sk) <= _SKEW_MAX and ku <= _KURT_MAX and ku >= johnson_su_kurtosis_floor(sk)
-            if not exact_normal and not feasible(skew_e, kurt_e):
-                if msrc['skew'] == 'workbook' or msrc['kurt'] == 'workbook':
-                    raise ValueError(f'asset {a!r}: the shape you gave (skew {mom["skew"]:.2f}, kurt {mom["kurt"]:.2f}) would need a residual '
-                                     f'with skew {skew_e:.1f} and kurt {kurt_e:.1f}, which no Johnson SU has; the residual is only '
-                                     f'{100 * share:.0f}% of the variance and the factors already give the asset skew {k3_sys / v ** 3:.2f} and '
-                                     f'kurtosis {3 + k4_sys / v ** 4:.2f}. Give a shape closer to the factors\', or lower the exposures')
-                # nearest shape a Johnson SU has: the skewness is kept (capped), the kurtosis raised to the floor for that skewness
-                sk0, ku0 = skew_e, kurt_e
-                skew_e = float(np.clip(skew_e, -_SKEW_MAX, _SKEW_MAX))
+            if 'skew' in gm or 'kurt' in gm:
+                s_t = gm.get('skew', samp.get('skew', 0.0)); k_t = gm.get('kurt', samp.get('kurt', 3.0))
+                k3_e = s_t * v ** 3 - k3_sys; k4_e = (k_t - 3.0) * v ** 4 - k4_sys
+                skew_e = k3_e / sig_e ** 3; kurt_e = 3.0 + k4_e / sig_e ** 4
+                if abs(skew_e) > _SKEW_MAX or kurt_e > _KURT_MAX or kurt_e < johnson_su_kurtosis_floor(skew_e):
+                    raise ValueError(f'asset {a!r}: the shape you gave (skew {s_t:.2f}, kurt {k_t:.2f}) would need a residual with skew {skew_e:.1f} '
+                                     f'and kurt {kurt_e:.1f}, which no Johnson SU has; the residual is only {100 * share:.0f}% of the variance and the '
+                                     f'factors already give the asset skew {k3_sys / v ** 3:.2f} and kurtosis {3 + k4_sys / v ** 4:.2f}. '
+                                     f"Give a shape closer to the factors', or lower the exposures")
+                msrc['skew'] = 'workbook' if 'skew' in gm else 'history (asset)'; msrc['kurt'] = 'workbook' if 'kurt' in gm else 'history (asset)'
+            elif has_hist:
+                skew_e = float(stats.skew(e)); kurt_e = float(stats.kurtosis(e) + 3.0)
                 fl = johnson_su_kurtosis_floor(skew_e)
-                kurt_e = float(min(max(kurt_e, fl), max(_KURT_MAX, fl)))
-                what = []
-                if abs(sk0) > _SKEW_MAX:
-                    what.append(f'skew {sk0:.1f} capped at {skew_e:.1f}')
-                if ku0 < kurt_e - 1e-9:
-                    what.append(f'kurt {ku0:.1f} raised to the floor {kurt_e:.1f}')
-                if ku0 > _KURT_MAX:
-                    what.append(f'kurt {ku0:.0f} capped at {kurt_e:.0f}')
-                flags.append(f'residual shape not reproducible ({100 * share:.0f}% of the variance): ' + ', '.join(what))
-            p = fit_johnson_su(0.0, 3.1, mean=0.0, vol=sig_e) if exact_normal else fit_johnson_su(skew_e, kurt_e, mean=0.0, vol=sig_e)
-            # ---- step 5: mean (pairs are set after every asset is known)
-            alpha[a] = float(mom['mean'] - b @ mu_f)
+                if kurt_e < fl:
+                    flags.append(f'residual kurtosis {kurt_e:.2f} raised to the floor {fl:.2f} of the Johnson SU'); kurt_e = fl
+                msrc['skew'] = msrc['kurt'] = 'history (residual)'
+            else:
+                skew_e, kurt_e = 0.0, 3.1; msrc['skew'] = msrc['kurt'] = 'normal'
+            p = fit_johnson_su(skew_e, kurt_e, mean=0.0, vol=sig_e)
+            # ---- mean. Given: the alpha absorbs it. Empty: the history gives the alpha, and the mean follows the factor means
+            if 'mean' in gm:
+                alpha_a = float(gm['mean'] - b @ mu_f); msrc['mean'] = 'workbook'
+            else:
+                alpha_a = float(c0); msrc['mean'] = 'history (alpha)'
+            # ---- (pairs are set after every asset is known)
+            alpha[a] = alpha_a
             beta[a] = b; se[a] = s_; r2[a] = R2; rvol[a] = sig_e; rparams[a] = p
             src[a] = {f: states[f][0] for f in factors}
             rows[a] = {'history': has_hist, 'tag': tag, 'value': len(value), 'corr': len(corr_g), 'fit': len(fit), 'zero': len(zero),
@@ -525,8 +519,9 @@ class FactorMarket:
     def check(self, X=None, n=25000, seed=0):
         """
         Given against simulated. Returns a dict of DataFrames: ``factors`` (moments,
-        with the correlation error in ``.attrs``), ``assets`` (mean, vol, skew, kurt:
-        target, source, simulated, Monte Carlo error), ``pairs`` (target, simulated).
+        with the correlation error in ``.attrs``), ``assets`` (mean and vol: the model's
+        value, its source, simulated, Monte Carlo error; skew and kurt: the given value
+        if any, simulated, and the sample's for information), ``pairs`` (target, simulated).
         """
         self._check()
         if X is None:
@@ -539,26 +534,17 @@ class FactorMarket:
         S = fm.implied_covariance(); s = pd.Series(np.sqrt(np.diag(S.values)), index=fm.assets)
         rows = {}
         for a in fm.assets:
-            x = X[a]; r = self.report.loc[a]
-            tgt = {'mean': mu[a], 'vol': s[a]}
-            # the asset's target shape is the sum of the systematic and residual cumulants it was built from
-            rows[a] = {'mean target': tgt['mean'], 'mean source': r['mean source'], 'mean simulated': x.mean(), 'mean MC error': x.std() / np.sqrt(nX),
-                       'vol target': tgt['vol'], 'vol source': r['vol source'], 'vol simulated': x.std(), 'vol MC error': x.std() / np.sqrt(2 * nX),
-                       'skew source': r['skew source'], 'skew simulated': x.skew(), 'skew MC error': np.sqrt(6.0 / nX),
-                       'kurt source': r['kurt source'], 'kurt simulated': x.kurtosis() + 3.0, 'kurt MC error': np.sqrt(24.0 / nX)}
+            x = X[a]; r = self.report.loc[a]; given = self.spec.asset_moments(a)
+            hist = self.R is not None and a in self.R.columns
+            rows[a] = {'mean target': mu[a], 'mean source': r['mean source'], 'mean simulated': x.mean(), 'mean MC error': x.std() / np.sqrt(nX),
+                       'vol target': s[a], 'vol source': r['vol source'], 'vol simulated': x.std(), 'vol MC error': x.std() / np.sqrt(2 * nX),
+                       'skew target': given.get('skew', np.nan), 'skew source': r['skew source'], 'skew simulated': x.skew(),
+                       'skew sample': self.R[a].skew() if hist else np.nan,
+                       'kurt target': given.get('kurt', np.nan), 'kurt source': r['kurt source'], 'kurt simulated': x.kurtosis() + 3.0,
+                       'kurt sample': self.R[a].kurtosis() + 3.0 if hist else np.nan}
         assets = pd.DataFrame(rows).T
-        for a in fm.assets:                                    # the target shape: what the analyst gave or the sample had
-            given = self.spec.asset_moments(a)
-            for m in ('skew', 'kurt'):
-                if m in given:
-                    assets.loc[a, f'{m} target'] = given[m]
-                elif self.R is not None and a in self.R.columns:
-                    assets.loc[a, f'{m} target'] = self.R[a].skew() if m == 'skew' else self.R[a].kurtosis() + 3.0
-                else:
-                    assets.loc[a, f'{m} target'] = 0.0 if m == 'skew' else 3.0
-        order = []
-        for m in _MOMENTS:
-            order += [f'{m} target', f'{m} source', f'{m} simulated', f'{m} MC error']
+        order = ['mean target', 'mean source', 'mean simulated', 'mean MC error', 'vol target', 'vol source', 'vol simulated', 'vol MC error',
+                 'skew target', 'skew source', 'skew simulated', 'skew sample', 'kurt target', 'kurt source', 'kurt simulated', 'kurt sample']
         assets = assets[order]
         pairs = None
         if fm.pair_report is not None:
