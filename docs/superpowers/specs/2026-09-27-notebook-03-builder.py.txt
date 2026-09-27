@@ -35,6 +35,32 @@ cells = []
 def md(s): cells.append({"cell_type": "markdown", "metadata": {}, "source": s.strip("\n")})
 def code(s): cells.append({"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip("\n")})
 
+READINGS = {
+ "READ_STEP1": "**Reading the table.** Three pairs are correlated above 0.5, Credit, Inflation\nand Commodity with Equity DM; the rest sit between $-0.02$ and 0.31. The\nyield-based factors carry the tails: a kurtosis of 9 for Inflation and 17 for\nCredit, the months of 2008 and 2020. Equity EM and Small cap are close to\nnormal. This is the table the generator reproduces, and the one a view edits.",
+ "READ_STEP2A": "**Reading the two diagnostics.** Both generators reproduce the 28 moments to\nthe third decimal and the 21 correlations within 0.01 for Fleishman and 0.03\nfor the C-vine (its acceptance tolerance is 0.05). The vine finds every\nfirst-tree pair symmetric and gives five of them a Student t with 2.4 to 3.8\ndegrees of freedom, and Small cap a Gaussian.",
+ "READ_STEP2B": "**Reading the report.** With nothing but the data, the regression gives SPY a\nbeta of 0.97 on Equity DM and six small betas of both signs on the other\nfactors, $-0.16$ on Equity EM among them, which nobody believes about the\nS&P 500: that is the noise lever 1 removes. The median $R^2$ is 0.77. In the\nspecification report every asset reads `history` with seven `fit` betas, and\nthe source of every moment says where the rule took it: the alpha and the\nresidual from the regression. The residual shapes are moderate, skewness\nbetween $-0.2$ and 1.6, kurtosis between 3.1 and 15 for HYG, whose 2008\nmonths the four factors do not fully explain. SPY's residual is lighter\ntailed than a normal, and the report flags that it was raised to the Johnson\nSU's floor: a residual of one percent a month, five percent of SPY's variance,\nwhich changes nothing visible.",
+ "READ_L1": "**Reading lever 1.** Every zero in the beta table is a zero the analyst\nimposed: SPY is Equity DM alone at 0.93, TLT is Real premia and Inflation, GLD\nis Real premia, Inflation and Commodity. The median $R^2$ falls from 0.77 to\n0.73; those four points are what the unrestricted fit was explaining with\nbetas that made no economic sense. The simulated volatilities stay within a\ntenth of a percent of the history, because the residual of each regression\ncarries whatever the allowed factors do not, and the sources now read one\n`fit` and six `zero` for SPY, three and four for XLF.",
+ "READ_L2": "**Reading lever 2.** The two given betas displace the regression's: 0.8 on\nCredit where the table estimated 0.36, 0.5 on Real premia where it estimated\n0.38, and the regression of the remainder now finds $-0.49$ on Inflation, the\nshort breakeven of a nominal bond. The asset's moments follow: HYG's\nvolatility rises from 10.2 to 11.5 percent a year and its skewness turns from\n$+0.3$ in the sample to $-0.7$, because a beta of 0.8 on Credit, whose\nskewness is $-1.9$, makes HYG carry Credit's left tail. That is the meaning\nof giving a beta: a statement about what the asset is, with consequences the\nhistory did not show. If the analyst also wants HYG's volatility kept, they\ngive it in the `assets` sheet (lever 9).",
+ "READ_L3": "**Reading lever 3.** A correlation of 0.30 with Inflation requires a beta of\n$+0.35$ where the regression had $-0.60$: gold's sample correlation with the\nInflation factor is 0.13, so the analyst's view is a different gold from the\nsample's, and the beta says so. The other betas adjust in the joint regression\n(Real premia 1.24 from 1.34, Commodity 0.17 from 0.30). The simulation has the\ncorrelation at 0.30. A correlation of 0.95 is refused: it would need a beta\nwhose systematic variance exceeds what GLD's residual can absorb.",
+ "READ_L4": "**Reading lever 4.** Three states on one row: `value` on Credit at 0.3,\n`fit` on Equity DM (0.26) and Real premia (0.73) as the tag allows, `zero` on\nthe four factors the tag excludes. This is the general form of an exposure\nrow, and the a-priori table and the given values compose without a rule to\nremember: the tag says which factors, the numbers override.",
+ "READ_L5": "**Reading lever 5.** The first specification is refused: with 0.6 on Credit\nand 0.2 on Equity DM the fund already has a systematic volatility of 7.5\npercent a year, and no residual can bring it down to 3. At 10 percent the\nrule leaves a residual of 6.6 percent and an alpha such that the mean is 7.\nThe simulation returns the fund at its mean and volatility within Monte Carlo\nerror, and its correlation with SPY, 0.61, is the one the two betas imply. The\nresidual is normal, `normal` in the report, so the fund's skewness is the\nfactors', about $-0.7$, inherited from Credit and Equity DM.",
+ "READ_L6": "**Reading lever 6.** Seven zeros, an alpha equal to the mean, a residual equal\nto the volatility: a pure residual, and its simulated correlation with SPY is\n0.016, noise around zero. An asset like this diversifies everything, which is\nright only if the analyst believes it depends on nothing in the factor list.",
+ "READ_L7": "**Reading lever 7.** The rule derives a residual with skewness $-1.7$ and\nkurtosis 12.2: the private equity allocation is 60 percent Equity DM and 30\npercent Small cap, whose combination has less skewness and kurtosis than the\ntarget, and the residual, 54 percent of the variance, carries the rest. The\nsimulation gives skewness $-0.95$ against $-1.0$ and kurtosis 6.4 against 7;\nthe kurtosis of 25,000 fat-tailed draws has a Monte Carlo error of a few\ntenths, so both are on target.",
+ "READ_L8": "**Reading lever 8.** SPY's alpha goes from 4.3 percent a year, the sample\npremium of the S&P 500 over its equity beta since 2007, to $-0.07$, and its\nmean is 7 within Monte Carlo error. The largest change of any other asset's\nmean under the model is exactly zero: an alpha is private to its asset.",
+ "READ_L9": "**Reading lever 9.** EEM's volatility of 6 percent is refused: two equity\nbetas impose a systematic volatility of 20.5 percent a year, and the message\nnames them. TLT's target of 14 against 14.1 in the sample shrinks its\nresidual from 4.8 to 4.4 percent a year, the systematic part being fixed by\nthe betas, and the simulation is at 13.9. A volatility target is a statement\nabout the residual, and it is feasible only above the systematic floor.",
+ "READ_L10": "**Reading lever 10.** SPY refuses a skewness of $-2$: its residual is 7 percent\nof its variance, and the cumulant rule would need it to have a skewness of\n$-84$. The message says what the factors already give SPY, a skewness of\n$-0.55$ and a kurtosis of 4.3, which is what SPY will have whatever the\nanalyst types. GLD, whose residual is 69 percent of its variance, takes the\nshape: the residual is given skewness $-0.68$ and kurtosis 6.4, and the asset\nsimulates at $-0.47$ and 5.0 against targets of $-0.5$ and 5. The lesson is\nthe one of question 3: an asset's shape belongs to the analyst only as far as\nits residual goes.",
+ "READ_L11": "**Reading lever 11.** The two bank funds have a systematic correlation of\n0.55, since they share four factors, and $R^2$ of 0.58 and 0.55, so the\nresiduals can move the correlation anywhere in $[0.11, 0.99]$: a target of\n0.30 is refused as below that range once the sign of the residual covariance\nis accounted for, while 0.90 needs a residual correlation of 0.80 and gets\nit, the simulation at 0.90 against 0.54 before. The correlation of KBE with\nSPY is unchanged to the third decimal: the residual correlation is private to\nthe pair. The sample had the pair at 0.94; the analyst chose 0.90.",
+ "READ_L12": "**Reading lever 12.** The refused triangle asks three funds that share the\nsame factors, XLK, QQQ and SMH, to be nearly uncorrelated: the range for XLK\nand QQQ is $[0.48, 1.00]$, and 0.05 is below it. The four accepted pairs\nneed residual correlations from 0.40 to 0.80 depending on how much the factors\nalready explain, and the simulation has each within 0.005 of its target.\nThese four pairs are where the seven factors failed the independence\nassumption in the sample (residual correlations of 0.88 to 0.97): the analyst\nis putting back by hand what a banks, a housing, a Pacific and a technology\nfactor would have carried.",
+ "READ_L13": "**Reading lever 13.** The alphas are the history's, so the view propagates:\nKorea's expected return falls by 3.5 percent a year, the banks' and\nfinancials' by 3.4, in proportion to their Equity DM betas, and the Treasury,\nTIPS, gold and commodity funds do not move, their equity beta being zero by\nthe a-priori table. SPY does not move either, for the opposite reason: its\nmean was given in lever 8, and its alpha absorbs the view. Given cells are\ntargets; empty cells follow.",
+ "READ_L14": "**Reading lever 14.** Setting the equity-bond correlation to $-0.30$ moves the\nbalanced portfolio's volatility from 3.13 to 2.80 percent a month, exactly the\nvalue the factor covariance implies, and its expected shortfall from 7.25 to\n6.45: eleven percent of risk from one cell of the workbook. XLF shows the\nother side: long equity and short real premia, its two positions now offset\nless, and its volatility rises from 22.5 to 25.4 percent a year with a\nresidual that has not changed. A factor view reaches every asset through its\nbetas, in the direction the betas dictate.",
+ "READ_L15": "**Reading lever 15.** From the two given correlations the completion fills\nfive: Illiquidity gets 0.28 with Inflation and 0.23 with Commodity, because\nthose factors are correlated with Equity DM and Credit, and $-0.04$ with Real\npremia, which is uncorrelated with both. Nothing was assumed beyond the two\nnumbers. The attached factor has its mean and volatility exactly and its seven\ncorrelations to the third decimal, the completed as well as the given.",
+ "READ_L16": "**Reading lever 16.** HYG's residual is the history's and does not change,\n6.45 percent a year before and after; the loading of 0.3 on Illiquidity adds\nsystematic variance, and HYG's volatility under the model rises from 10.6 to\n11.4 percent a year. That is what a new exposure does to an asset with a\nhistory: it adds a source of return, it does not replace one. An analyst who\nwants HYG's volatility kept gives it in the `assets` sheet, and the residual\nshrinks to make room, as in lever 9. HYG's correlation with Illiquidity is\n0.48, the private credit fund's 0.64, from betas of 0.3 and 0.5 and the\nfactor's own correlations.",
+ "READ_L17": "**Reading lever 17.** The first pair target is refused: a fund on Equity DM,\nCredit and Illiquidity has a systematic correlation of 0.49 with HYG and a\nrange of $[0.06, 0.92]$, and 0.20 falls below it once the residual\ncorrelation is solved. At 0.75 the residual correlation is 0.61. The report\nrow shows the five answers at once: three `value` betas, mean, volatility\nand shape from the workbook, one pair; the residual derived by the rule has\nskewness $-0.8$ and kurtosis 8.2. The last table has every input within\nMonte Carlo error: mean 6.15 against 6, volatility 9.03 against 9, skewness\n$-0.54$ against $-0.6$, kurtosis 5.1 against 5.5, correlation 0.75.",
+ "READ_CHECK": "**Reading the check.** Factors: moments to the sixth decimal, correlations\nwithin 0.027. Assets: every mean and volatility within about one Monte Carlo\nerror of the model's value, over all 72; the largest mean difference, 0.84\npercent a year, equals the largest error. The shape columns say what an empty\ncell means. GLD, Private equity and Multi-strategy, whose shapes were given,\nare on target. TLT's simulated skewness is $-0.42$ against $+0.44$ in the\nsample and HYG's kurtosis 6.6 against 10.9: their shape cells were empty, so\ntheir residuals kept the history's shape and the assets inherited the\nfactors', Real premia and Inflation for TLT, Credit for HYG. That is by\ndesign, and the sample columns are there so the analyst sees it and types a\nshape if they disagree. Seven flags, all the same kind: a residual lighter\ntailed than a normal raised to the Johnson SU's floor, a change of a few\nhundredths of kurtosis on residuals that are a small share of their assets.\nThe portfolios are simulated under the workbook, not under the sample: the\nequity premium is 5 percent instead of 7.6, the equity-bond correlation\n$-0.30$ instead of $+0.31$, so the balanced portfolio's volatility is 2.82\nagainst 3.21 in history and its expected shortfall 6.46 against 7.27. The\nC-vine and Fleishman lines differ by a few hundredths, as step 2a said they\nwould on near-orthogonal factors.",
+ "READ_USE": "**Reading the outputs.** Rows of the cross-section and of the factor table\ncorrespond one to one under the same seed, so any asset month can be\ndecomposed into its factor months and residual. The one-year quantiles read\nthe workbook back: Brazil's median return is zero and its 5 percent quantile\n$-43$, the private credit fund's $-10$, SPY's $-18$ with a median of 6. The\nreloaded simulator reproduces three scenarios to the last digit, so the three\nJSON files carry everything the simulation needs; the full workbook is saved\nbeside them as the record of what was specified.",
+ "READ_APP": "**Reading the three tables.** Every first-tree pair is symmetric at the 90\npercent level, the asymmetries between $-0.12$ and $+0.14$ with intervals\nabout $\\pm 0.3$ wide; on the copula scale the profiles are flat within that\nnoise, and on the returns their left lean is Equity DM's skewness. The family\ntable gives the measure: at a correlation of 0.09 the six families differ by\n0.015 in BIC per observation and by 0.11 in the profile, at 0.28 by 0.027 and\n0.23, and only above 0.5 by 0.16 and 0.46 to 0.50. Below a correlation of\nabout 0.2 the copula family is not identifiable from the data and does not\nmatter for the scenarios; above 0.3 it is both. For Real premia and Commodity\nthe best family by BIC alone would be a Gumbel rotated by 180 degrees, but\nthe symmetry test does not reject symmetry for them, and the rule of notebook\n02, symmetry first, then BIC among the admissible families, keeps the Student\nt. The copula layer is worth most where correlations are high: the\nasset-class level of notebook 02, and the state-dependent correlations of\nnotebooks 04 and 05."
+}
+
 md(r"""
 # 03 Many assets: the simulator for a universe
 
@@ -129,6 +155,23 @@ V = lambda v: v * np.sqrt(12) * 100       # monthly vol  -> percent a year
 INPUTS = os.path.join(ROOT, "examples", "inputs")
 def var_es(r, alpha=0.05):
     q = np.quantile(r, alpha); return -q, -r[r <= q].mean()
+
+def show_sheet(df, title, max_rows=16):
+    """Draw a workbook sheet as it looks in Excel: column letters, row numbers, a header row, empty cells empty."""
+    d = df.reset_index() if df.index.name else df.copy(); d = d.head(max_rows)
+    fmt = lambda v: "" if v is None or (isinstance(v, float) and np.isnan(v)) else (f"{v:g}" if isinstance(v, (int, float, np.integer, np.floating)) else str(v))
+    body = [[str(i + 2)] + [fmt(v) for v in row] for i, row in enumerate(d.values)]
+    header = ["1"] + [str(c) for c in d.columns]; letters = [""] + [chr(65 + j) for j in range(len(d.columns))]
+    widths = [max([len(str(c)) + 2] + [len(r[j + 1]) + 2 for r in body]) for j, c in enumerate(d.columns)]   # each column sized to its content
+    total = sum(widths); cw = [0.045] + [0.955 * w / total for w in widths]
+    fig, ax = plt.subplots(figsize=(min(0.11 * (total + 6), 16), 0.32 * (len(body) + 2) + 0.4)); ax.axis("off")
+    tab = ax.table(cellText=[letters, header] + body, loc="upper left", cellLoc="left", colWidths=cw)
+    tab.auto_set_font_size(False); tab.set_fontsize(9); tab.scale(1, 1.3)
+    for (r, c), cell in tab.get_celld().items():
+        cell.set_edgecolor("#c8c8c8")
+        if r == 0 or c == 0: cell.set_facecolor("#e8e8e8"); cell.set_text_props(color="#555555", ha="center")
+        elif r == 1: cell.set_facecolor("#dbe5f1"); cell.set_text_props(weight="bold")
+    ax.set_title(title, loc="left", fontsize=10, pad=2); plt.show()
 ''')
 md(r"""
 ## What you have
@@ -234,7 +277,13 @@ with the targets, moment by moment, and give the largest correlation error.
 """)
 code(r'''
 sim_fl = FactorMarket(R, F, spec=None, generator="fleishman").fit()
-sim_fl.market.diagnostics(sim_fl.pilot).summary(digits=3);
+def diagnostics_table(sim):
+    d = sim.market.diagnostics(sim.pilot); m = d.moments
+    out = pd.DataFrame({"mean target (%/yr)": A(m["mean target"]), "mean simulated (%/yr)": A(m["mean simulated"]), "vol target (%/yr)": V(m["vol target"]), "vol simulated (%/yr)": V(m["vol simulated"]),
+                        "skew target": m["skew target"], "skew simulated": m["skew simulated"], "kurt target": m["kurt target"], "kurt simulated": m["kurt simulated"]})
+    print(f"{d.n} simulated factor months | correlation error: max |.| {d.max_abs_corr_error:.3f}, mean |.| {d.mean_abs_corr_error:.3f}")
+    return out.round(2)
+diagnostics_table(sim_fl)
 ''')
 md(r"""
 **Then the C-vine.** The generator of notebook 02 on the same targets: the
@@ -254,10 +303,9 @@ this generator.
 code(r'''
 t0 = time.time(); sim = FactorMarket(R, F, spec=None, generator="cvine", central="Equity DM").fit(); print(f"C-vine fit on the factors: {time.time() - t0:.0f} s")
 display(sim.market.edges[sim.market.edges["tree"] == 1])
-sim.market.diagnostics(sim.pilot).summary(digits=3);
+diagnostics_table(sim)
 ''')
-md(r"""
-%%READ_STEP2A%%
+md(READINGS["READ_STEP2A"] + r"""
 
 **Why the copula layer is quiet here.** Factors are built to be close to
 independent; their correlations are mostly between 0 and 0.3. A copula shapes
@@ -394,7 +442,7 @@ which changes nothing visible.
 def lever(title, give, does, check, codetxt, key):
     md(f"### {title}\n\n**What you give.** {give}\n\n**What the simulator does.** {does}\n\n**Check.** {check}")
     code(codetxt)
-    md(f"%%{key}%%")
+    md(READINGS.get(key, f"%%{key}%%"))
 
 md(r"""
 ## The levers
@@ -412,8 +460,8 @@ lever("Lever 1: the a-priori table",
       "The betas of the seven assets, every zero being a zero the table imposed; the report's counts of fit and zero; the median $R^2$ against the all-factors fit, the difference being the noise the table refused; and the simulated volatility of the seven assets against history, which the residual from the regression keeps close whatever the betas.",
       r'''
 spec = MarketSpec.read(os.path.join(INPUTS, "universe_inputs.xlsx"))
-print("sheet assets (first rows):"); display(spec.assets.head(4))
-print("sheet tags:"); display(spec.tags)
+show_sheet(spec.assets.head(4), "sheet assets (first rows)")
+show_sheet(spec.tags, "sheet tags")
 sim1 = sim.with_spec(spec)
 display(sim1.model.beta.loc[show].round(3))
 print(f"R2 median: every factor estimated {sim.model.r2.median():.2f}, a-priori table {sim1.model.r2.median():.2f}")
@@ -428,7 +476,7 @@ lever("Lever 2: beta values for some factors of an asset, the rest estimated",
       "HYG's betas next to the all-estimated ones, to see what the given values displaced; its report row with `value`, `fit`, `zero`; the simulated volatility and skewness of HYG against the sample: the given betas change what the factors carry, and the asset's moments follow.",
       r'''
 rows = pd.DataFrame({"ticker": ["HYG", "HYG"], "factor": ["Credit", "Real premia"], "beta": [0.8, 0.5], "corr": [np.nan, np.nan]})
-print("sheet exposures:"); display(rows)
+show_sheet(rows, "sheet exposures")
 spec2 = spec.add("exposures", rows); sim2 = sim.with_spec(spec2)
 display(pd.DataFrame({"a-priori table": sim1.model.beta.loc["HYG"], "with the two given betas": sim2.model.beta.loc["HYG"], "source": sim2.model.beta_source.loc["HYG"]}).T)
 X2 = sim2.simulate(25000, seed=1)
@@ -442,7 +490,7 @@ lever("Lever 3: a correlation with a factor instead of a beta",
       "The beta the correlation implied next to the beta the regression estimated; the simulated correlation of GLD with Inflation at 0.30; and one refused correlation, too high for GLD's volatility, with the message.",
       r'''
 rows = pd.DataFrame({"ticker": ["GLD"], "factor": ["Inflation"], "beta": [np.nan], "corr": [0.30]})
-print("sheet exposures, row added:"); display(rows)
+show_sheet(rows, "sheet exposures, row added")
 spec3 = spec2.add("exposures", rows); sim3 = sim.with_spec(spec3)
 display(pd.DataFrame({"estimated (lever 1)": sim1.model.beta.loc["GLD"], "from the correlation": sim3.model.beta.loc["GLD"], "source": sim3.model.beta_source.loc["GLD"]}).T)
 X3 = sim3.simulate(25000, seed=1)
@@ -459,7 +507,7 @@ lever("Lever 4: values for some factors and an a-priori list for the others, on 
       "XLU's report row and beta sources.",
       r'''
 rows = pd.DataFrame({"ticker": ["XLU"], "factor": ["Credit"], "beta": [0.3], "corr": [np.nan]})
-print("sheet exposures, row added:"); display(rows)
+show_sheet(rows, "sheet exposures, row added")
 spec4 = spec3.add("exposures", rows); sim4 = sim.with_spec(spec4)
 display(pd.DataFrame({"beta": sim4.model.beta.loc["XLU"], "source": sim4.model.beta_source.loc["XLU"]}).T)
 sim4.report.loc[["XLU"]]
@@ -477,7 +525,7 @@ except ValueError as err:
     print("refused:", err, "\n")
 a_rows = pd.DataFrame({"ticker": ["Private credit"], "tag": ["private_credit"], "mean": [0.07], "vol": [0.10]})
 t_rows = pd.DataFrame({"tag": ["private_credit"], "Credit": [0.6], "Equity DM": [0.2]})
-print("sheet assets, row added:"); display(a_rows); print("sheet tags, row added:"); display(t_rows)
+show_sheet(a_rows, "sheet assets, row added"); show_sheet(t_rows, "sheet tags, row added")
 spec5 = spec4.add("assets", a_rows).add("tags", t_rows); sim5 = sim.with_spec(spec5)
 X5 = sim5.simulate(25000, seed=1); C5 = sim5.model.implied_covariance(); C5 = C5 / np.sqrt(np.outer(np.diag(C5), np.diag(C5)))
 display(pd.DataFrame({"Private credit": {"mean target (%/yr)": 7.0, "mean simulated (%/yr)": A(X5["Private credit"].mean()), "vol target (%/yr)": 10.0, "vol simulated (%/yr)": V(X5["Private credit"].std()),
@@ -491,7 +539,7 @@ lever("Lever 6: an asset without a history and without exposures",
       "The report row, and the simulated correlation with SPY, zero within Monte Carlo error.",
       r'''
 a_rows = pd.DataFrame({"ticker": ["Cash plus"], "mean": [0.03], "vol": [0.01]})
-print("sheet assets, row added:"); display(a_rows)
+show_sheet(a_rows, "sheet assets, row added")
 spec6 = spec5.add("assets", a_rows); sim6 = sim.with_spec(spec6)
 X6 = sim6.simulate(25000, seed=1)
 print(f"Cash plus: alpha {A(sim6.model.alpha['Cash plus']):.2f} %/yr, corr with SPY simulated {X6['Cash plus'].corr(X6['SPY']):.3f}")
@@ -505,7 +553,7 @@ lever("Lever 7: an asset without a history, with its skewness and kurtosis",
       r'''
 a_rows = pd.DataFrame({"ticker": ["Private equity"], "tag": ["private_equity"], "mean": [0.10], "vol": [0.18], "skew": [-1.0], "kurt": [7.0]})
 t_rows = pd.DataFrame({"tag": ["private_equity"], "Equity DM": [0.6], "Small cap": [0.3]})
-print("sheet assets, row added:"); display(a_rows); print("sheet tags, row added:"); display(t_rows)
+show_sheet(a_rows, "sheet assets, row added"); show_sheet(t_rows, "sheet tags, row added")
 spec7 = spec6.add("assets", a_rows).add("tags", t_rows); sim7 = sim.with_spec(spec7)
 X7 = sim7.simulate(25000, seed=1)
 display(pd.DataFrame({"Private equity": {"skew target": -1.0, "skew simulated": X7["Private equity"].skew(), "kurt target": 7.0, "kurt simulated": X7["Private equity"].kurtosis() + 3}}).T.round(2))
@@ -518,7 +566,7 @@ lever("Lever 8: a mean on an asset with a history",
       "SPY's alpha before and after, its simulated mean, and the largest change of any other asset's mean under the model, exactly zero.",
       r'''
 a_rows = pd.DataFrame({"ticker": ["SPY"], "tag": ["equity_dm"], "mean": [0.07]})
-print("sheet assets, row edited:"); display(a_rows)
+show_sheet(a_rows, "sheet assets, row edited")
 spec8 = spec7.add("assets", a_rows); sim8 = sim.with_spec(spec8)
 X8 = sim8.simulate(25000, seed=1)
 others = [a for a in X7.columns if a != "SPY"]
@@ -537,7 +585,7 @@ try:
 except ValueError as err:
     print("refused:", err, "\n")
 a_rows = pd.DataFrame({"ticker": ["TLT"], "tag": ["treasury"], "vol": [0.14]})
-print("sheet assets, row edited:"); display(a_rows)
+show_sheet(a_rows, "sheet assets, row edited")
 spec9 = spec8.add("assets", a_rows); sim9 = sim.with_spec(spec9)
 X9 = sim9.simulate(25000, seed=1)
 print(f"TLT: residual vol {V(sim8.report.loc['TLT', 'resid vol']):.2f} -> {V(sim9.report.loc['TLT', 'resid vol']):.2f} %/yr | vol simulated {V(X9['TLT'].std()):.2f} %/yr, target 14.00, history {V(R['TLT'].std()):.2f}")
@@ -554,7 +602,7 @@ try:
 except ValueError as err:
     print("refused:", err, "\n")
 a_rows = pd.DataFrame({"ticker": ["GLD"], "tag": ["precious_metals"], "skew": [-0.5], "kurt": [5.0]})
-print("sheet assets, row edited:"); display(a_rows)
+show_sheet(a_rows, "sheet assets, row edited")
 spec10 = spec9.add("assets", a_rows); sim10 = sim.with_spec(spec10)
 X10 = sim10.simulate(25000, seed=1)
 display(pd.DataFrame({"GLD": {"skew history": R["GLD"].skew(), "skew target": -0.5, "skew simulated": X10["GLD"].skew(), "kurt history": R["GLD"].kurtosis() + 3, "kurt target": 5.0, "kurt simulated": X10["GLD"].kurtosis() + 3}}).T.round(2))
@@ -571,7 +619,7 @@ try:
 except ValueError as err:
     print("refused:", err, "\n")
 p_rows = pd.DataFrame({"ticker_1": ["KBE"], "ticker_2": ["KRE"], "corr": [0.90]})
-print("sheet pairs:"); display(p_rows)
+show_sheet(p_rows, "sheet pairs")
 spec11 = spec10.add("pairs", p_rows); sim11 = sim.with_spec(spec11)
 display(sim11.pair_report.round(3))
 X11 = sim11.simulate(25000, seed=1)
@@ -589,7 +637,7 @@ try:
 except ValueError as err:
     print("refused:", err, "\n")
 p_rows = pd.DataFrame({"ticker_1": ["ITB", "EWA", "QQQ"], "ticker_2": ["XHB", "EPP", "XLK"], "corr": [0.85, 0.85, 0.85]})
-print("sheet pairs, rows added:"); display(p_rows)
+show_sheet(p_rows, "sheet pairs, rows added")
 spec12 = spec11.add("pairs", p_rows); sim12 = sim.with_spec(spec12)
 display(sim12.pair_report.round(3))
 X12 = sim12.simulate(25000, seed=1)
@@ -602,7 +650,7 @@ lever("Lever 13: a view on a factor's mean",
       "The implied change for the four largest equity betas and four assets with none; the simulated means of SPY (mean given, unchanged), EWY, TLT and GLD before and after.",
       r'''
 f_rows = pd.DataFrame({"factor": ["Equity DM"], "mean": [0.05]})
-print("sheet factors:"); display(f_rows)
+show_sheet(f_rows, "sheet factors")
 spec13 = spec12.add("factors", f_rows)
 t0 = time.time(); sim13 = sim.with_spec(spec13); print(f"refit on the edited factor targets: {time.time() - t0:.0f} s")
 d_mu = sim13.targets.mean["Equity DM"] - sim12.targets.mean["Equity DM"]; shift = sim13.model.beta["Equity DM"] * d_mu
@@ -617,7 +665,7 @@ lever("Lever 14: a view on a factor correlation",
       "A balanced portfolio, 60 percent equally across the equity funds and 40 percent across the bond funds: its volatility implied by the factor covariance before and after, and the simulated volatility, VaR and ES. And one asset's volatility before and after: XLF, long equity and short real premia, whose systematic variance the new correlation raises; its residual is the history's, so its volatility follows the view.",
       r'''
 c_rows = pd.DataFrame({"factor_1": ["Equity DM"], "factor_2": ["Real premia"], "corr": [-0.30]})
-print("sheet factor_corr:"); display(c_rows)
+show_sheet(c_rows, "sheet factor_corr")
 spec14 = spec13.add("factor_corr", c_rows)
 t0 = time.time(); sim14 = sim.with_spec(spec14); print(f"refit on the edited factor correlation: {time.time() - t0:.0f} s")
 eq = [a for a in tickers if spec.assets.set_index("ticker").loc[a, "tag"] in ("equity_dm", "equity_dm_commodity", "financials", "banks", "rate_sensitive_equity", "small_cap", "equity_em", "equity_em_commodity")]
@@ -640,7 +688,7 @@ lever("Lever 15: a factor without a history",
       r'''
 f_rows = pd.DataFrame({"factor": ["Illiquidity"], "mean": [0.03], "vol": [0.06]})
 c_rows = pd.DataFrame({"factor_1": ["Illiquidity", "Illiquidity"], "factor_2": ["Equity DM", "Credit"], "corr": [0.35, 0.45]})
-print("sheet factors, row added:"); display(f_rows); print("sheet factor_corr, rows added:"); display(c_rows)
+show_sheet(f_rows, "sheet factors, row added"); show_sheet(c_rows, "sheet factor_corr, rows added")
 spec15 = spec14.add("factors", f_rows).add("factor_corr", c_rows)
 t0 = time.time(); sim15 = sim.with_spec(spec15); print(f"vine refitted on the seven historical factors, Illiquidity attached: {time.time() - t0:.0f} s")
 display(sim15.factor_report)
@@ -656,7 +704,7 @@ lever("Lever 16: an asset with a history loading on the new factor",
       r'''
 e_rows = pd.DataFrame({"ticker": ["HYG"], "factor": ["Illiquidity"], "beta": [0.3], "corr": [np.nan]})
 t_rows = pd.DataFrame({"tag": ["private_credit"], "Credit": [0.6], "Equity DM": [0.2], "Illiquidity": [0.5]})
-print("sheet exposures, row added:"); display(e_rows); print("sheet tags, row edited:"); display(t_rows)
+show_sheet(e_rows, "sheet exposures, row added"); show_sheet(t_rows, "sheet tags, row edited")
 spec16 = spec15.add("exposures", e_rows).add("tags", t_rows); sim16 = sim15.with_spec(spec16)
 X16 = sim16.simulate(25000, seed=1)
 v15 = V(np.sqrt(sim15.model.implied_covariance().loc["HYG", "HYG"])); v16 = V(np.sqrt(sim16.model.implied_covariance().loc["HYG", "HYG"]))
@@ -676,7 +724,7 @@ try:
 except ValueError as err:
     print("refused:", err, "\n")
 p_rows = pd.DataFrame({"ticker_1": ["Multi-strategy"], "ticker_2": ["HYG"], "corr": [0.75]})
-print("sheet assets, row added:"); display(a_rows); print("sheet tags, row added:"); display(t_rows); print("sheet pairs, row added:"); display(p_rows)
+show_sheet(a_rows, "sheet assets, row added"); show_sheet(t_rows, "sheet tags, row added"); show_sheet(p_rows, "sheet pairs, row added")
 spec17 = spec16.add("assets", a_rows).add("tags", t_rows).add("pairs", p_rows); sim17 = sim16.with_spec(spec17)
 display(sim17.report.loc[["Multi-strategy"]]); display(sim17.pair_report.loc[[("Multi-strategy", "HYG")]].round(3))
 X17 = sim17.simulate(25000, seed=1); x = X17["Multi-strategy"]
