@@ -2,6 +2,21 @@
 
 ## 0.4.0 (unreleased)
 
+- The specification layer (notebook 03): every factor and asset is described by
+  what is known and the rest filled by a stated rule. `FactorModel.exposures`
+  accepts given betas (`{factor: value}`, the remainder regressed) and pinned
+  allowed sets (`{factor: 'fit' | value}`) besides the allowed-set list;
+  `beta_source`. `FactorModel.add_asset` / `add_assets`: assets without a history
+  from mean, volatility, exposures and residual shape. `Targets.add_factor`: a
+  factor without a history from mean, volatility and a few correlations, the
+  others by maximum-determinant completion (`complete_correlation`), attached to
+  the C-vine by a Gaussian conditional draw. `with_targets(pair_correlations=...)`:
+  a correlation between two assets through their residual correlation, with the
+  eligible range `rho_sys +/- sqrt((1 - R2_i)(1 - R2_j))`, a positive
+  semidefiniteness check and `pair_report`; correlated residuals drawn from a
+  Gaussian copula with Johnson SU marginals (`johnson_su_from_normal`).
+  `FactorModel(factor_targets=...)`, `spec_report`, `implied_covariance`,
+  save/load version 2.
 - Dynamics selection by goodness of fit: `select_dynamics(criterion='gof')`
   (default) runs the parametric-bootstrap Cramér-von Mises test on every
   candidate and keeps the lowest BIC among those with a p-value of at least 5

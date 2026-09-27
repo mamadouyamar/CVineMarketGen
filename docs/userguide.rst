@@ -325,16 +325,49 @@ Assets on factors
    X0 = fm.simulate(F, residuals=False)        # factor exposure only
    fm.implied_mean(view_on_factor_means)       # expected asset returns under a view on the factors
 
-``fm.with_targets({'SPY': {'mean': 0.07, 'vol': 0.17}})`` (annual, or a table
-read from a spreadsheet) returns a copy whose listed assets hit the given mean
-through their alpha and the given volatility through their residual scale,
-the betas kept; a volatility below the systematic volatility the betas imply
-is refused. ``FactorModel(..., exposures={asset: [factors]})`` restricts each
-asset to the factors its characteristics justify.
+Every asset is described by what is known about it and the rest is filled by
+a stated rule (notebook 03, design note ``2026-09-26-specification-layer``):
+
+* **Exposures.** ``FactorModel(..., exposures={asset: spec})`` with three forms:
+  a list of factors is the allowed set (regression on those, zero elsewhere); a
+  dict ``{factor: value}`` gives betas that are fixed while the remainder is
+  regressed on the unnamed factors; a dict with ``'fit'`` values pins some betas
+  and regresses the ``'fit'`` ones, every other factor zero. ``fm.beta_source``
+  records ``given`` / ``fitted`` / ``zero`` per entry.
+* **Assets without a history.** ``fm.add_asset(name, mean, vol, exposures={...},
+  skew=0, kurt=3)`` (annual by default) sets ``alpha = m - beta' mu_f`` and
+  ``sigma_e^2 = v^2 - beta' Sigma_f beta`` (refused below the systematic
+  volatility), the residual a Johnson SU, Gaussian by default; ``add_assets``
+  takes a table. ``fm.asset_source`` is ``history`` or ``spec``.
+* **Factors without a history.** ``Targets.add_factor(name, mean, vol,
+  corr={factor: rho, ...})`` completes the missing correlations by maximum
+  determinant (zero partial correlation given the specified entries,
+  ``complete_correlation``) and reports which were given; ``CVineMarket`` fits the
+  vine on the historical factors and attaches the new one by a Gaussian
+  conditional draw with the factor's own Johnson SU marginal; ``FleishmanMarket``
+  needs nothing more. ``FactorModel(..., factor_targets=t)`` takes the factor
+  moments from such targets; a beta on the new factor is given, never fitted, and
+  an asset with a history that loads on it keeps the model's volatility by a
+  smaller residual.
+* **Targets on assets.** ``fm.with_targets({'SPY': {'mean': 0.07, 'vol': 0.17}})``
+  (annual, or a table read from a spreadsheet) hits the mean through the alpha
+  and the volatility through the residual scale, the betas kept; a volatility
+  below the systematic one is refused. ``pair_correlations={('HYG', 'LQD'): 0.85}``
+  hits a correlation between two assets through their residual correlation, the
+  only free quantity once betas and volatilities are fixed: the reachable range is
+  the systematic correlation plus or minus ``sqrt((1 - R2_i)(1 - R2_j))``, a target
+  outside it is refused with the range, several pairs must form a positive
+  semidefinite residual correlation matrix, and the named pairs' residuals are
+  drawn from a Gaussian copula with the assets' Johnson SU marginals.
+  ``fm.pair_report`` and ``fm.target_report`` list what was done.
+* ``fm.spec_report()`` prints, per asset, the source and the counts of given,
+  fitted and zero betas, the targets applied, and the residual volatility before
+  and after; ``fm.implied_covariance()`` is ``B Sigma_f B' + D``.
+
 A ``Paths`` object of factor paths gives a ``Paths`` of asset paths. Residuals
-are independent across assets and of the factors; drop them to study the
-factor exposure alone. ``load_etf_monthly`` fetches monthly ETF returns to
-regress on the seven factors of ``load_factor_data``.
+are independent across assets and of the factors unless a pair correlation is
+targeted; drop them to study the factor exposure alone. ``load_etf_monthly``
+fetches monthly ETF returns to regress on the seven factors of ``load_factor_data``.
 
 Save and load
 -------------
