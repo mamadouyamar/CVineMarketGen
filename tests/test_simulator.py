@@ -142,3 +142,18 @@ def test_a_correlation_view_moves_the_volatility_of_a_history_asset():
                      factor_corr=pd.DataFrame({'factor_1': ['eq'], 'factor_2': ['credit'], 'corr': [-0.6]}))
     with pytest.raises(ValueError, match='betas alone'):                                                 # the same volatility, given: refused
         FactorMarket(R, F, spec=sp2, generator='fleishman').fit()
+
+
+def test_add_edits_a_row_in_place_and_keeps_its_cells():
+    sp = MarketSpec(assets=pd.DataFrame({'ticker': ['A', 'B', 'C'], 'tag': ['x', 'y', 'z'], 'vol': [np.nan, 0.2, np.nan]}),
+                    tags=pd.DataFrame({'tag': ['x', 'y', 'z'], 'eq': ['fit', 'fit', np.nan]}))
+    sp2 = sp.add('assets', pd.DataFrame({'ticker': ['A'], 'mean': [0.07]}))
+    assert list(sp2.assets['ticker']) == ['A', 'B', 'C']                       # the row keeps its place
+    assert sp2.assets.loc[0, 'mean'] == 0.07 and sp2.assets.loc[0, 'tag'] == 'x'   # and its other cells
+    sp3 = sp2.add('assets', pd.DataFrame({'ticker': ['D'], 'mean': [0.05], 'vol': [0.1]}))
+    assert list(sp3.assets['ticker']) == ['A', 'B', 'C', 'D'] and sp3.assets.loc[1, 'vol'] == 0.2
+    sp4 = sp3.add('tags', pd.DataFrame({'tag': ['y'], 'credit': [0.5]}))        # a new column on an existing tag
+    assert list(sp4.tags.index) == ['x', 'y', 'z'] and sp4.tags.loc['y', 'credit'] == 0.5 and sp4.tags.loc['y', 'eq'] == 'fit'
+    sp5 = sp4.add('exposures', pd.DataFrame({'ticker': ['A'], 'factor': ['eq'], 'beta': [0.8]}))
+    sp5 = sp5.add('exposures', pd.DataFrame({'ticker': ['A'], 'factor': ['eq'], 'beta': [1.0]}))
+    assert len(sp5.exposures) == 1 and sp5.exposures.loc[0, 'beta'] == 1.0      # the same pair is one row, edited

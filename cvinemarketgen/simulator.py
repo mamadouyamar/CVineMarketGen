@@ -41,6 +41,8 @@ from .targets import Targets, nearest_positive_definite
 
 _SHEETS = ('assets', 'tags', 'exposures', 'pairs', 'factors', 'factor_corr')
 _MOMENTS = ('mean', 'vol', 'skew', 'kurt')
+SHEET_KEY = {'assets': ['ticker'], 'tags': ['tag'], 'exposures': ['ticker', 'factor'],
+             'pairs': ['ticker_1', 'ticker_2'], 'factors': ['factor'], 'factor_corr': ['factor_1', 'factor_2']}
 _SKEW_MAX, _KURT_MAX = 3.5, 40.0          # the residual shape the rule may ask for, at most (the floor at skew 3.5 is 33, below the kurtosis cap)
 
 
@@ -177,26 +179,45 @@ class MarketSpec:
 
     def add(self, sheet, rows):
         """
-        A copy with ``rows`` (a DataFrame or a list of dicts) appended to ``sheet``.
-        For ``tags`` the rows are indexed by ``tag`` and may bring new factor columns;
-        an existing tag is replaced. For ``assets`` and ``factors`` an existing ticker
-        or factor is replaced. Other sheets append.
+        A copy with ``rows`` (a DataFrame or a list of dicts) written into ``sheet``.
+
+        A row whose key is already in the sheet is *edited in place*: the values given
+        are written into that row's cells, the cells not given are left as they are, and
+        the row keeps its position in the file. A row with a new key is appended. Keys
+        are the ticker, the tag, the factor, or the pair of names (see ``SHEET_KEY``).
+        New columns (a tag loading on a factor that had no column) are added.
         """
         if sheet not in _SHEETS:
             raise ValueError(f'unknown sheet {sheet!r}')
         new = self.copy()
-        add = pd.DataFrame(rows)
+        add = pd.DataFrame(rows).copy()
+        key = SHEET_KEY[sheet]
+        base = new.tags.reset_index() if sheet == 'tags' else getattr(new, sheet).copy()
+        if sheet == 'tags' and 'tag' in add.columns:
+            pass
+        elif sheet == 'tags':
+            add = add.reset_index().rename(columns={'index': 'tag'})
+        for c in add.columns:
+            if c not in base.columns:
+                base[c] = np.nan
+        missing = [k for k in key if k not in add.columns]
+        if missing:
+            raise ValueError(f'add to {sheet!r}: the rows need the column(s) {missing}')
+        appended = []
+        for _, row in add.iterrows():
+            hit = base.index[(base[key].astype(str) == row[key].astype(str).values).all(axis=1)] if len(base) else []
+            if len(hit):
+                vals = row.dropna()
+                base.loc[hit[0], vals.index] = vals.values          # edited in place: the row keeps its place and its other cells
+            else:
+                appended.append(row)
+        if appended:
+            base = pd.concat([base, pd.DataFrame(appended)], ignore_index=True, sort=False)
+        base = base.reset_index(drop=True)
         if sheet == 'tags':
-            if 'tag' in add.columns:
-                add = add.set_index('tag')
-            base = new.tags.drop(index=[t for t in add.index if t in new.tags.index], errors='ignore')
-            new.tags = pd.concat([base, add], axis=0, sort=False)
+            new.tags = base.set_index('tag')
         else:
-            key = {'assets': 'ticker', 'factors': 'factor'}.get(sheet)
-            base = getattr(new, sheet)
-            if key is not None:
-                base = base[~base[key].astype(str).isin(add[key].astype(str))]
-            setattr(new, sheet, _frame(pd.concat([base, add], axis=0, ignore_index=True, sort=False), base.columns))
+            setattr(new, sheet, base)
         return MarketSpec(assets=new.assets, tags=new.tags.reset_index().rename(columns={'index': 'tag'}), exposures=new.exposures,
                           pairs=new.pairs, factors=new.factors, factor_corr=new.factor_corr, periods=new.periods)
 
