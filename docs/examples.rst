@@ -1,9 +1,12 @@
 Examples
 ========
 
-Ten executed notebooks, in order: a course in which each notebook is
-motivated by what the previous one could not do. Start with 01. Every notebook carries a Colab
-badge.
+Executed notebooks, in order: a course in which each notebook is motivated by
+what the previous one could not do. Start with 01. Every notebook carries a
+Colab badge. They are written to one standard, ``docs/notebook-principles.md``:
+explain then show, one exhibit at a time; draw an input as the artifact the
+reader types, and show a modification in its context; every number in the prose
+comes from the run beside it.
 
 .. toctree::
    :maxdepth: 1
