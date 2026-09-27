@@ -1,0 +1,908 @@
+# Builds examples/03_many_assets_factors.ipynb (structure agreed cell by cell, 2026-09-26) and the shipped workbook. Run from the repo root.
+import json, sys, os
+import numpy as np, pandas as pd
+sys.path.insert(0, os.getcwd())
+from cvinemarketgen import MarketSpec
+
+# ------------------------------------------------------------------ the shipped workbook: tickers, tags, a-priori table
+TAGS = {
+    "equity_dm": ("XLK XLV XLI XLP XLY SPY DIA QQQ IWD IWF EFA EWJ EWG EWU EWQ EWL EWP EWI EWD EWN EWH EWS EPP", ["Equity DM"]),
+    "equity_dm_commodity": ("XLE XOP XLB EWA EWC", ["Equity DM", "Commodity"]),
+    "financials": ("XLF", ["Equity DM", "Real premia", "Credit"]),
+    "banks": ("KBE KRE", ["Equity DM", "Real premia", "Credit", "Small cap"]),
+    "rate_sensitive_equity": ("XLU VNQ PFF XHB ITB", ["Equity DM", "Real premia", "Credit"]),
+    "small_cap": ("SMH IBB XRT IWM IJR IWN IWO MDY", ["Equity DM", "Small cap"]),
+    "equity_em": ("EEM VWO EWY EWT FXI EWM", ["Equity DM", "Equity EM"]),
+    "equity_em_commodity": ("EWZ EWW", ["Equity DM", "Equity EM", "Commodity"]),
+    "treasury": ("TLT IEF IEI TLH SHY TIP", ["Real premia", "Inflation"]),
+    "aggregate_credit": ("AGG BND MBB LQD", ["Real premia", "Inflation", "Credit"]),
+    "high_yield": ("HYG", ["Real premia", "Inflation", "Credit", "Equity DM"]),
+    "precious_metals": ("GLD SLV", ["Real premia", "Inflation", "Commodity"]),
+    "gold_miners": ("GDX", ["Real premia", "Inflation", "Commodity", "Equity DM"]),
+    "commodity": ("DBC USO", ["Commodity", "Inflation"]),
+}
+FACTORS = ["Equity DM", "Equity EM", "Real premia", "Inflation", "Credit", "Commodity", "Small cap"]
+assets_rows = [{"ticker": t, "tag": tag} for tag, (tk, _) in TAGS.items() for t in tk.split()]
+tags_rows = [{"tag": tag, **{f: ("fit" if f in fs else np.nan) for f in FACTORS}} for tag, (_, fs) in TAGS.items()]
+base = MarketSpec(assets=pd.DataFrame(assets_rows), tags=pd.DataFrame(tags_rows))
+os.makedirs("examples/inputs", exist_ok=True)
+base.write("examples/inputs/universe_inputs.xlsx")
+MarketSpec().write("examples/inputs/template.xlsx")
+print("workbooks written:", len(assets_rows), "assets,", len(tags_rows), "tags")
+
+# ------------------------------------------------------------------ cells
+cells = []
+def md(s): cells.append({"cell_type": "markdown", "metadata": {}, "source": s.strip("\n")})
+def code(s): cells.append({"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip("\n")})
+
+md(r"""
+# 03 Many assets: the simulator for a universe
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/03_many_assets_factors.ipynb)
+
+**The problem**
+
+You manage a universe of many assets and you need scenarios for it: synthetic
+months of returns, one column per asset, many thousands of rows, that you can
+feed to an optimizer, a risk engine or a pricing model. The scenarios must
+reproduce what you believe about each asset, its mean, its volatility, the
+shape of its tails, and how the assets move together, in calm months and in
+bad ones.
+
+Three things make this hard when the universe is large.
+
+1. **Too many numbers to estimate.** Sixty-eight assets have 2,278 correlations
+   and 272 moments. From 230 months of history these cannot be estimated one by
+   one; a correlation matrix of that size estimated from that sample is mostly
+   noise.
+2. **Not every asset has a history.** A new fund, a private allocation, a
+   product about to be launched has no return series, only a view on what it
+   earns, how much it moves and what it depends on. It must still be in the
+   scenarios.
+3. **Views are about drivers, not assets.** An analyst's view is on equities,
+   on rates, on credit spreads, on inflation. Written on 68 assets one by one, a
+   view is inconsistent by construction.
+
+Notebooks 01 and 02 built a generator for six assets from their moments and
+their dependence. This notebook takes that generator to a universe.
+""")
+md(r"""
+## The route: a few drivers, then a map to the assets
+
+The simulator does not draw the assets. It draws a small number of common
+drivers, the factors, and maps each simulated factor month to every asset:
+
+$$
+r_j = \alpha_j + \sum_{k=1}^{K} \beta_{jk}\, f_k + e_j .
+$$
+
+The factors $f_k$ are drawn together by the generator of notebook 02, which
+reproduces their moments, their correlations and their tail dependence. The
+betas $\beta_{jk}$ say how much of each factor asset $j$ carries. The residual
+$e_j$ is what remains of the asset once the factors are removed, drawn from
+its own distribution and independent of the other assets.
+
+This answers the three difficulties. Seven factors have 21 correlations and 28
+moments, which 230 months can estimate; the 2,278 asset correlations follow
+from the betas. An asset without a history is simulated from its exposures and
+a residual sized to its volatility. A view is stated on a factor and reaches
+every asset through the betas.
+
+**The process.** The four steps of notebooks 01 and 02, applied to the
+factors and then carried to the assets:
+
+1. *Targets*: what the factors must reproduce.
+2. *Fit*: the generator on the factors, and the betas and residual of each asset.
+3. *Check*: the scenarios against every input.
+4. *Use*: scenarios and paths out.
+
+What you have decides how each step is done. For every asset and every factor
+there are four possible pieces of knowledge: a return history, moments,
+exposures, correlations. The sections that follow take the steps in order and,
+at each one, go from the case where you have the least to the case where you
+have the most.
+""")
+md("## Import")
+code(r'''
+import os, sys, time, warnings
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+warnings.filterwarnings("ignore")
+pd.set_option("display.width", 200); pd.set_option("display.max_columns", 40); pd.set_option("display.max_colwidth", 120)
+
+ROOT = os.path.dirname(os.getcwd()) if os.path.basename(os.getcwd()) == "examples" else os.getcwd()
+sys.path.insert(0, ROOT)
+try:
+    import cvinemarketgen
+except ImportError:                      # Google Colab
+    import subprocess
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "git+https://github.com/mamadouyamar/CVineMarketGen.git", "openpyxl"], check=True)
+    import cvinemarketgen
+print("cvinemarketgen", cvinemarketgen.__version__)
+
+from cvinemarketgen import load_etf_monthly, load_factor_data, Targets, MarketSpec, FactorMarket, exceedance_curve, iid_tests
+from scipy import stats
+import seaborn as sns
+A = lambda m: m * 1200                    # monthly mean -> percent a year
+V = lambda v: v * np.sqrt(12) * 100       # monthly vol  -> percent a year
+INPUTS = os.path.join(ROOT, "examples", "inputs")
+def var_es(r, alpha=0.05):
+    q = np.quantile(r, alpha); return -q, -r[r <= q].mean()
+''')
+md(r"""
+## What you have
+
+The first question the simulator asks. Before any step, list what you know
+about each asset and each factor you want in the scenarios. Four kinds of
+knowledge, any combination:
+
+| Knowledge | Asset | Factor |
+|---|---|---|
+| a return history | yes / no | yes / no |
+| moments: mean, volatility, and if you have them skewness and kurtosis | yes / no | yes / no |
+| exposures to the factors: which factors it may load on (the a-priori table), and/or the values of some betas, or a correlation with a factor | yes / no | not applicable |
+| correlations | with a named asset | with some factors |
+
+**The workbook.** This knowledge goes in one Excel workbook, six sheets, that
+the simulator reads in one call. The Python-fluent analyst builds the same six
+tables in code.
+
+| Sheet | Columns | What a row says |
+|---|---|---|
+| `assets` | ticker, tag, mean, vol, skew, kurt | an asset in the scenarios, its asset class, and any moment you impose (annual) |
+| `tags` | tag, one column per factor | the a-priori table: for each asset class, empty = does not load, `fit` = estimate the beta, a number = the beta |
+| `exposures` | ticker, factor, beta, corr | one asset departing from its tag on one factor: a beta, or a correlation with the factor |
+| `pairs` | ticker_1, ticker_2, corr | a correlation you impose between two assets |
+| `factors` | factor, mean, vol, skew, kurt | a factor and any moment you impose (annual); a factor with no history must be here with mean and vol |
+| `factor_corr` | factor_1, factor_2, corr | a correlation you impose between two factors, or give for a factor without a history |
+
+**The empty-cell rule.** An empty cell is filled from the history when the
+object has one, and otherwise by a stated fallback: skewness 0 and kurtosis 3;
+mean and volatility have none, the simulator stops and names the object. A
+ticker or a factor has a history if it is a column of the return file. An
+empty `tags` cell is zero; `fit` without a history is refused. Absent
+optional sheets impose nothing. The specification report then says, for every
+value used, whether it came from the workbook, the history or a fallback.
+
+**This notebook's starting inventory** is the simplest: a history for every
+asset and every factor, and nothing else. Sixty-eight ETFs (sectors, size and
+style, countries, bonds, commodities, real estate and industries, one fund per
+index) and seven factors (Equity DM, Equity EM, Real premia, Inflation, Credit,
+Commodity, Small cap), monthly, 230 common months from June 2007. The factors
+are excess returns built from public data by `load_factor_data`; their
+definitions are in the documentation. Later cells change the inventory one
+entry at a time, so that every row of the table above is illustrated; each
+shows the sheet as you would type it, the one call, and a check.
+
+The code loads the two histories, aligns them on the common months, prints
+their shapes and date range, and lists the sheets of the empty template
+shipped with the notebook.
+""")
+code(r'''
+tickers = "XLF XLK XLE XLV XLI XLP XLU XLY XLB SPY IWM MDY IWD IWF IWN IWO QQQ DIA IJR EFA EEM VWO EWJ EWG EWU EWC EWA EWZ EWY EWT EWH EWS EWQ EWL EWP EWI EWM EWW EWD EWN EPP FXI TLT IEF SHY LQD HYG TIP AGG BND MBB IEI TLH GLD SLV USO DBC GDX VNQ KBE KRE XHB ITB SMH IBB XRT PFF XOP".split()
+R = load_etf_monthly(tickers, start="2007-04", cache=os.path.join(ROOT, "data", "etf_cache_universe.csv"))[tickers]
+F = load_factor_data(cache=os.path.join(ROOT, "data", "factors_cache.csv"))
+idx = R.index.intersection(F.index); R, F = R.loc[idx], F.loc[idx]
+print(f"asset history: {R.shape[1]} assets x {R.shape[0]} months | factor history: {F.shape[1]} factors x {F.shape[0]} months | {idx.min()} to {idx.max()}")
+template = MarketSpec.read(os.path.join(INPUTS, "template.xlsx"))
+pd.DataFrame({"sheet": ["assets", "tags", "exposures", "pairs", "factors", "factor_corr"],
+              "columns": [", ".join(template.assets.columns), "tag, " + ", ".join(F.columns), ", ".join(template.exposures.columns), ", ".join(template.pairs.columns), ", ".join(template.factors.columns), ", ".join(template.factor_corr.columns)]}).set_index("sheet")
+''')
+
+# ------------------------------------------------------------------ step 1
+md(r"""
+## Step 1: targets on the factors
+
+The targets are what the generator will reproduce: one table with a row per
+factor, mean, volatility, skewness, kurtosis, and the correlation matrix beside
+it. Mean and volatility are shown annualized for reading; the generator works
+on the monthly numbers. What you do depends on what you have:
+
+- *A history for every factor.* The table is the sample: moments and
+  correlations of the 230 months. This notebook's case here.
+- *Moments you believe instead of the sample's.* A row in the `factors` sheet
+  with the cells you impose; the generator reproduces the edited table. Cell 20.
+- *A factor with no history.* A row in `factors` with mean and volatility,
+  skewness and kurtosis if known, and its correlations with some factors in
+  `factor_corr`; the missing correlations are completed by a rule. Cell 22.
+
+The code builds the targets from the factor history and prints the table.
+""")
+code(r'''
+t = Targets.from_history(F)
+pd.concat([A(t.mean).rename("mean (% a year)"), V(t.vol).rename("vol (% a year)"), t.skew.rename("skewness"), t.kurt.rename("kurtosis"), t.corr], axis=1).round(2)
+''')
+md(r"""
+**Reading the table.** Three pairs are correlated above 0.5, Credit, Inflation
+and Commodity with Equity DM; the rest sit between $-0.02$ and 0.31. The
+yield-based factors carry the tails: a kurtosis of 9 for Inflation and 17 for
+Credit, the months of 2008 and 2020. Equity EM and Small cap are close to
+normal. This is the table the generator reproduces, and the one a view edits.
+""")
+
+# ------------------------------------------------------------------ step 2a
+md(r"""
+## Step 2a: the generator on the factors
+
+**Fleishman first.** The generator of notebook 01: a cubic of a normal per
+factor, Gaussian dependence calibrated to the correlations. It reads the same
+factor targets, whatever their source in the workbook, and fits in a second.
+`FactorMarket` is the one call of this notebook: histories, the workbook (none
+yet), the generator. The diagnostics compare 50,000 simulated factor months
+with the targets, moment by moment, and give the largest correlation error.
+""")
+code(r'''
+sim_fl = FactorMarket(R, F, spec=None, generator="fleishman").fit()
+sim_fl.market.diagnostics(sim_fl.pilot).summary(digits=3);
+''')
+md(r"""
+**Then the C-vine.** The generator of notebook 02 on the same targets: the
+symmetry test on each pair, a copula family per pair, the vine calibrated to
+the 21 correlations, a Johnson SU marginal per factor. Seven variables make it
+affordable, about two minutes. What you do depends on what you have:
+
+- *A history for every factor.* Families selected from the history, as here.
+- *No history for a factor.* The vine is fitted on the factors that have one;
+  the factor without is attached afterwards by a rule stated in cell 22.
+- *A view on a correlation.* The vine is refitted on the edited table, cell 21.
+
+The code fits, prints the family of each first-tree pair, and the diagnostics
+of the 50,000 factor months it simulates. The rest of the notebook runs on
+this generator.
+""")
+code(r'''
+t0 = time.time(); sim = FactorMarket(R, F, spec=None, generator="cvine", central="Equity DM").fit(); print(f"C-vine fit on the factors: {time.time() - t0:.0f} s")
+display(sim.market.edges[sim.market.edges["tree"] == 1])
+sim.market.diagnostics(sim.pilot).summary(digits=3);
+''')
+md(r"""
+%%READ_STEP2A%%
+
+**Why the copula layer is quiet here.** Factors are built to be close to
+independent; their correlations are mostly between 0 and 0.3. A copula shapes
+how two variables move together in the tails, and there is little to shape
+when they barely move together at all: at these correlations the Gaussian,
+the Student t and the asymmetric families give profiles within a few
+hundredths of each other, and the data cannot tell them apart. So the vine
+adds little over a Gaussian dependence on factors, and the tails of the assets
+come mostly from the factors' own skewness and kurtosis, which the marginals
+carry. The copula layer earns its place where correlations are high, at the
+asset-class level of notebook 02, and, for factors, in the regime dynamics of
+notebooks 04 and 05, where correlation is high in bad states and low
+otherwise. The appendix gives the numbers.
+""")
+
+# ------------------------------------------------------------------ step 2b: the rule
+md(r"""
+## Step 2b: the map from factors to assets
+
+**The object.** For each asset, the equation of the route: return = alpha +
+betas times factors + residual. The asset is the sum of two independent
+pieces, the systematic part $\boldsymbol\beta' \mathbf f$, whose distribution
+comes from the factor generator, and the residual $e$, whose distribution is
+chosen so that the asset as a whole has the moments the analyst wants.
+
+**The four questions the simulator asks about one asset, and what it does with each answer.**
+
+*Question 1. What does this asset load on?* For each factor you either give a
+beta, give a correlation with the factor, say "estimate it", or say "nothing".
+A beta you give is used as is. A correlation you give is turned into the beta
+that produces it, given the other betas. "Estimate it" runs a regression of
+the asset on those factors, after removing the part you gave; it needs a
+history, and without one the simulator stops and asks for the values.
+"Nothing" is a zero. If you say nothing at all about the asset, every factor
+is "estimate it".
+
+*Question 2. How volatile is the asset?* If you give the volatility, the
+factors you chose already produce some of it,
+$\boldsymbol\beta' \boldsymbol\Sigma_f \boldsymbol\beta$, and the residual
+gets the rest: $\sigma_e^2 = v^2 - \boldsymbol\beta' \boldsymbol\Sigma_f \boldsymbol\beta$.
+If the factors alone already exceed the volatility, the simulator stops and
+tells you which betas are responsible. If you give nothing, the history gives
+the *residual's* volatility, the standard deviation of the regression
+residual, and the asset's volatility follows,
+$v^2 = \boldsymbol\beta' \boldsymbol\Sigma_f \boldsymbol\beta + \sigma_e^2$:
+it equals the sample's when the factor targets are the sample's, and it moves
+with them when you state a view on a factor's volatility or on a correlation.
+
+*Question 3. What shape does the asset have?* If you give the skewness and
+kurtosis, the factors already give the asset some of each, and the residual
+is given the rest, because cumulants of independent parts add:
+
+$$
+\kappa_{3,e} = s\, v^3 - \kappa_3(\boldsymbol\beta' \mathbf f), \qquad
+\kappa_{4,e} = (k - 3)\, v^4 - \kappa_4(\boldsymbol\beta' \mathbf f),
+$$
+
+so the residual has skewness $\kappa_{3,e} / \sigma_e^3$ and excess kurtosis
+$\kappa_{4,e} / \sigma_e^4$, and a Johnson SU is fitted to them. The
+systematic cumulants are computed from the simulated factor months. If the
+rest is a shape no distribution has (the Johnson SU's kurtosis has a floor
+that rises with the skewness squared), the simulator stops and says how much
+of the asset's shape the factors already carry: an asset whose variance is
+mostly systematic has the factors' shape, and cannot be given another. If you
+give nothing, the history gives the *residual's* shape, the skewness and
+kurtosis of the regression residual, and the asset's shape follows from the
+factors' and the residual's. Without a history the residual is normal.
+
+*Question 4. Does this asset have to be correlated with a named asset?* If
+yes, the correlation is carried by the two residuals. The factors already
+give the pair a correlation; the residual correlation supplies the difference,
+
+$$
+\rho^{e}_{ij} = \frac{\rho^{*}_{ij}\, s_i s_j - \boldsymbol\beta_i' \boldsymbol\Sigma_f \boldsymbol\beta_j}{\sigma_{e_i} \sigma_{e_j}},
+$$
+
+and it can only do so within a range: the factors' correlation plus or minus
+$\sqrt{(1 - R_i^2)(1 - R_j^2)}$, the geometric mean of what the factors leave
+unexplained in each asset. Outside the range the simulator stops and prints
+the range. Several pairs must form a positive-semidefinite residual
+correlation matrix.
+
+*Last, the mean.* If you give it, the alpha is set so that alpha plus the
+factors' contribution equals it, $\alpha = m - \boldsymbol\beta' \boldsymbol\mu_f$.
+If you give nothing, the history gives the alpha, the intercept of the
+regression, and the mean follows the factor means: it equals the sample's
+when the factor targets are the sample's, and a view on a factor's mean moves
+it by the beta times the change. The mean comes last because nothing else
+depends on it.
+
+**One principle behind the four answers.** An empty cell means "what the
+history says about the model's own quantity": the betas, the alpha, the
+residual's volatility and shape. It never means "the sample moment of the
+asset as a target", because a target would be absorbed by the alpha or the
+residual and a view on a factor would then reach no asset. Given cells are
+targets; empty cells are estimates.
+
+The questions are asked in this order because each answer needs the ones
+before: the residual variance needs the betas, the residual shape needs the
+residual variance, the pair range needs the residual variances. The implied
+covariance of the assets is $\mathbf B \boldsymbol\Sigma_f \mathbf B' + \mathbf D$,
+with $\mathbf D$ the residual covariance, diagonal except where question 4
+filled an entry. The specification report prints, for every asset, the four
+answers and any flag.
+
+**This notebook's case now.** A history for every asset and no other
+knowledge: every factor "estimate it", alpha and residual from the
+regression, no pairs. The regression is ordinary least squares with Newey-West standard
+errors. The code prints the betas of seven assets, the $R^2$ quantiles across
+the 68, and the specification report for the seven.
+""")
+code(r'''
+show = ["SPY", "XLF", "EWZ", "TLT", "HYG", "GLD", "XLU"]
+display(sim.model.report.loc[show, ["alpha"] + sim.model.factors + ["R2", "resid vol"]].round(3))
+print("R2 across the 68 assets, quantiles:"); display(sim.model.r2.quantile([0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]).round(2).to_frame("R2").T)
+sim.report.loc[show]
+''')
+md(r"""
+**Reading the report.** With nothing but the data, the regression gives SPY a
+beta of 0.97 on Equity DM and six small betas of both signs on the other
+factors, $-0.16$ on Equity EM among them, which nobody believes about the
+S&P 500: that is the noise lever 1 removes. The median $R^2$ is 0.77. In the
+specification report every asset reads `history` with seven `fit` betas, and
+the source of every moment says where the rule took it: the alpha and the
+residual from the regression. The residual shapes are moderate, skewness
+between $-0.2$ and 1.6, kurtosis between 3.1 and 15 for HYG, whose 2008
+months the four factors do not fully explain. SPY's residual is lighter
+tailed than a normal, and the report flags that it was raised to the Johnson
+SU's floor: a residual of one percent a month, five percent of SPY's variance,
+which changes nothing visible.
+""")
+
+# ------------------------------------------------------------------ levers
+def lever(title, give, does, check, codetxt, key):
+    md(f"### {title}\n\n**What you give.** {give}\n\n**What the simulator does.** {does}\n\n**Check.** {check}")
+    code(codetxt)
+    md(f"%%{key}%%")
+
+md(r"""
+## The levers
+
+One cell per kind of knowledge. Each shows the sheet rows as you would type
+them, the one call, and a check that the lever did what it said. The workbook
+grows from cell to cell; `sim.with_spec` refits only what changed, so an asset
+lever takes a fraction of a second and a factor lever two minutes. The seven
+example assets stay the same throughout.
+""")
+
+lever("Lever 1: the a-priori table",
+      "The `assets` sheet with a tag per ticker, and the `tags` sheet with `fit` on the factors each asset class may load on: equity funds on Equity DM; small and mid caps also on Small cap; emerging markets also on Equity EM; energy, materials and commodity exporters also on Commodity; financials, utilities, real estate and preferreds on Real premia and Credit as well; nominal bond funds on Real premia and Inflation, aggregates and corporates also on Credit; precious metals on Real premia, Inflation and Commodity. Shipped as `universe_inputs.xlsx`.",
+      "Question 1 answered as \"estimate it\" on the ticked factors and \"nothing\" on the others. Questions 2 to 4 unchanged, the moments still from the sample.",
+      "The betas of the seven assets, every zero being a zero the table imposed; the report's counts of fit and zero; the median $R^2$ against the all-factors fit, the difference being the noise the table refused; and the simulated volatility of the seven assets against history, which the residual from the regression keeps close whatever the betas.",
+      r'''
+spec = MarketSpec.read(os.path.join(INPUTS, "universe_inputs.xlsx"))
+print("sheet assets (first rows):"); display(spec.assets.head(4))
+print("sheet tags:"); display(spec.tags)
+sim1 = sim.with_spec(spec)
+display(sim1.model.beta.loc[show].round(3))
+print(f"R2 median: every factor estimated {sim.model.r2.median():.2f}, a-priori table {sim1.model.r2.median():.2f}")
+X1 = sim1.simulate(25000, seed=1)
+display(pd.DataFrame({"vol, history (%/yr)": V(R[show].std()), "vol, simulated (%/yr)": V(X1[show].std())}).round(2).T)
+sim1.report.loc[show]
+''', "READ_L1")
+
+lever("Lever 2: beta values for some factors of an asset, the rest estimated",
+      "Rows in the `exposures` sheet with a number in `beta`: HYG, 0.8 on Credit and 0.5 on Real premia, from the fund's spread duration and duration. HYG's tag still says which other factors are `fit`.",
+      "Question 1: the two betas used as given, the return minus 0.8 Credit minus 0.5 Real premia regressed on HYG's remaining `fit` factors, zero elsewhere. Questions 2 and 3 take the residual of that regression, its volatility and its shape, so the asset's volatility and skewness now follow from the given betas.",
+      "HYG's betas next to the all-estimated ones, to see what the given values displaced; its report row with `value`, `fit`, `zero`; the simulated volatility and skewness of HYG against the sample: the given betas change what the factors carry, and the asset's moments follow.",
+      r'''
+rows = pd.DataFrame({"ticker": ["HYG", "HYG"], "factor": ["Credit", "Real premia"], "beta": [0.8, 0.5], "corr": [np.nan, np.nan]})
+print("sheet exposures:"); display(rows)
+spec2 = spec.add("exposures", rows); sim2 = sim.with_spec(spec2)
+display(pd.DataFrame({"a-priori table": sim1.model.beta.loc["HYG"], "with the two given betas": sim2.model.beta.loc["HYG"], "source": sim2.model.beta_source.loc["HYG"]}).T)
+X2 = sim2.simulate(25000, seed=1)
+display(pd.DataFrame({"HYG": {"vol, history (%/yr)": V(R["HYG"].std()), "vol, simulated (%/yr)": V(X2["HYG"].std()), "skew, history": R["HYG"].skew(), "skew, simulated": X2["HYG"].skew()}}).T.round(2))
+sim2.report.loc[["HYG"]]
+''', "READ_L2")
+
+lever("Lever 3: a correlation with a factor instead of a beta",
+      "A row in `exposures` with a number in `corr`: GLD, correlation 0.30 with Inflation, because the analyst thinks of gold as an inflation hedge in those terms rather than as a duration on the breakeven.",
+      "Question 1: the correlation is turned into the beta that produces it. With GLD's other betas fixed, the correlation with Inflation is $(\\boldsymbol\\beta' \\boldsymbol\\Sigma_f)_{\\text{Inflation}}$ divided by the two volatilities, linear in the unknown beta, so the beta is solved in one line; several correlations on one asset make a small linear system, iterated with the regression.",
+      "The beta the correlation implied next to the beta the regression estimated; the simulated correlation of GLD with Inflation at 0.30; and one refused correlation, too high for GLD's volatility, with the message.",
+      r'''
+rows = pd.DataFrame({"ticker": ["GLD"], "factor": ["Inflation"], "beta": [np.nan], "corr": [0.30]})
+print("sheet exposures, row added:"); display(rows)
+spec3 = spec2.add("exposures", rows); sim3 = sim.with_spec(spec3)
+display(pd.DataFrame({"estimated (lever 1)": sim1.model.beta.loc["GLD"], "from the correlation": sim3.model.beta.loc["GLD"], "source": sim3.model.beta_source.loc["GLD"]}).T)
+X3 = sim3.simulate(25000, seed=1)
+print(f"corr(GLD, Inflation): history {R['GLD'].corr(F['Inflation']):.2f}, simulated {X3['GLD'].corr(sim3.last_factors['Inflation']):.2f}, target 0.30")
+try:
+    sim.with_spec(spec2.add("exposures", pd.DataFrame({"ticker": ["GLD"], "factor": ["Inflation"], "beta": [np.nan], "corr": [0.95]})))
+except ValueError as err:
+    print("refused:", err)
+''', "READ_L3")
+
+lever("Lever 4: values for some factors and an a-priori list for the others, on one asset",
+      "XLU keeps its tag (`fit` on Equity DM, Real premia and Credit, zero elsewhere) and gets one `exposures` row: beta 0.3 on Credit.",
+      "Question 1 with three states on one asset: `value` on Credit, `fit` on Equity DM and Real premia, `zero` on the four others.",
+      "XLU's report row and beta sources.",
+      r'''
+rows = pd.DataFrame({"ticker": ["XLU"], "factor": ["Credit"], "beta": [0.3], "corr": [np.nan]})
+print("sheet exposures, row added:"); display(rows)
+spec4 = spec3.add("exposures", rows); sim4 = sim.with_spec(spec4)
+display(pd.DataFrame({"beta": sim4.model.beta.loc["XLU"], "source": sim4.model.beta_source.loc["XLU"]}).T)
+sim4.report.loc[["XLU"]]
+''', "READ_L4")
+
+lever("Lever 5: an asset without a history, from its mean, volatility and betas",
+      "A new row in `assets` with a ticker that is not in the return file, a mean and a volatility (annual), and a tag whose `tags` row holds numbers, since nothing can be estimated: a private credit fund, 7 percent and 10 percent, tag `private_credit` with 0.6 on Credit and 0.2 on Equity DM.",
+      "Question 1: the values. Question 2: the residual gets $\\sigma_e^2 = v^2 - \\boldsymbol\\beta' \\boldsymbol\\Sigma_f \\boldsymbol\\beta$. Question 3: skewness and kurtosis not given, so the residual is normal and the asset inherits the factors' shape. Mean: alpha.",
+      "One refused row first, a volatility below what the two betas alone produce, with the message. Then the report row, and the simulated mean, volatility and correlation with SPY against the values the model implies.",
+      r'''
+try:
+    sim.with_spec(spec4.add("assets", pd.DataFrame({"ticker": ["Private credit"], "tag": ["private_credit"], "mean": [0.07], "vol": [0.03]}))
+                        .add("tags", pd.DataFrame({"tag": ["private_credit"], "Credit": [0.6], "Equity DM": [0.2]})))
+except ValueError as err:
+    print("refused:", err, "\n")
+a_rows = pd.DataFrame({"ticker": ["Private credit"], "tag": ["private_credit"], "mean": [0.07], "vol": [0.10]})
+t_rows = pd.DataFrame({"tag": ["private_credit"], "Credit": [0.6], "Equity DM": [0.2]})
+print("sheet assets, row added:"); display(a_rows); print("sheet tags, row added:"); display(t_rows)
+spec5 = spec4.add("assets", a_rows).add("tags", t_rows); sim5 = sim.with_spec(spec5)
+X5 = sim5.simulate(25000, seed=1); C5 = sim5.model.implied_covariance(); C5 = C5 / np.sqrt(np.outer(np.diag(C5), np.diag(C5)))
+display(pd.DataFrame({"Private credit": {"mean target (%/yr)": 7.0, "mean simulated (%/yr)": A(X5["Private credit"].mean()), "vol target (%/yr)": 10.0, "vol simulated (%/yr)": V(X5["Private credit"].std()),
+                                         "corr with SPY, implied": C5.loc["Private credit", "SPY"], "corr with SPY, simulated": X5["Private credit"].corr(X5["SPY"])}}).T.round(2))
+sim5.report.loc[["Private credit"]]
+''', "READ_L5")
+
+lever("Lever 6: an asset without a history and without exposures",
+      "A row in `assets` with a mean and a volatility and no tag: a cash-plus sleeve, 3 percent and 1 percent.",
+      "Question 1: nothing on every factor. The asset is a pure residual, independent of everything; its alpha is its mean and its residual volatility its volatility.",
+      "The report row, and the simulated correlation with SPY, zero within Monte Carlo error.",
+      r'''
+a_rows = pd.DataFrame({"ticker": ["Cash plus"], "mean": [0.03], "vol": [0.01]})
+print("sheet assets, row added:"); display(a_rows)
+spec6 = spec5.add("assets", a_rows); sim6 = sim.with_spec(spec6)
+X6 = sim6.simulate(25000, seed=1)
+print(f"Cash plus: alpha {A(sim6.model.alpha['Cash plus']):.2f} %/yr, corr with SPY simulated {X6['Cash plus'].corr(X6['SPY']):.3f}")
+sim6.report.loc[["Cash plus"]]
+''', "READ_L6")
+
+lever("Lever 7: an asset without a history, with its skewness and kurtosis",
+      "A row in `assets` with all four moments and a tag with values: a private equity allocation, mean 10, volatility 18 percent, skewness $-1.0$, kurtosis 7, tag `private_equity` with 0.6 on Equity DM and 0.3 on Small cap.",
+      "Question 3 with a given shape: the residual receives the asset's third and fourth cumulants minus those of $0.6\\, \\text{Equity DM} + 0.3\\, \\text{Small cap}$, computed on the simulated factor months.",
+      "The residual shape the rule derived, in the report; the simulated skewness and kurtosis of the asset against the targets.",
+      r'''
+a_rows = pd.DataFrame({"ticker": ["Private equity"], "tag": ["private_equity"], "mean": [0.10], "vol": [0.18], "skew": [-1.0], "kurt": [7.0]})
+t_rows = pd.DataFrame({"tag": ["private_equity"], "Equity DM": [0.6], "Small cap": [0.3]})
+print("sheet assets, row added:"); display(a_rows); print("sheet tags, row added:"); display(t_rows)
+spec7 = spec6.add("assets", a_rows).add("tags", t_rows); sim7 = sim.with_spec(spec7)
+X7 = sim7.simulate(25000, seed=1)
+display(pd.DataFrame({"Private equity": {"skew target": -1.0, "skew simulated": X7["Private equity"].skew(), "kurt target": 7.0, "kurt simulated": X7["Private equity"].kurtosis() + 3}}).T.round(2))
+sim7.report.loc[["Private equity"]]
+''', "READ_L7")
+
+lever("Lever 8: a mean on an asset with a history",
+      "The `mean` cell of SPY's row in `assets`: 7 percent a year, against 11.4 in the sample.",
+      "The alpha: $\\alpha = m - \\boldsymbol\\beta' \\boldsymbol\\mu_f$. Nothing else moves.",
+      "SPY's alpha before and after, its simulated mean, and the largest change of any other asset's mean under the model, exactly zero.",
+      r'''
+a_rows = pd.DataFrame({"ticker": ["SPY"], "tag": ["equity_dm"], "mean": [0.07]})
+print("sheet assets, row edited:"); display(a_rows)
+spec8 = spec7.add("assets", a_rows); sim8 = sim.with_spec(spec8)
+X8 = sim8.simulate(25000, seed=1)
+others = [a for a in X7.columns if a != "SPY"]
+mu7 = sim7.model.alpha + sim7.model.beta @ sim7.targets.mean.loc[sim7.model.factors]; mu8 = sim8.model.alpha + sim8.model.beta @ sim8.targets.mean.loc[sim8.model.factors]
+print(f"SPY alpha: {A(sim7.model.alpha['SPY']):.2f} -> {A(sim8.model.alpha['SPY']):.2f} %/yr | SPY mean simulated {A(X8['SPY'].mean()):.2f} %/yr, target 7.00 | largest change of another asset's model mean {A((mu8[others] - mu7[others]).abs().max()):.4f} %/yr")
+sim8.report.loc[["SPY"]]
+''', "READ_L8")
+
+lever("Lever 9: a volatility on an asset with a history, and the floor",
+      "The `vol` cell of TLT's row: 14 percent a year. And a first attempt at EEM with 6 percent.",
+      "Question 2: the residual scale set so that systematic plus residual variance equals the target; refused when the betas alone exceed it.",
+      "EEM's refusal with the floor named; TLT's residual volatility before and after and its simulated volatility.",
+      r'''
+try:
+    sim.with_spec(spec8.add("assets", pd.DataFrame({"ticker": ["EEM"], "tag": ["equity_em"], "vol": [0.06]})))
+except ValueError as err:
+    print("refused:", err, "\n")
+a_rows = pd.DataFrame({"ticker": ["TLT"], "tag": ["treasury"], "vol": [0.14]})
+print("sheet assets, row edited:"); display(a_rows)
+spec9 = spec8.add("assets", a_rows); sim9 = sim.with_spec(spec9)
+X9 = sim9.simulate(25000, seed=1)
+print(f"TLT: residual vol {V(sim8.report.loc['TLT', 'resid vol']):.2f} -> {V(sim9.report.loc['TLT', 'resid vol']):.2f} %/yr | vol simulated {V(X9['TLT'].std()):.2f} %/yr, target 14.00, history {V(R['TLT'].std()):.2f}")
+sim9.report.loc[["TLT"]]
+''', "READ_L9")
+
+lever("Lever 10: a skewness and a kurtosis on an asset with a history, and the shape floor",
+      "The `skew` and `kurt` cells of GLD's row: $-0.5$ and 5, against the sample's. And a first attempt at SPY with skewness $-2$ and kurtosis 5.",
+      "Question 3: the residual receives the asset's target cumulants minus the systematic ones. SPY is almost all systematic, so its small residual would need an impossible shape and the row is refused with the floor. GLD has a large residual and the shape is feasible.",
+      "SPY's refusal; GLD's residual shape in the report; GLD's simulated skewness and kurtosis against the targets.",
+      r'''
+try:
+    sim.with_spec(spec9.add("assets", pd.DataFrame({"ticker": ["SPY"], "tag": ["equity_dm"], "mean": [0.07], "skew": [-2.0], "kurt": [5.0]})))
+except ValueError as err:
+    print("refused:", err, "\n")
+a_rows = pd.DataFrame({"ticker": ["GLD"], "tag": ["precious_metals"], "skew": [-0.5], "kurt": [5.0]})
+print("sheet assets, row edited:"); display(a_rows)
+spec10 = spec9.add("assets", a_rows); sim10 = sim.with_spec(spec10)
+X10 = sim10.simulate(25000, seed=1)
+display(pd.DataFrame({"GLD": {"skew history": R["GLD"].skew(), "skew target": -0.5, "skew simulated": X10["GLD"].skew(), "kurt history": R["GLD"].kurtosis() + 3, "kurt target": 5.0, "kurt simulated": X10["GLD"].kurtosis() + 3}}).T.round(2))
+sim10.report.loc[["GLD"]]
+''', "READ_L10")
+
+lever("Lever 11: a correlation between two assets, with its range",
+      "A row in `pairs`: the two bank funds KBE and KRE at 0.90. Their residuals were the most correlated of the universe in lever 1's fit, a banks factor the seven do not carry. And a first attempt at 0.30.",
+      "Question 4: the residual correlation supplies what the factors do not, within the range the two unexplained shares allow. The pair report gives the systematic correlation, the range and the residual correlation used.",
+      "The refusal at 0.30 with the range; the pair report; the simulated correlation at 0.90; and one untouched pair unchanged.",
+      r'''
+try:
+    sim.with_spec(spec10.add("pairs", pd.DataFrame({"ticker_1": ["KBE"], "ticker_2": ["KRE"], "corr": [0.30]})))
+except ValueError as err:
+    print("refused:", err, "\n")
+p_rows = pd.DataFrame({"ticker_1": ["KBE"], "ticker_2": ["KRE"], "corr": [0.90]})
+print("sheet pairs:"); display(p_rows)
+spec11 = spec10.add("pairs", p_rows); sim11 = sim.with_spec(spec11)
+display(sim11.pair_report.round(3))
+X11 = sim11.simulate(25000, seed=1)
+print(f"corr(KBE, KRE): history {R['KBE'].corr(R['KRE']):.2f}, before {X10['KBE'].corr(X10['KRE']):.2f}, after {X11['KBE'].corr(X11['KRE']):.2f} | corr(KBE, SPY) before {X10['KBE'].corr(X10['SPY']):.3f}, after {X11['KBE'].corr(X11['SPY']):.3f}")
+''', "READ_L11")
+
+lever("Lever 12: several pairs, and the joint check",
+      "Three more rows in `pairs`: the homebuilders ITB and XHB at 0.85, Australia and the Pacific fund EWA and EPP at 0.85, the Nasdaq and the technology sector QQQ and XLK at 0.85, the other large residual correlations of lever 1. And a triangle that cannot exist.",
+      "Question 4 for each pair, then the residual correlation matrix must be positive semidefinite; a set of pairs that is not is refused as a whole, with the smallest eigenvalue.",
+      "The refused triangle; the pair report with four rows; the four simulated correlations.",
+      r'''
+bad = pd.DataFrame({"ticker_1": ["XLK", "XLK", "QQQ"], "ticker_2": ["QQQ", "SMH", "SMH"], "corr": [0.05, 0.05, 0.05]})   # three near-independent pairs among three funds that share the same factors
+try:
+    sim.with_spec(spec11.add("pairs", bad))
+except ValueError as err:
+    print("refused:", err, "\n")
+p_rows = pd.DataFrame({"ticker_1": ["ITB", "EWA", "QQQ"], "ticker_2": ["XHB", "EPP", "XLK"], "corr": [0.85, 0.85, 0.85]})
+print("sheet pairs, rows added:"); display(p_rows)
+spec12 = spec11.add("pairs", p_rows); sim12 = sim.with_spec(spec12)
+display(sim12.pair_report.round(3))
+X12 = sim12.simulate(25000, seed=1)
+pd.DataFrame({f"{i}, {j}": {"history": R[i].corr(R[j]), "target": c, "simulated": X12[i].corr(X12[j])} for i, j, c in zip(sim12.spec.pairs["ticker_1"], sim12.spec.pairs["ticker_2"], sim12.spec.pairs["corr"])}).T.round(3)
+''', "READ_L12")
+
+lever("Lever 13: a view on a factor's mean",
+      "A row in `factors`: Equity DM, mean 5 percent a year, against 7.6 in the sample; the other cells empty, so volatility and shape stay the sample's.",
+      "Step 1 edited; the generator is refitted on the edited targets (two minutes for the C-vine). The alphas are the history's, so every asset's expected return moves by its Equity DM beta times the change, and an asset whose mean you gave (SPY, lever 8) keeps it, its alpha absorbing the view.",
+      "The implied change for the four largest equity betas and four assets with none; the simulated means of SPY (mean given, unchanged), EWY, TLT and GLD before and after.",
+      r'''
+f_rows = pd.DataFrame({"factor": ["Equity DM"], "mean": [0.05]})
+print("sheet factors:"); display(f_rows)
+spec13 = spec12.add("factors", f_rows)
+t0 = time.time(); sim13 = sim.with_spec(spec13); print(f"refit on the edited factor targets: {time.time() - t0:.0f} s")
+d_mu = sim13.targets.mean["Equity DM"] - sim12.targets.mean["Equity DM"]; shift = sim13.model.beta["Equity DM"] * d_mu
+display(pd.concat([shift.nsmallest(4), shift[["TLT", "TIP", "GLD", "DBC"]]]).mul(1200).round(2).to_frame("implied change of expected return (%/yr)").T)
+X13 = sim13.simulate(25000, seed=1)
+pd.DataFrame({"before (%/yr)": A(X12[["SPY", "EWY", "TLT", "GLD"]].mean()), "after (%/yr)": A(X13[["SPY", "EWY", "TLT", "GLD"]].mean())}).round(2).T
+''', "READ_L13")
+
+lever("Lever 14: a view on a factor correlation",
+      "A row in `factor_corr`: Equity DM and Real premia at $-0.30$, against $+0.31$ in the sample: the diversification a balanced portfolio hopes for from its bonds, stated at the factor level.",
+      "Step 1 edited and the generator refitted. No asset's mean or volatility changes; every equity-bond pair in the universe changes at once, by what $\\mathbf B \\boldsymbol\\Sigma_f \\mathbf B' + \\mathbf D$ implies.",
+      "A balanced portfolio, 60 percent equally across the equity funds and 40 percent across the bond funds: its volatility implied by the factor covariance before and after, and the simulated volatility, VaR and ES. And one asset's volatility before and after: XLF, long equity and short real premia, whose systematic variance the new correlation raises; its residual is the history's, so its volatility follows the view.",
+      r'''
+c_rows = pd.DataFrame({"factor_1": ["Equity DM"], "factor_2": ["Real premia"], "corr": [-0.30]})
+print("sheet factor_corr:"); display(c_rows)
+spec14 = spec13.add("factor_corr", c_rows)
+t0 = time.time(); sim14 = sim.with_spec(spec14); print(f"refit on the edited factor correlation: {time.time() - t0:.0f} s")
+eq = [a for a in tickers if spec.assets.set_index("ticker").loc[a, "tag"] in ("equity_dm", "equity_dm_commodity", "financials", "banks", "rate_sensitive_equity", "small_cap", "equity_em", "equity_em_commodity")]
+bd = [a for a in tickers if spec.assets.set_index("ticker").loc[a, "tag"] in ("treasury", "aggregate_credit", "high_yield")]
+w_bal = pd.Series(0.0, index=tickers); w_bal[eq] = 0.6 / len(eq); w_bal[bd] = 0.4 / len(bd)
+X14 = sim14.simulate(25000, seed=1)
+rows = {}
+for name, s_, X_ in [("before: corr +0.31 (sample)", sim13, X13), ("after: corr -0.30", sim14, X14)]:
+    S_ = s_.model.implied_covariance().loc[tickers, tickers].values; r_ = (X_[tickers] @ w_bal).values; v_, e_ = var_es(r_)
+    rows[name] = {"portfolio vol, implied (%/month)": np.sqrt(w_bal.values @ S_ @ w_bal.values) * 100, "portfolio vol, simulated (%/month)": r_.std() * 100, "VaR 5%, simulated (%)": v_ * 100, "ES 5%, simulated (%)": e_ * 100}
+display(pd.DataFrame(rows).T.round(2))
+v13 = V(np.sqrt(sim13.model.implied_covariance().loc["XLF", "XLF"])); v14 = V(np.sqrt(sim14.model.implied_covariance().loc["XLF", "XLF"]))
+print(f"XLF volatility under the model: {v13:.2f} -> {v14:.2f} %/yr (history {V(R['XLF'].std()):.2f}); simulated {V(X13['XLF'].std()):.2f} -> {V(X14['XLF'].std()):.2f}")
+''', "READ_L14")
+
+lever("Lever 15: a factor without a history",
+      "A row in `factors` with mean and volatility (3 and 6 percent a year) for a factor that is not in the factor file, Illiquidity, and two rows in `factor_corr` giving its correlation with Equity DM (0.35) and Credit (0.45). Skewness and kurtosis empty, so normal.",
+      "Step 1: the five missing correlations are completed by the maximum-determinant rule, the unique valid completion in which every unspecified pair has zero partial correlation given the specified ones: $\\mathbf r_U = \\mathbf R_{US} \\mathbf R_{SS}^{-1} \\mathbf r_S$. Nothing is assumed beyond the two numbers given. Step 2a: the vine is fitted on the seven factors with a history, and the new factor is attached to each simulated month by a Gaussian conditional draw on the normal scale, $z_s = \\mathbf c' \\mathbf z_h + \\sqrt{1 - \\mathbf r' \\mathbf R^{-1} \\mathbf r}\\, \\varepsilon$ with $\\mathbf c = \\mathbf R^{-1} \\mathbf r$, then its own marginal quantile; the correlations are corrected once on the draw so they land on target.",
+      "The completion report, given against completed; the simulated mean, volatility and seven correlations of the new factor against the targets.",
+      r'''
+f_rows = pd.DataFrame({"factor": ["Illiquidity"], "mean": [0.03], "vol": [0.06]})
+c_rows = pd.DataFrame({"factor_1": ["Illiquidity", "Illiquidity"], "factor_2": ["Equity DM", "Credit"], "corr": [0.35, 0.45]})
+print("sheet factors, row added:"); display(f_rows); print("sheet factor_corr, rows added:"); display(c_rows)
+spec15 = spec14.add("factors", f_rows).add("factor_corr", c_rows)
+t0 = time.time(); sim15 = sim.with_spec(spec15); print(f"vine refitted on the seven historical factors, Illiquidity attached: {time.time() - t0:.0f} s")
+display(sim15.factor_report)
+Fs = sim15.pilot
+print(f"Illiquidity simulated: mean {A(Fs['Illiquidity'].mean()):.2f} %/yr (target 3.00), vol {V(Fs['Illiquidity'].std()):.2f} %/yr (target 6.00)")
+pd.DataFrame({"target": sim15.targets.corr.loc["Illiquidity", F.columns], "simulated": Fs.corr().loc["Illiquidity", F.columns], "source": sim15.targets.completion_report.loc["Illiquidity", "source"]}).round(3).T
+''', "READ_L15")
+
+lever("Lever 16: an asset with a history loading on the new factor",
+      "A row in `exposures`: HYG, beta 0.3 on Illiquidity. A beta on a factor without history is always a value, since nothing can be regressed on it. The private credit fund's tag gets 0.5 on Illiquidity in `tags`.",
+      "Question 1 adds the given beta. The residual is the history's (question 2 with an empty volatility cell), so the added systematic variance raises HYG's volatility under the model; an analyst who wants it kept gives the volatility. Question 3 keeps the residual's shape.",
+      "HYG's residual volatility before and after, unchanged; HYG's volatility implied by the model, before and after the loading; the simulated correlations of HYG and of the private credit fund with Illiquidity.",
+      r'''
+e_rows = pd.DataFrame({"ticker": ["HYG"], "factor": ["Illiquidity"], "beta": [0.3], "corr": [np.nan]})
+t_rows = pd.DataFrame({"tag": ["private_credit"], "Credit": [0.6], "Equity DM": [0.2], "Illiquidity": [0.5]})
+print("sheet exposures, row added:"); display(e_rows); print("sheet tags, row edited:"); display(t_rows)
+spec16 = spec15.add("exposures", e_rows).add("tags", t_rows); sim16 = sim15.with_spec(spec16)
+X16 = sim16.simulate(25000, seed=1)
+v15 = V(np.sqrt(sim15.model.implied_covariance().loc["HYG", "HYG"])); v16 = V(np.sqrt(sim16.model.implied_covariance().loc["HYG", "HYG"]))
+print(f"HYG residual vol {V(sim15.report.loc['HYG', 'resid vol']):.2f} -> {V(sim16.report.loc['HYG', 'resid vol']):.2f} %/yr | HYG vol implied by the model {v15:.2f} -> {v16:.2f} %/yr | corr with Illiquidity simulated: HYG {X16['HYG'].corr(sim16.last_factors['Illiquidity']):.2f}, Private credit {X16['Private credit'].corr(sim16.last_factors['Illiquidity']):.2f}")
+sim16.report.loc[["HYG", "Private credit"]]
+''', "READ_L16")
+
+lever("Lever 17: everything at once, on one asset",
+      "A new asset, a multi-strategy fund with no history: in `assets` mean 6, volatility 9 percent, skewness $-0.6$, kurtosis 5.5; a tag `multi_strategy` with 0.2 on Equity DM, 0.3 on Credit and 0.2 on Illiquidity; and a `pairs` row with HYG, first at 0.20, then at 0.75. The shape is close to the factors' own: with less than half of the variance in the residual, a shape far from theirs would be refused, as lever 10 showed.",
+      "The four questions in order: betas as values; the residual scale from the volatility; the residual shape from the cumulants; the residual correlation with HYG within its range; the alpha last.",
+      "The first pair target is refused: a fund loading on the same three factors as HYG has a systematic correlation with it that the two unexplained shares can only move so far, and 0.20 is below the range; the message prints it. Then its report row and pair row at 0.75, and every one of its inputs against the simulation.",
+      r'''
+a_rows = pd.DataFrame({"ticker": ["Multi-strategy"], "tag": ["multi_strategy"], "mean": [0.06], "vol": [0.09], "skew": [-0.6], "kurt": [5.5]})
+t_rows = pd.DataFrame({"tag": ["multi_strategy"], "Equity DM": [0.2], "Credit": [0.3], "Illiquidity": [0.2]})
+try:
+    sim16.with_spec(spec16.add("assets", a_rows).add("tags", t_rows).add("pairs", pd.DataFrame({"ticker_1": ["Multi-strategy"], "ticker_2": ["HYG"], "corr": [0.20]})))
+except ValueError as err:
+    print("refused:", err, "\n")
+p_rows = pd.DataFrame({"ticker_1": ["Multi-strategy"], "ticker_2": ["HYG"], "corr": [0.75]})
+print("sheet assets, row added:"); display(a_rows); print("sheet tags, row added:"); display(t_rows); print("sheet pairs, row added:"); display(p_rows)
+spec17 = spec16.add("assets", a_rows).add("tags", t_rows).add("pairs", p_rows); sim17 = sim16.with_spec(spec17)
+display(sim17.report.loc[["Multi-strategy"]]); display(sim17.pair_report.loc[[("Multi-strategy", "HYG")]].round(3))
+X17 = sim17.simulate(25000, seed=1); x = X17["Multi-strategy"]
+pd.DataFrame({"Multi-strategy": {"mean (%/yr)": (6.0, A(x.mean())), "vol (%/yr)": (9.0, V(x.std())), "skew": (-0.6, x.skew()), "kurt": (5.5, x.kurtosis() + 3), "corr with HYG": (0.75, x.corr(X17["HYG"]))}}).T.applymap(lambda p: f"target {p[0]:.2f}, simulated {p[1]:.2f}")
+''', "READ_L17")
+
+# ------------------------------------------------------------------ step 3 check
+md(r"""
+## Step 3: check, every input against the simulation
+
+The workbook now carries every kind of knowledge of the table in "What you
+have". One simulation of 25,000 months, and `check` returns one table per
+object type: the model's value and its source (workbook, history or
+fallback), the simulated value, and the Monte Carlo error to read the
+difference against; for the shape, the given value when there is one, and the
+sample's for information, since an empty shape cell is the residual's shape,
+not the asset's.
+Then two portfolios, the equal-weight portfolio of the 68 listed assets and
+the balanced portfolio of lever 14, with their volatility, VaR and ES, all
+simulated quantities since nothing was targeted on them; the history's values
+are shown beside them for the reader, not as a target, since the workbook has
+moved several inputs away from the sample. The Fleishman generator on the
+same workbook is the last line of that table, the comparison the course has
+carried since notebook 01.
+""")
+code(r'''
+final = sim17; X = final.simulate(25000, seed=11); chk = final.check(X)
+fac = chk["factors"]
+print(f"factors: largest |difference| simulated minus target: mean {fac['mean diff'].abs().max():.1e}, vol {fac['vol diff'].abs().max():.1e}, skew {fac['skew diff'].abs().max():.2f}, kurt {fac['kurt diff'].abs().max():.2f}; correlations: max |.| {fac.attrs['max_abs_corr_error']:.3f}, mean |.| {fac.attrs['mean_abs_corr_error']:.3f}")
+a = chk["assets"]
+touched = ["SPY", "TLT", "GLD", "HYG", "XLU", "Private credit", "Cash plus", "Private equity", "Multi-strategy"]
+print("\nassets (mean and vol in %/yr): the touched ones")
+show_a = a.loc[touched].copy()
+for c in ["mean target", "mean simulated", "mean MC error"]: show_a[c] = A(show_a[c].astype(float))
+for c in ["vol target", "vol simulated", "vol MC error"]: show_a[c] = V(show_a[c].astype(float))
+display(show_a.round(2))
+num = a[[c for c in a.columns if "source" not in c]].astype(float)
+print("all %d assets: largest |mean difference| %.2f %%/yr (largest MC error %.2f), largest |vol difference| %.2f %%/yr; shape against the sample, for the assets with a history: median |skew difference| %.2f, median |kurt difference| %.2f"
+      % (len(a), A((num["mean simulated"] - num["mean target"]).abs().max()), A(num["mean MC error"].max()), V((num["vol simulated"] - num["vol target"]).abs().max()),
+         (num["skew simulated"] - num["skew sample"]).abs().median(), (num["kurt simulated"] - num["kurt sample"]).abs().median()))
+print("\npairs:"); display(chk["pairs"].round(3))
+fl = final.report.loc[final.report["flags"] != "", "flags"]; print(f"\nflags: {len(fl)}"); display(fl.to_frame())
+w_eq = pd.Series(1.0 / len(tickers), index=tickers)
+sim_fl_final = FactorMarket(R, F, spec=spec17, generator="fleishman").fit(); Xf = sim_fl_final.simulate(25000, seed=11)
+rows = {}
+for pn, w in [("equal weight, 68 listed assets", w_eq), ("60/40, equity funds / bond funds", w_bal)]:
+    for name, X_ in [("history (sample, not a target)", R), ("simulated, C-vine", X), ("simulated, Fleishman", Xf)]:
+        r_ = (X_[tickers] @ w).values; v_, e_ = var_es(r_); rows[(pn, name)] = {"vol (%/month)": r_.std() * 100, "skewness": stats.skew(r_), "kurtosis": stats.kurtosis(r_) + 3, "VaR 5% (%)": v_ * 100, "ES 5% (%)": e_ * 100}
+print("\nportfolios:"); pd.DataFrame(rows).T.round(2)
+''')
+md(r"""
+**Reading the check.** Factors: moments to the sixth decimal, correlations
+within 0.027. Assets: every mean and volatility within about one Monte Carlo
+error of the model's value, over all 72; the largest mean difference, 0.84
+percent a year, equals the largest error. The shape columns say what an empty
+cell means. GLD, Private equity and Multi-strategy, whose shapes were given,
+are on target. TLT's simulated skewness is $-0.42$ against $+0.44$ in the
+sample and HYG's kurtosis 6.6 against 10.9: their shape cells were empty, so
+their residuals kept the history's shape and the assets inherited the
+factors', Real premia and Inflation for TLT, Credit for HYG. That is by
+design, and the sample columns are there so the analyst sees it and types a
+shape if they disagree. Seven flags, all the same kind: a residual lighter
+tailed than a normal raised to the Johnson SU's floor, a change of a few
+hundredths of kurtosis on residuals that are a small share of their assets.
+The portfolios are simulated under the workbook, not under the sample: the
+equity premium is 5 percent instead of 7.6, the equity-bond correlation
+$-0.30$ instead of $+0.31$, so the balanced portfolio's volatility is 2.82
+against 3.21 in history and its expected shortfall 6.46 against 7.27. The
+C-vine and Fleishman lines differ by a few hundredths, as step 2a said they
+would on near-orthogonal factors.
+""")
+
+# ------------------------------------------------------------------ step 4 use
+md(r"""
+## Step 4: use, scenarios out
+
+Three objects leave the notebook. The **cross-section**: $n$ simulated months
+by 71 assets, exchangeable draws with no time order, in decimals at the
+monthly frequency, with the factor months beside it so that each asset month
+can be decomposed. The **paths**: $n$ paths of $h$ months, independent months
+here (notebooks 04 and 05 add the dynamics), from which the cumulative return
+over the horizon is $\prod_{t}(1 + r_{j,t}) - 1$, given per path by
+`Paths.terminal`. The **fitted simulator**: saved to three JSON files and
+reloaded without a refit, so the same scenarios can be regenerated elsewhere
+with the same seed. The cell produces the three, writes the cross-section, the
+terminal returns and the full workbook to `examples/output`, and reloads the
+simulator to check that it reproduces the scenarios to the last digit.
+""")
+code(r'''
+out = os.path.join(ROOT, "examples", "output"); os.makedirs(out, exist_ok=True)
+scen = final.simulate(25000, seed=7); scen_f = final.last_factors
+paths = final.simulate_paths(2000, 12, seed=8); term = paths.terminal()
+print("cross-section:", scen.shape, "| factor months:", scen_f.shape, "| paths:", paths.array.shape, "| one-year returns:", term.shape)
+display(scen.iloc[:3, :6].round(4))
+print("one-year return, 5% quantile and median across paths (%):"); display(pd.DataFrame({"5% quantile": term.quantile(0.05) * 100, "median": term.median() * 100}).loc[show + ["Private credit", "Multi-strategy"]].round(1).T)
+scen.to_csv(os.path.join(out, "scenarios_monthly.csv")); scen_f.to_csv(os.path.join(out, "factor_scenarios_monthly.csv")); term.to_csv(os.path.join(out, "one_year_returns.csv"))
+spec17.write(os.path.join(out, "universe_inputs_full.xlsx")); final.save(os.path.join(out, "simulator"))
+back = FactorMarket.load(os.path.join(out, "simulator"))
+same = np.allclose(back.simulate(3, seed=2).values, final.simulate(3, seed=2).values)
+print("reloaded simulator reproduces the scenarios:", same, "| files:", sorted(os.listdir(out)))
+''')
+md(r"""
+**Reading the outputs.** Rows of the cross-section and of the factor table
+correspond one to one under the same seed, so any asset month can be
+decomposed into its factor months and residual. The one-year quantiles read
+the workbook back: Brazil's median return is zero and its 5 percent quantile
+$-43$, the private credit fund's $-10$, SPY's $-18$ with a median of 6. The
+reloaded simulator reproduces three scenarios to the last digit, so the three
+JSON files carry everything the simulation needs; the full workbook is saved
+beside them as the record of what was specified.
+""")
+
+# ------------------------------------------------------------------ appendix
+md(r"""
+## Appendix: method notes on the dependence of near-orthogonal factors
+
+*Internal diagnostics; the analyst can skip them.* Three facts behind the
+paragraph of step 2a.
+
+**The symmetry test on the factor pairs.** For each first-tree pair, the
+difference between the mean exceedance correlation on the left and on the
+right of the profile, on the copula scale, with its 90 percent bootstrap
+interval (notebook 02). A pair is asymmetric when the interval excludes zero.
+""")
+code(r'''
+sim.market.classification.round(3)
+''')
+md(r"""
+**The exceedance profiles of the factors, on two scales.** Each factor
+against Equity DM: the history in black, the C-vine's simulated months in
+blue, the Fleishman market on the same targets in grey. The top row is on the
+returns; the bottom row on normal scores, $\Phi^{-1}(\mathrm{rank}/(n+1))$,
+where the marginals are removed and only the copula remains. On the returns
+the history's profiles lean left where the factor is correlated with equity;
+part of that slope is Equity DM's own skewness, which makes its conditional
+variance larger in its bad months whatever the copula, and both generators
+show it. On the copula scale the pairs are close to flat, which is what the
+symmetry test measured.
+""")
+code(r'''
+normal_scores = lambda v: pd.Series(stats.norm.ppf(stats.rankdata(v) / (len(v) + 1)), index=getattr(v, "index", None))
+base = "Equity DM"; others_f = [f for f in F.columns if f != base]; zg = np.round(np.arange(-1, 1.0001, 0.05), 3)
+Fcv, Ffl = sim.pilot, sim_fl.pilot
+with sns.axes_style("whitegrid"):
+    fig, axes = plt.subplots(2, len(others_f), figsize=(3.2 * len(others_f), 6.2), sharey="row")
+    for j, f in enumerate(others_f):
+        for row, (label, tf) in enumerate([("returns", lambda v: v), ("normal scores (copula scale)", normal_scores)]):
+            ax = axes[row, j]
+            for G, col, name in [(F, "black", "history"), (Ffl, "tab:grey", "Fleishman"), (Fcv, "tab:blue", "C-vine")]:
+                ax.plot(zg, exceedance_curve(tf(G[base]), tf(G[f]), zg).values, color=col, lw=2 if name == "history" else 1.4, label=name)
+            ax.axvline(0, color="grey", lw=0.6, ls=":"); ax.set_title(f"{f} vs {base}\n{label}", fontsize=9); ax.set_xlabel(f"threshold on {base} (sd)", fontsize=8)
+    axes[0, 0].set_ylabel("exceedance correlation"); axes[1, 0].set_ylabel("exceedance correlation"); axes[0, 0].legend(fontsize=8)
+    plt.tight_layout(); plt.show()
+''')
+md(r"""
+**How far apart the families are, by correlation.** For each first-tree pair,
+every family of the catalog (Gaussian, Student t, Clayton and Gumbel in the
+two rotations matching the sign of the dependence) is fitted by maximum
+likelihood to the pair's pseudo-observations, and the exceedance profile of
+each fitted copula is simulated on the copula scale. The table gives the pair's
+correlation, the BIC gap per observation between the best and the worst
+family, and the largest distance between any two families' profiles. When the
+correlation is small the families are the same object: the choice cannot be
+identified from the data and has no consequence for the scenarios. Where the
+correlation is large the families differ, and the selection matters and is
+testable.
+""")
+code(r'''
+import pyvinecopulib as pv
+from cvinemarketgen.copulas import CopulaTools
+_ct = CopulaTools(); zz = np.array([-1.0, -0.5, 0.0, 0.5, 1.0])
+def pobs(x, y): return np.column_stack([stats.rankdata(x) / (len(x) + 1), stats.rankdata(y) / (len(y) + 1)])
+def profile(cop, n=100000):
+    s = cop.simulate(n, seeds=[1, 2, 3, 4, 5]); return exceedance_curve(stats.norm.ppf(s[:, 0]), stats.norm.ppf(s[:, 1]), zz).values
+rows = {}
+for f in others_f:
+    u = pobs(F[base], F[f]); tau = stats.kendalltau(u[:, 0], u[:, 1])[0]; rots = [0, 180] if tau >= 0 else [90, 270]
+    fits = {}
+    for fam, rot in [(pv.BicopFamily.gaussian, 0), (pv.BicopFamily.student, 0)] + [(g, r) for g in (pv.BicopFamily.clayton, pv.BicopFamily.gumbel) for r in rots]:
+        cop = _ct.fit_student_itau(u) if fam == pv.BicopFamily.student else pv.Bicop(fam, rot)
+        if fam != pv.BicopFamily.student: cop.fit(u)
+        fits[f"{fam.name} {rot}"] = (cop.bic(u) / len(u), profile(cop))
+    bics = np.array([v[0] for v in fits.values()]); profs = np.array([v[1] for v in fits.values()])
+    rows[f] = {"correlation with Equity DM": F[base].corr(F[f]), "BIC gap per obs, worst minus best": bics.max() - bics.min(),
+               "largest profile distance between two families": (profs.max(0) - profs.min(0)).max(), "best family by BIC": min(fits, key=lambda k: fits[k][0])}
+pd.DataFrame(rows).T.sort_values("correlation with Equity DM", key=lambda s: s.abs())
+''')
+md(r"""
+**Reading the three tables.** Every first-tree pair is symmetric at the 90
+percent level, the asymmetries between $-0.12$ and $+0.14$ with intervals
+about $\pm 0.3$ wide; on the copula scale the profiles are flat within that
+noise, and on the returns their left lean is Equity DM's skewness. The family
+table gives the measure: at a correlation of 0.09 the six families differ by
+0.015 in BIC per observation and by 0.11 in the profile, at 0.28 by 0.027 and
+0.23, and only above 0.5 by 0.16 and 0.46 to 0.50. Below a correlation of
+about 0.2 the copula family is not identifiable from the data and does not
+matter for the scenarios; above 0.3 it is both. For Real premia and Commodity
+the best family by BIC alone would be a Gumbel rotated by 180 degrees, but
+the symmetry test does not reject symmetry for them, and the rule of notebook
+02, symmetry first, then BIC among the admissible families, keeps the Student
+t. The copula layer is worth most where correlations are high: the
+asset-class level of notebook 02, and the state-dependent correlations of
+notebooks 04 and 05.
+""")
+md(r"""
+## What this misses, and what comes next
+
+The scenarios are one-period draws, exchangeable across months, whereas a
+factor's history is a time series. The table applies the tests of
+independence over time to the factors, on the series and on its squares: the
+squared returns are autocorrelated for several factors, so a large month is
+followed by large months, in either direction, and paths made of independent
+months understate the risk over a horizon.
+
+**Notebook 04** takes one factor's history as a time series, tests it, and
+introduces the models that describe its dynamics and the generalized error
+they leave behind. **Notebook 05** simulates the factors together with those
+dynamics and hands the paths to the simulator of this notebook.
+""")
+code(r'''
+pd.DataFrame({f: iid_tests(F[f].values) for f in F.columns}).T.round(3).rename(columns={"lb_z": "Ljung-Box p, returns", "lb_z2": "Ljung-Box p, squared returns", "arch_lm": "ARCH-LM p"})
+''')
+
+nb = {"cells": cells, "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}, "language_info": {"name": "python"}}, "nbformat": 4, "nbformat_minor": 5}
+for i, c in enumerate(nb["cells"]):
+    c["source"] = c["source"].splitlines(keepends=True); c["id"] = f"c{i:03d}"
+path = sys.argv[1] if len(sys.argv) > 1 else "examples/03_many_assets_factors.ipynb"
+json.dump(nb, open(path, "w"), indent=1, ensure_ascii=False); open(path, "a").write("\n")
+print("written", path, len(cells), "cells")

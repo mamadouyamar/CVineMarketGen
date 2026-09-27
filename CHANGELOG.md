@@ -2,6 +2,14 @@
 
 ## 0.4.0 (unreleased)
 
+- The simulator for a universe: `MarketSpec` (a six-sheet workbook or six
+  DataFrames: assets, tags, exposures, pairs, factors, factor_corr; empty cell =
+  history if available, else fallback) and `FactorMarket` (one call: factor
+  targets from history and workbook, Fleishman or C-vine generator, then for
+  every asset the rule in fixed order: betas as value / correlation-implied /
+  fit / zero, volatility, shape by the cumulant rule, pair correlations, mean).
+  `report`, `factor_report`, `check`, `with_spec`, `simulate_paths`, save/load;
+  optional extra `excel` (openpyxl). Notebook 03 rebuilt on it.
 - The specification layer (notebook 03): every factor and asset is described by
   what is known and the rest filled by a stated rule. `FactorModel.exposures`
   accepts given betas (`{factor: value}`, the remainder regressed) and pinned

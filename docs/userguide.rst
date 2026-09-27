@@ -313,6 +313,46 @@ monthly residual layer. The monthly sample must end at a quarter end, so that
 the simulated months start a new quarter; ``load_fred_quarterly`` fetches
 quarterly FRED series.
 
+The simulator for a universe
+----------------------------
+
+.. code-block:: python
+
+   spec = MarketSpec.read('universe_inputs.xlsx')             # six sheets: assets, tags, exposures, pairs, factors, factor_corr
+   sim = FactorMarket(asset_returns, factor_returns, spec, generator='cvine', central='Equity DM').fit()
+   sim.report                                                 # per asset: history?, tag, betas by state, source of each moment, pairs, flags
+   sim.factor_report                                          # per factor: history?, source of each moment, correlations given / completed
+   X = sim.simulate(25000, seed=1); Fs = sim.last_factors     # scenario months, and the factor months behind them
+   chk = sim.check(X)                                         # given vs simulated: factors, assets (with source and MC error), pairs
+   sim2 = sim.with_spec(spec.add('pairs', [{'ticker_1': 'KBE', 'ticker_2': 'KRE', 'corr': 0.9}]))   # refits only what changed
+   sim.save('sim'); FactorMarket.load('sim')
+
+What you know about each asset and factor goes in the workbook (notebook 03).
+``assets``: ticker, tag, mean, vol, skew, kurt (annual). ``tags``: one row per
+asset class, one column per factor, empty = does not load, ``fit`` = estimate
+the beta, a number = the beta. ``exposures``: ticker, factor, beta or corr, one
+asset departing from its tag. ``pairs``: a correlation imposed between two
+assets. ``factors``: factor, mean, vol, skew, kurt; a factor without a history
+must be here with mean and vol. ``factor_corr``: a correlation imposed between
+two factors, or given for a factor without a history. An empty cell is filled
+from the history when the object has one, otherwise by a fallback (skew 0,
+kurt 3; mean and vol have none). A ticker or factor has a history iff it is a
+column of the return table.
+
+The rule for an asset, in a fixed order, each step taking the previous as given:
+betas (values as given, correlations with a factor solved for the beta,
+``fit`` betas by regression of the return minus the given part, zero elsewhere);
+volatility (residual variance = target variance minus systematic variance,
+refused below the floor); shape (cumulants of independent terms add, the
+residual receives the asset's third and fourth cumulants minus the systematic
+part's, refused below the marginal's range when the shape was given, floored
+and flagged when it came from the sample); pair correlations (residual
+correlation within ``rho_sys +/- sqrt((1 - R2_i)(1 - R2_j))``, positive
+semidefinite); mean (alpha). Factors without a history have their missing
+correlations completed by maximum determinant and are attached to the C-vine by
+a Gaussian conditional draw. ``pip install cvinemarketgen[excel]`` for the
+workbook.
+
 Assets on factors
 -----------------
 
