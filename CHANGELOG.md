@@ -2,6 +2,13 @@
 
 ## 0.4.0 (unreleased)
 
+- Simulator corrections found by executing notebook 03: `MarketSpec.add` edits a row
+  whose key already exists in place, keeping its position and the cells not restated
+  (it used to delete and append, moving the row and clearing them); a correlation given
+  between an asset and a factor is solved jointly with the volatility the asset ends up
+  with, and refused, with the value it can reach, when the volatility cell is empty and
+  the beta it would need departs so far from the history that the ratio saturates;
+  `FactorMarket.simulate` skips the acceptance loop below 2,000 months.
 - The simulator for a universe: `MarketSpec` (a six-sheet workbook or six
   DataFrames: assets, tags, exposures, pairs, factors, factor_corr; empty cell =
   history if available, else fallback) and `FactorMarket` (one call: factor

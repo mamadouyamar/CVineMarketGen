@@ -339,8 +339,14 @@ from the history when the object has one, otherwise by a fallback (skew 0,
 kurt 3; mean and vol have none). A ticker or factor has a history iff it is a
 column of the return table.
 
+In a workbook, a row whose key (ticker, tag, factor, or pair of names) is already in
+the sheet is edited in place: the cells given are written, the cells not given are
+left alone, and the row keeps its position.
+
 The rule for an asset, in a fixed order, each step taking the previous as given:
-betas (values as given, correlations with a factor solved for the beta,
+betas (values as given; a correlation with a factor solved jointly with the
+volatility the asset ends up with, and refused when the volatility cell is empty and
+the correlation asked for is past what the history supports;
 ``fit`` betas by regression of the return minus the given part, zero elsewhere);
 volatility (residual variance = target variance minus systematic variance,
 refused below the floor); shape (cumulants of independent terms add, the
