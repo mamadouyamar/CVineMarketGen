@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from scipy.optimize import fsolve, minimize
+from scipy.optimize import least_squares, fsolve, minimize
 
 from .moment_match import MomentMatch
 from .copulas import CopulaTools
@@ -26,6 +26,21 @@ _ct = _mm
 _JSU_STARTS = ([0, 1, 1.5, 1], [-0.5, -0.5, 1.2, 0.8], [0.5, 0.5, 1.2, 0.8], [0, 1, 3, 3], [-2, -2, 2, 1.5], [0, 0, 0.8, 0.5])
 
 
+def _jsu_shape(gamma, delta):
+    """Skewness and excess kurtosis of the Johnson SU with shape (gamma, delta); location and scale do not enter."""
+    w = np.exp(delta ** -2.0); O = gamma / delta
+    var = 0.5 * (w - 1.0) * (w * np.cosh(2 * O) + 1.0)
+    skew = -(np.sqrt(w) * (w - 1.0) ** 2 * (w * (w + 2.0) * np.sinh(3 * O) + 3.0 * np.sinh(O))) / (4.0 * var ** 1.5)
+    K1 = w ** 2 * (w ** 4 + 2.0 * w ** 3 + 3.0 * w ** 2 - 3.0) * np.cosh(4 * O)
+    K2 = 4.0 * w ** 2 * (w + 2.0) * np.cosh(2 * O)
+    K3 = 3.0 * (2.0 * w + 1.0)
+    exk = (w - 1.0) ** 2 * (K1 + K2 + K3) / (8.0 * var ** 2) - 3.0
+    return skew, exk
+
+
+_JSU_SHAPE_STARTS = ((0.0, 1.5), (-0.5, 1.2), (0.5, 1.2), (0.0, 3.0), (-2.0, 2.0), (2.0, 2.0), (0.0, 0.8), (-1.0, 0.6), (1.0, 0.6), (-4.0, 1.5), (4.0, 1.5))
+
+
 def fit_johnson_su(skew, kurt, mean=0.0, vol=1.0):
     """
     Johnson SU parameters matching a skewness and a raw kurtosis (normal = 3).
@@ -33,8 +48,51 @@ def fit_johnson_su(skew, kurt, mean=0.0, vol=1.0):
     Returns a dict with ``gamma, xi, delta, lambda`` for the *standardized*
     variable, the ``mean`` and ``vol`` to apply afterwards, and ``residual``,
     the norm of the moment mismatch. Use :func:`johnson_su_sample` to draw.
+
+    Skewness and kurtosis depend on the shape ``(gamma, delta)`` only, so they are
+    solved as two equations in two unknowns (Levenberg-Marquardt from a few
+    starts); ``lambda`` and ``xi`` then standardize the variable in closed form.
+    The four-parameter Nelder-Mead search of the earlier versions is the fallback.
     """
     target = [0.0, 1.0, float(skew), float(kurt) - 3.0]
+    s_t, k_t = float(skew), float(kurt) - 3.0
+
+    def resid(x):
+        g, d = x[0], x[1]
+        if d <= 1e-6:
+            return np.array([1e3, 1e3])
+        with np.errstate(all='ignore'):
+            sk, ek = _jsu_shape(g, d)
+        if not (np.isfinite(sk) and np.isfinite(ek)):
+            return np.array([1e3, 1e3])
+        return np.array([sk - s_t, ek - k_t])
+
+    best = None
+    for g0, d0 in _JSU_SHAPE_STARTS:
+        try:
+            r = least_squares(resid, [g0, d0], method='lm', xtol=1e-14, ftol=1e-14, gtol=1e-14, max_nfev=2000)
+        except Exception:
+            continue
+        g, d = float(r.x[0]), float(r.x[1])
+        if d <= 1e-6:
+            continue
+        mism = float(np.linalg.norm(resid([g, d])))
+        if best is None or mism < best[0]:
+            best = (mism, g, d)
+        if mism < 1e-10:
+            break
+    if best is not None and best[0] < 1e-6:
+        _, g, d = best
+        w = np.exp(d ** -2.0); O = g / d
+        var1 = 0.5 * (w - 1.0) * (w * np.cosh(2 * O) + 1.0)           # variance for lambda = 1
+        lam = 1.0 / np.sqrt(var1)
+        xi = lam * np.sqrt(w) * np.sinh(O)                             # mean zero: xi - lambda e^{1/(2 delta^2)} sinh(gamma/delta) = 0
+        p = np.array([g, xi, d, lam])
+        with np.errstate(all='ignore'):
+            mism = float(np.linalg.norm(np.asarray(_mm.moments_JSU(p), float) - target))
+        if np.isfinite(mism) and mism < 1e-6:
+            return {'gamma': float(p[0]), 'xi': float(p[1]), 'delta': float(p[2]), 'lambda': float(p[3]),
+                    'mean': float(mean), 'vol': float(vol), 'residual': float(mism)}
     best = None
     for x0 in _JSU_STARTS:
         res = minimize(_mm.univariate_moments_matching_func_JSU, x0, args=([target],), method='Nelder-Mead',
