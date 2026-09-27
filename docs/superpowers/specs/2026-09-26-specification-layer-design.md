@@ -208,3 +208,62 @@ without history; 6 targets on assets (mean, vol, pairs); 7 check, given
 against simulated; 8 use (simulate, retrieve, aggregate, save, export);
 appendix method notes. Each section opens with the mathematics of its rule
 and prints the specification report after the change.
+
+---
+
+## Revision 2 (2026-09-26, evening): the workbook and the fixed-order rule
+
+Agreed cell by cell with the author. This revision supersedes the asset part of
+the layer above where they differ (the residual shape is now derived from the
+asset's moments, not given directly).
+
+### What you can know about an asset: four dimensions
+- history: yes / no.
+- exposures, per factor, one of four states: `value` (a beta given), `corr`
+  (a correlation with the factor given, turned into the beta), `fit`
+  (regressed, needs a history; refused otherwise), `zero`.
+- moments: any subset of mean, vol, skew, kurt. Mean and vol required without a
+  history. Empty = from the history if there is one, else fallback (skew 0,
+  kurt 3).
+- pair correlations: any set of named assets.
+
+### The rule, fixed order, each step taking the previous as given
+1. Betas: values; correlations solved for the beta, `(beta' Sigma_f)_k = rho s_j sigma_k`
+   with the other betas fixed (iterated with the regression, 3 passes); fit betas
+   by regression of `r - sum(value beta f)` on the fit factors (Newey-West, R2);
+   zero elsewhere.
+2. Volatility: `sigma_e^2 = v^2 - beta' Sigma_f beta`; refused if <= 0, naming
+   the largest systematic contributors.
+3. Shape: cumulants of independent terms add. `k3_e = s v^3 - k3(beta' f)`,
+   `k4_e = (k - 3) v^4 - k4(beta' f)`, systematic cumulants from a pilot draw of
+   the factor generator; residual skew `k3_e / sigma_e^3`, kurt `3 + k4_e / sigma_e^4`;
+   Johnson SU fitted. Floor: kurt_e >= 3.1 + 2 skew_e^2 (the marginal's range).
+   Below it: refused when s, k were given; nearest feasible shape and flag
+   `shape not reproduced` when they came from the sample or the fallback.
+4. Pairs: as in A6 (range, PSD check).
+5. Mean: `alpha = m - beta' mu_f`.
+
+### The workbook (`MarketSpec`)
+Sheets: `assets` (ticker, tag, mean, vol, skew, kurt), `tags` (tag x factor:
+empty / `fit` / number), `exposures` (ticker, factor, beta, corr; overrides the
+tag), `pairs` (ticker_1, ticker_2, corr), `factors` (factor, mean, vol, skew,
+kurt), `factor_corr` (factor_1, factor_2, corr). Moments annual. Empty cell =
+history if available, else fallback. A ticker/factor has a history iff it is a
+column of the return file. Optional sheets may be absent. The same six frames
+can be given in code.
+
+### The one call: `FactorMarket`
+`FactorMarket(asset_history, factor_history, spec, generator='cvine'|'fleishman', central=None, n_pilot=50000)`
+- `fit()`: factor targets (history + `factors` + `factor_corr` + `add_factor`
+  for factors without history); generator fit; pilot draw; the rule for every
+  asset in `assets`; builds a `FactorModel` for simulation.
+- `report` (per asset: history, tag, counts of value/corr/fit/zero, source of
+  each moment, pairs, flags), `factor_report` (per factor: history, source of
+  each moment, given/completed correlations), `betas`, `model` (the FactorModel),
+  `market` (the factor generator).
+- `simulate(n, seed)` -> assets DataFrame, `.last_factors` the factor months;
+  `simulate_paths(n_paths, horizon, seed)`.
+- `check(X=None, n=25000, seed=0)` -> given vs simulated for factor moments and
+  correlations, asset moments (with source and Monte Carlo error), pairs.
+- `save(path)` / `load(path)`.
+`openpyxl` as optional extra `excel`.

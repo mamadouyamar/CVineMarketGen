@@ -31,6 +31,7 @@ dependencies = [
 test = ["pytest"]
 garch = ["arch"]
 blocks = ["statsmodels"]
+excel = ["openpyxl"]
 doc = ["sphinx", "sphinx_rtd_theme", "myst-nb", "ipykernel"]
 
 [project.urls]
