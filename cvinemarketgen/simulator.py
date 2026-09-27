@@ -34,13 +34,14 @@ import pandas as pd
 from scipy import stats
 
 from .factors import FactorModel, _newey_west_se
-from .functions import fit_johnson_su
+from .functions import fit_johnson_su, johnson_su_kurtosis_floor
 from .markets import CVineMarket, FleishmanMarket, Diagnostics
 from .paths import Paths
 from .targets import Targets, nearest_positive_definite
 
 _SHEETS = ('assets', 'tags', 'exposures', 'pairs', 'factors', 'factor_corr')
 _MOMENTS = ('mean', 'vol', 'skew', 'kurt')
+_SKEW_MAX, _KURT_MAX = 3.5, 40.0          # the residual shape the rule may ask for, at most (the floor at skew 3.5 is 33, below the kurtosis cap)
 
 
 def _frame(x, columns):
@@ -376,11 +377,18 @@ class FactorMarket:
                 resid[a] = e; samp_rvol[a] = float(np.std(e, ddof=1))
             # ---- step 2: volatility
             sys_var = float(b @ Sigma_f @ b); v = mom['vol']
-            if v ** 2 <= sys_var:
+            if v ** 2 <= sys_var * (1 + 1e-9):
                 contrib = pd.Series(b ** 2 * np.diag(Sigma_f), index=factors).sort_values(ascending=False)
                 top = ', '.join(f'{f} (beta {b[factors.index(f)]:.2f})' for f in contrib.index[:2] if contrib[f] > 0)
-                raise ValueError(f'asset {a!r}: the betas alone give a volatility of {np.sqrt(sys_var) * np.sqrt(per) * 100:.1f}% a year, '
-                                 f'above the target {v * np.sqrt(per) * 100:.1f}%; largest contributors {top}. Lower them or raise the volatility')
+                if msrc['vol'] == 'workbook':
+                    raise ValueError(f'asset {a!r}: the betas alone give a volatility of {np.sqrt(sys_var) * np.sqrt(per) * 100:.1f}% a year, '
+                                     f'above the target {v * np.sqrt(per) * 100:.1f}%; largest contributors {top}. Lower them or raise the volatility')
+                # the sample volatility is a fallback, not a target: the factor targets (a view on a correlation, on a volatility)
+                # can push the systematic variance above it; the asset then takes the systematic volatility, with a small residual, and a flag
+                v_new = float(np.sqrt(sys_var) * 1.02)
+                flags.append(f'volatility raised from the sample {v * np.sqrt(per) * 100:.1f}% to the systematic {v_new * np.sqrt(per) * 100:.1f}% a year '
+                             f'implied by the betas and the factor targets ({top})')
+                mom['vol'] = v = v_new; msrc['vol'] = 'systematic'
             sig_e = float(np.sqrt(v ** 2 - sys_var))
             # ---- step 3: shape by the cumulant rule
             sysr = P @ b; sd_s = sysr.std()
@@ -388,14 +396,28 @@ class FactorMarket:
             k4_sys = float(stats.kurtosis(sysr) * sd_s ** 4) if sd_s > 0 else 0.0
             k3_e = mom['skew'] * v ** 3 - k3_sys; k4_e = (mom['kurt'] - 3.0) * v ** 4 - k4_sys
             skew_e = k3_e / sig_e ** 3; kurt_e = 3.0 + k4_e / sig_e ** 4
-            floor = 3.1 + 2.0 * skew_e ** 2
+            share = sig_e ** 2 / v ** 2                                   # unexplained share of the variance
             exact_normal = abs(skew_e) < 1e-9 and abs(kurt_e - 3.0) < 1e-9
-            if kurt_e < floor and not exact_normal:
+            feasible = lambda sk, ku: abs(sk) <= _SKEW_MAX and ku <= _KURT_MAX and ku >= johnson_su_kurtosis_floor(sk)
+            if not exact_normal and not feasible(skew_e, kurt_e):
                 if msrc['skew'] == 'workbook' or msrc['kurt'] == 'workbook':
                     raise ValueError(f'asset {a!r}: the shape you gave (skew {mom["skew"]:.2f}, kurt {mom["kurt"]:.2f}) would need a residual '
-                                     f'with skew {skew_e:.2f} and kurt {kurt_e:.2f}, below the floor {floor:.2f}; the factors already carry '
-                                     f'skew {k3_sys / v ** 3:.2f} and excess kurtosis {k4_sys / v ** 4:.2f} of the asset')
-                flags.append(f'shape floored (residual kurt {kurt_e:.2f} -> {floor:.2f})'); kurt_e = floor
+                                     f'with skew {skew_e:.1f} and kurt {kurt_e:.1f}, which no Johnson SU has; the residual is only '
+                                     f'{100 * share:.0f}% of the variance and the factors already give the asset skew {k3_sys / v ** 3:.2f} and '
+                                     f'kurtosis {3 + k4_sys / v ** 4:.2f}. Give a shape closer to the factors\', or lower the exposures')
+                # nearest shape a Johnson SU has: the skewness is kept (capped), the kurtosis raised to the floor for that skewness
+                sk0, ku0 = skew_e, kurt_e
+                skew_e = float(np.clip(skew_e, -_SKEW_MAX, _SKEW_MAX))
+                fl = johnson_su_kurtosis_floor(skew_e)
+                kurt_e = float(min(max(kurt_e, fl), max(_KURT_MAX, fl)))
+                what = []
+                if abs(sk0) > _SKEW_MAX:
+                    what.append(f'skew {sk0:.1f} capped at {skew_e:.1f}')
+                if ku0 < kurt_e - 1e-9:
+                    what.append(f'kurt {ku0:.1f} raised to the floor {kurt_e:.1f}')
+                if ku0 > _KURT_MAX:
+                    what.append(f'kurt {ku0:.0f} capped at {kurt_e:.0f}')
+                flags.append(f'residual shape not reproducible ({100 * share:.0f}% of the variance): ' + ', '.join(what))
             p = fit_johnson_su(0.0, 3.1, mean=0.0, vol=sig_e) if exact_normal else fit_johnson_su(skew_e, kurt_e, mean=0.0, vol=sig_e)
             # ---- step 5: mean (pairs are set after every asset is known)
             alpha[a] = float(mom['mean'] - b @ mu_f)

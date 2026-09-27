@@ -24,7 +24,7 @@ def _spec():
     return MarketSpec(
         assets=pd.DataFrame({'ticker': ['A', 'B', 'C', 'PC', 'Cash'], 'tag': ['eqcredit', 'eqcmd', 'eq', 'private', None],
                              'mean': [np.nan, 0.05, np.nan, 0.07, 0.02], 'vol': [np.nan, np.nan, 0.20, 0.14, 0.01],
-                             'skew': [np.nan, np.nan, -1.0, -0.8, np.nan], 'kurt': [np.nan, np.nan, 8.0, 6.0, np.nan]}),
+                             'skew': [np.nan, np.nan, -1.0, -0.8, np.nan], 'kurt': [np.nan, np.nan, 8.0, 9.0, np.nan]}),
         tags=pd.DataFrame({'tag': ['eqcredit', 'eqcmd', 'eq', 'private'], 'eq': ['fit', 'fit', 1.0, 0.2], 'credit': [0.5, np.nan, np.nan, 0.6],
                            'cmd': [np.nan, 'fit', np.nan, np.nan], 'illiq': [np.nan, np.nan, np.nan, 0.5]}),
         exposures=pd.DataFrame({'ticker': ['B'], 'factor': ['eq'], 'beta': [np.nan], 'corr': [0.4]}),
@@ -75,7 +75,7 @@ def test_refusals_name_the_cause():
     with pytest.raises(ValueError, match='betas alone'):
         FactorMarket(R, F, spec=sp, generator='fleishman').fit()
     sp = _spec(); sp.assets.loc[sp.assets['ticker'] == 'C', 'kurt'] = 4.0              # a shape the residual cannot carry
-    with pytest.raises(ValueError, match='below the floor'):
+    with pytest.raises(ValueError, match='no Johnson SU has'):
         FactorMarket(R, F, spec=sp, generator='fleishman').fit()
     sp = _spec(); sp.tags.loc['private', 'eq'] = 'fit'                                  # fit without a history
     with pytest.raises(ValueError, match='give values'):
@@ -92,7 +92,7 @@ def test_shape_floor_is_flagged_not_refused_for_sample_shapes():
     R, F = _universe()
     R = R.copy(); R['C'] = 0.9 * F['eq'] + 0.02 * np.random.default_rng(3).uniform(-1.7, 1.7, len(F))   # platykurtic residual
     m = FactorMarket(R, F, generator='fleishman').fit()
-    assert 'shape floored' in m.report.loc['C', 'flags']
+    assert 'raised to the floor' in m.report.loc['C', 'flags']
 
 
 def test_workbook_roundtrip_and_persistence():
@@ -117,3 +117,15 @@ def test_cvine_generator_with_a_synthetic_factor():
     X = m.simulate(20000, seed=1)
     assert list(m.last_factors.columns) == ['eq', 'credit', 'cmd', 'illiq'] and X.shape == (20000, 5)
     assert abs(m.last_factors['illiq'].corr(m.last_factors['eq']) - 0.35) < 0.03
+
+
+def test_factor_view_that_exceeds_a_sample_volatility_is_flagged_not_refused():
+    R, F = _universe()
+    R = R.copy(); R['D'] = 1.0 * F['eq'] - 1.0 * F['credit'] + 0.005 * np.random.default_rng(5).standard_normal(len(F))   # long eq, short credit
+    sp = MarketSpec(factor_corr=pd.DataFrame({'factor_1': ['eq'], 'factor_2': ['credit'], 'corr': [-0.6]}))          # a view that raises D's systematic variance
+    m = FactorMarket(R, F, spec=sp, generator='fleishman').fit()
+    assert 'volatility raised' in m.report.loc['D', 'flags'] and m.report.loc['D', 'vol source'] == 'systematic'
+    sp2 = MarketSpec(assets=pd.DataFrame({'ticker': ['D'], 'vol': [R['D'].std() * np.sqrt(12)]}),
+                     factor_corr=pd.DataFrame({'factor_1': ['eq'], 'factor_2': ['credit'], 'corr': [-0.6]}))
+    with pytest.raises(ValueError, match='betas alone'):                                                              # the same volatility, given: refused
+        FactorMarket(R, F, spec=sp2, generator='fleishman').fit()

@@ -38,6 +38,26 @@ def _jsu_shape(gamma, delta):
     return skew, exk
 
 
+def johnson_su_kurtosis_floor(skew):
+    """
+    The smallest raw kurtosis a Johnson SU can have at a given skewness, with a small
+    margin. The family's lower boundary is the lognormal line, ``skew = (w + 2) sqrt(w - 1)``,
+    ``kurt = w^4 + 2 w^3 + 3 w^2 - 3``; the floor is that kurtosis plus 5 percent of its
+    excess plus 0.1, and never below ``3.1 + 2 skew^2`` (the convention of the marginal fit).
+    """
+    a = abs(float(skew))
+    lo, hi = 1.0, 1.0 + max(1.0, a) ** 2 + 2.0
+    for _ in range(80):                                # bisection on w: (w + 2) sqrt(w - 1) is increasing
+        w = 0.5 * (lo + hi)
+        if (w + 2.0) * np.sqrt(w - 1.0) < a:
+            lo = w
+        else:
+            hi = w
+    w = 0.5 * (lo + hi)
+    k_ln = w ** 4 + 2.0 * w ** 3 + 3.0 * w ** 2 - 3.0
+    return max(3.1 + 2.0 * a ** 2, k_ln + 0.05 * (k_ln - 3.0) + 0.1)
+
+
 _JSU_SHAPE_STARTS = ((0.0, 1.5), (-0.5, 1.2), (0.5, 1.2), (0.0, 3.0), (-2.0, 2.0), (2.0, 2.0), (0.0, 0.8), (-1.0, 0.6), (1.0, 0.6), (-4.0, 1.5), (4.0, 1.5))
 
 
@@ -94,9 +114,9 @@ def fit_johnson_su(skew, kurt, mean=0.0, vol=1.0):
             return {'gamma': float(p[0]), 'xi': float(p[1]), 'delta': float(p[2]), 'lambda': float(p[3]),
                     'mean': float(mean), 'vol': float(vol), 'residual': float(mism)}
     best = None
-    for x0 in _JSU_STARTS:
+    for x0 in _JSU_STARTS[:3]:                                        # fallback, rarely reached: shapes the two-parameter solve could not reach
         res = minimize(_mm.univariate_moments_matching_func_JSU, x0, args=([target],), method='Nelder-Mead',
-                       tol=1e-10, options={'maxfev': 20000, 'xatol': 1e-10, 'fatol': 1e-14})
+                       tol=1e-10, options={'maxfev': 5000, 'xatol': 1e-10, 'fatol': 1e-14})
         with np.errstate(all='ignore'):
             mism = float(np.linalg.norm(np.asarray(_mm.moments_JSU(res.x), float) - target))
         if np.isfinite(mism) and res.x[2] > 0 and res.x[3] > 1e-6 and (best is None or mism < best[0]):
