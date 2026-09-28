@@ -78,3 +78,14 @@ def test_gof_bootstrap_jsu_innovation_and_gof_criterion():
     c = ad.candidates
     assert {'cvm', 'gof_pvalue', 'passed'} <= set(c.columns) and c['gof_pvalue'].notna().all() and len(c) == 2
     assert ad.report.iloc[0]['n_candidates'] == 2
+
+
+def test_cvm_statistic_matches_genhmm1d_sn1d():
+    """Our Cramer-von Mises statistic is GenHMM1d's Sn1d, which is Algorithm 3.B.1 of Remillard (2013)."""
+    import pytest
+    genhmm = pytest.importorskip('genhmm1d.hmm')
+    import numpy as np
+    from cvinemarketgen.selection import cvm_statistic
+    rng = np.random.default_rng(0)
+    for u in (rng.uniform(size=200), rng.beta(2, 5, size=300), np.sort(rng.uniform(size=50))):
+        assert abs(cvm_statistic(u) - float(genhmm.HMM().Sn1d(np.asarray(u, float)))) < 1e-10

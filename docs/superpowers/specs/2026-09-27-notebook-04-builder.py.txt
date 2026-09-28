@@ -9,8 +9,8 @@ READINGS = {
  "READ_STEP1": "**What the tests say.** Nothing to predict in the level: the Ljung-Box\n$p$-value on the returns is 0.48, and the bars in the left panel stay inside\nthe band. Everything to predict in the size: 0.0001 on the squares and 0.001\nfor ARCH-LM, and the right panel is outside the band for the first four lags.\n\nSo the filter has one job. It has to take the size out, and it can leave the\nlevel alone.",
  "READ_GARCH": "**What the fit says.** Persistence 0.80, which puts the half-life of a shock\nat about three months, and an unconditional volatility of 16.3 percent a year\nagainst 16.1 in the sample. The fitted volatility runs from 10 percent in the\ncalm stretches to above 40 in late 2008.\n\nThe error is what matters. Its three $p$-values are 0.87, 0.53 and 0.60,\nagainst 0.48, 0.0001 and 0.001 for the returns. What was in the squares is\ngone. The filter did its one job.",
  "READ_HMM": "**What the fit says.** Two regimes: one at $-0.4$ percent a year with a\nvolatility of 21, one at 16 percent a year with a volatility of 8. Both last\nabout ten months. That is a crisis state and a normal state, and the picture\nshows the chain sitting in the first one through 2008, 2020 and 2022.\n\nThree regimes fit something else. The middle state is the normal one, but the\nother two last 2.5 and 1.2 months and have means of $-57$ and $+93$ percent a\nyear. Those are not volatility states, they are outlier catchers: with twelve\nparameters on 230 months, the likelihood is maximised by putting a state on a\nhandful of extreme months.\n\nThat shows up in the error. The Rosenblatt transform divides out the model's\npredictive variance, so a variance that spikes for one month and reverts does\nnot track the long turbulent stretches of 2008, 2020 and 2022, and they stay\nin the error: ARCH-LM gives 0.028, a rejection at 5 percent, and the squares\n0.056, on the line. The two-regime error is clear on all three, 0.71, 0.58\nand 0.56.",
- "READ_GOF": "**What the test says.** Two of the three pass. The GARCH with the error it\nwill actually simulate has a $p$-value of 0.16: its uniforms are as far from\nflat as 16 percent of the series the fitted model generates itself. The\ntwo-regime hidden Markov model passes at 0.33.\n\nThe same GARCH with a Gaussian error is rejected outright, $p = 0.00$. The\nmiddle histogram shows why: too much mass in the lowest bin, too little in\nthe highest, which is a skewness of $-0.67$ that no normal can carry. The\nfilter is right and the error's distribution is wrong, and that is enough to\nreject the pair.\n\nOne caveat carries into the next step. The statistic looks at the\n*distribution* of the uniforms, not at their order in time. A model whose\nerror is still clustered can pass it if the marginal is right. That is why\nthe table below keeps the three diagnostics next to the test.",
- "READ_SELECT": "**What the table says.** Twenty-seven of the twenty-eight pass. The only\nrejection is the three-regime hidden Markov model at 0.04, the model that\nfitted a 1.2-month regime, and it fails the diagnostics on the squares too.\n\nThe two constant-variance models pass the test at 0.30 and 0.18 while their\nsquared errors are autocorrelated at $p = 0.000$. That is the caveat of the\nprevious step in one line: the Johnson SU absorbs their kurtosis, so their\nuniforms look flat, and only the diagnostics see that the ordering is wrong.\nThe BIC puts them last anyway, 38 units behind.\n\nThe winner is the GJR(1,1) with a constant mean. It beats the plain GARCH by\n14.5 units of BIC for one extra parameter, which costs 5.4, so the asymmetry\nterm earns its place: $\\alpha$ is zero and $\\gamma$ is 0.45, meaning only\nfalls raise next month's variance. The two-regime hidden Markov model is\neleventh, 20 units behind, and passes everything, so the next step keeps it\nas the alternative description.",
+ "READ_GOF": "**What the test says.** Two of the three pass. The GARCH with the error it\nwill actually simulate has a $p$-value of 0.16: its uniforms are as far from\nflat as 16 percent of the series the fitted model generates itself. The\ntwo-regime hidden Markov model passes at 0.33.\n\nThe same GARCH with a Gaussian error is rejected outright, $p = 0.00$. The\nmiddle histogram shows why: too much mass in the lowest bin, too little in\nthe highest, which is a skewness of $-0.67$ that no normal can carry. The\nfilter is right and the error's distribution is wrong, and that is enough to\nreject the pair.\n\nOne caveat carries into the next section. The statistic looks at the\n*distribution* of the pseudo-observations, not at their order in time. A\nmodel whose error is still clustered can pass it if the marginal is right.",
+ "READ_SELECT": "**What the table says.** Twenty-seven of the twenty-eight are admissible. The\nonly rejection is the three-regime hidden Markov model at 0.04, the model\nthat spent two of its states on a handful of outliers.\n\nAmong the twenty-seven the BIC decides, and it takes the GJR(1,1) with a\nconstant mean. It beats the plain GARCH by 14.5 units for one extra\nparameter, which costs 5.4, so the asymmetry term earns its place: $\\alpha$ is\nzero and $\\gamma$ is 0.45, so only falls raise next month's variance. The\ntwo-regime hidden Markov model is eleventh, 20 units behind, and admissible,\nso the next section keeps it as the alternative description.\n\nTwo constant-variance models are admissible as well, at 0.30 and 0.18. That\nis a fact about the test, not about them: it compares the distribution of the\npseudo-observations with the uniform and never looks at their order in time,\nso a model that leaves the clustering in its error can still pass. The BIC\nputs them last anyway, 38 units behind.",
  "READ_PATHS": "**What the paths say.** The two-year volatility is 23 percent for the GJR\nagainst 22 in the history, 28 for the hidden Markov model and 27 for\nindependent draws. The GJR is closest because it starts from the calm\nvariance of mid-2026, which holds its first months down. The hidden Markov\nmodel is wide for a different reason: its two regimes are 16 percentage\npoints apart in mean, so a path that stays in one of them for two years ends\nfar from a path that stays in the other.\n\nThe autocorrelation of the squares is 0.07 and 0.03 along the paths against\n0.31 in the history. Both are too low, and the history's 0.31 is one episode,\n2008 to 2009, measured over 230 months; the path figure is measured over 24.\n\n**The kurtosis column is a warning, not a result.** The GJR paths pool to 19\nagainst 4.6 in the history, but the median path has a kurtosis of 2.8 and the\n95th percentile 5.3. The pooled figure comes from a few explosive paths: 6\npercent of them contain a month worse than the worst in the sample, and the\nlargest simulated month is 89 percent.\n\nThe second table says why. The fourth-moment condition of this model is 1.02,\njust above one, so its unconditional kurtosis is infinite and any pooled\nestimate grows with the number of paths. The persistence of 0.85 is not the\nproblem; the size of $\\gamma$ is. Neither the likelihood nor the\ngoodness-of-fit test can see this, because both look at 230 standardized\nerrors and this is a property of the recursion. The hidden Markov model, whose\nvariance is bounded in each state, pools to 5.4.\n\nIf you use the paths, compute that condition and count the paths that exceed\nthe worst observed month. Notebook 05 returns to it with seven factors\nrunning at once.",
  "READ_DAILY": "**What the daily data say.** The test discriminates here. Ten of the\ntwenty-seven pass and every one of them is a GJR; the best GARCH without the\nasymmetry term is rejected at $p = 0.00$ despite a BIC only 190 units worse.\nDay to day, the fall-raises-variance effect is not a refinement, it is what\nthe data insist on. The winner is again the GJR(1,1) with a constant mean,\n$\\gamma = 0.22$ and $\\beta = 0.86$, a persistence of 0.97 and a shock\nhalf-life of about a month of trading days.\n\nOn the paths the model does the trader's job. The autocorrelation of the\nsquares is 0.17 along a path against 0.25 in the history and $-0.01$ for\nindependent draws: the clustering survives the inversion. The median worst\nday of a year is $-3.9$ percent against $-3.8$ in the rolling history, where\nindependent draws give $-5.2$. Without clustering the fat tail spends its\nextreme days at random and every year gets one; with clustering the extreme\ndays arrive together and most years get none.\n\nThe one-year volatility is 18.8 against 16.8 and the 5 percent quantile\n$-23.5$ against $-19.1$: too wide, for the reason above. The fourth-moment\ncondition here is 1.07 and the pooled kurtosis 47 against 17. A year of daily\nsteps gives the recursion 252 chances to run away, so the check matters more\nhere than at the monthly frequency.",
  "READ_SAVE": "**What the file holds.** The parameters, the last observed return and\nvariance, which is where a path starts, and the shape of the error, skewness\n$-0.67$ and kurtosis 3.47, which is what the Johnson SU is fitted to. The\nreloaded model reproduces the paths exactly, so the file is the object and\nnot a summary of it."
@@ -191,8 +191,8 @@ md(r"""
 
 **What this section is for.** Find out what the filter has to remove, before choosing one.
 
-Two questions, each a test, and the answers decide what the filter has to
-remove.
+Two questions, each a test. They decide what the filter has to remove. They
+are not the selection rule: that is section 6, and it uses one test only.
 
 *Is the level predictable from its past?* The autocorrelation of the returns,
 $\hat\rho_j = \sum_t (r_t - \bar r)(r_{t-j} - \bar r) / \sum_t (r_t - \bar r)^2$,
@@ -367,23 +367,36 @@ md(r"""
 <a id="s6-1"></a>
 ### 6.1 The parametric-bootstrap goodness-of-fit test
 
-Passing the diagnostics says the error carries no predictable structure. It
-does not say the model's distribution is right, and the distribution is what
-a path is made of. The test is the one of the master's thesis (Thioub, 2019;
-GenHMM1d's `GofHMMGen`). Under the fitted model the uniforms of the
-generalized error, $v_t = G(\varepsilon_t)$ with $G$ the error's
-distribution, are i.i.d. uniform on $[0,1]$, and the Cramér-von Mises
-statistic measures their distance from uniformity,
+**This is the selection rule.** Everything before this section was
+exploration. From here one test, and only this one, decides which models are
+admissible.
+
+If the model is well specified, its generalized error is i.i.d., so the
+pseudo-observations $U_i = G(\varepsilon_i)$, with $G$ the error's own
+distribution, are i.i.d. uniform on $[0,1]$. The Cramér-von Mises statistic
+measures how far their empirical distribution function $D_n$ is from the
+uniform,
 
 $$
-W^2 = \frac{1}{12 n} + \sum_{t=1}^{n} \left( v_{(t)} - \frac{2t - 1}{2n} \right)^2,
+S_n \;=\; n \int_0^1 \{D_n(u) - u\}^2 \, du \;=\; \sum_{i=1}^{n} \left( U_{(i)} - \frac{i - 1/2}{n} \right)^2 + \frac{1}{12n},
 $$
 
-with $v_{(t)}$ the sorted uniforms. Its distribution once the parameters are
-estimated is not known in closed form, so it is bootstrapped: $B$ series of
-length $n$ are simulated from the fitted model, the model is refitted on each,
-the statistic is recomputed, and the $p$-value is the share of bootstrap
-statistics above the observed one.
+with $U_{(1)} < \dots < U_{(n)}$ the ordered pseudo-observations. Large values
+reject. Because the parameters are estimated, the null distribution of $S_n$
+depends on the family, so the $p$-value comes from a parametric bootstrap: $B$
+series of length $n$ are drawn from the fitted model, the model is *refitted*
+on each one, the statistic is recomputed, and
+
+$$
+p \;=\; \frac{1}{B} \sum_{k=1}^{B} \mathbf 1\{ S_n^{(k)} > S_n \} .
+$$
+
+This is Algorithm 3.B.2 of Rémillard (2013), *Statistical Methods for
+Financial Engineering*; for the hidden Markov model it is the test of the
+master's thesis (Thioub, 2019), which GenHMM1d implements as `GofHMMGen`. On
+this series the two give the same statistic, 0.0554. One code path is used
+for all the candidates here so that the 28 $p$-values are comparable, and a
+test pins its statistic to GenHMM1d's `Sn1d`.
 
 **What $G$ is decides what is tested.** For the hidden Markov model, $v_t$ is
 the Rosenblatt transform above, uniform by construction, and the bootstrap
@@ -444,29 +457,28 @@ print("the GARCH family grid, plus HMM(2) and HMM(3):", 2 * (1 + 3 * 4) + 2, "ca
 grid
 ''')
 md(r"""
-The rule has two steps, in this order.
+The rule is two steps and nothing else.
 
-1. **Goodness of fit.** The bootstrap test above on every candidate, with
-   $B = 100$. A candidate is admissible if its $p$-value is at least 5
-   percent, since a model whose simulated series do not look like the data
-   has not done its job, however high its likelihood.
-2. **Parsimony among the admissible.** The lowest Bayesian information
-   criterion,
+1. **Admissible:** the goodness-of-fit test above, on every candidate, with
+   $B = 100$. A candidate is admissible if its bootstrap $p$-value is at
+   least 5 percent. No other test enters.
+2. **Chosen:** among the admissible, the lowest BIC,
    $$\mathrm{BIC} = -2\,\ell + k \ln n,$$
    with $\ell$ the log-likelihood on the data's scale and $k$ the number of
    parameters, which charges each parameter $\ln n \approx 5.4$ units of
    log-likelihood.
 
-The order matters and it is not the usual one: the likelihood never gets to
-choose among models that the data reject. This is the rule of the master's
-thesis, and `select_dynamics(criterion='gof')` is it. It costs 2,800 refits,
-about twelve minutes here.
+The order is the point. The likelihood never chooses among models the data
+reject, and the test never ranks the models it accepts. The diagnostics of
+section 4 take no part in either step; `select_dynamics` reports them beside
+the result only so that a reader can look. That is
+`select_dynamics(criterion='gof')`, 2,800 refits, about eight minutes.
 """)
 code(r'''
 t0 = time.time()
 sel = select_dynamics(y.to_frame(), B=100, seed=0, verbose=False)
 best = sel.models["Equity DM"]
-cand = sel.candidates.sort_values("bic")[["model", "n_params", "bic", "gof_pvalue", "passed", "lb_z", "lb_z2", "arch_lm"]].reset_index(drop=True)
+cand = sel.candidates.sort_values("bic")[["model", "n_params", "bic", "gof_pvalue", "passed"]].reset_index(drop=True)
 print(f"{len(cand)} candidates fitted and tested in {time.time() - t0:.0f} s | selected {best.name} | passing the test: {int(cand['passed'].sum())}")
 cand.round(3)
 ''')
@@ -590,7 +602,7 @@ what makes the pattern visible.
 code(r'''
 t0 = time.time()
 sel_d = select_dynamics(D.to_frame(), states=(2,), B=50, seed=0, verbose=False)
-bd = sel_d.models["SPY"]; cd = sel_d.candidates.sort_values("bic")[["model", "n_params", "bic", "gof_pvalue", "passed", "lb_z", "lb_z2", "arch_lm"]]
+bd = sel_d.models["SPY"]; cd = sel_d.candidates.sort_values("bic")[["model", "n_params", "bic", "gof_pvalue", "passed"]]
 print(f"{len(cd)} candidates in {time.time() - t0:.0f} s | selected {bd.name} | passing the test: {int(cd['passed'].sum())} of {len(cd)}")
 pd.concat([cd[cd["passed"]].head(5), cd[~cd["passed"]].head(3)]).round(3).reset_index(drop=True)
 ''')
