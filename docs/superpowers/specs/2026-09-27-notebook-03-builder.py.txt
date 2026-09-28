@@ -1,8 +1,6 @@
 # Builds examples/03_many_assets_factors.ipynb: one worked case, eleven code blocks. Run from the repo root.
 import json, sys, os
 
-RENDERER = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'renderer.py')).read()
-
 cells = []
 def md(s): cells.append({"cell_type": "markdown", "metadata": {}, "source": s.strip("\n")})
 def code(s): cells.append({"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip("\n")})
@@ -32,7 +30,7 @@ md(r"""
 
 Each thing you can put in the workbook has its own short recipe in
 `examples/recipes/`. The derivations are in the methods note,
-`docs/methods-note.pdf`. Runtime: about four minutes, almost all of it one
+`docs/methods-note/methods-note.pdf`. Runtime: about four minutes, almost all of it one
 vine fit.
 """)
 
@@ -94,6 +92,7 @@ except ImportError:                        # Google Colab
 print("cvinemarketgen", cvinemarketgen.__version__)
 
 from cvinemarketgen import load_etf_monthly, load_factor_data, MarketSpec, FactorMarket
+from cvinemarketgen import show_workbook, show_sheet, show_change, sheet_view    # a workbook drawn as its sheets
 from scipy import stats
 import seaborn as sns
 A = lambda m: m * 1200                     # monthly mean -> percent a year
@@ -101,8 +100,7 @@ V = lambda v: v * np.sqrt(12) * 100        # monthly vol  -> percent a year
 INPUTS = os.path.join(ROOT, "examples", "inputs")
 def var_es(r, alpha=0.05):
     q = np.quantile(r, alpha); return -q, -r[r <= q].mean()
-
-''' + RENDERER)
+''')
 
 sec("s3", "3. The workbook", "Everything you know about your universe goes in one file.")
 md(r"""

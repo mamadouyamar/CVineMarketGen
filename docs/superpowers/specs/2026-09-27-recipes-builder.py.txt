@@ -99,7 +99,7 @@ def build(name, title, lead, toc, body):
 
 The whole universe in one file, fitted, checked and written out:
 [notebook 03](../03_many_assets_factors.ipynb). The derivations, the feasible
-shapes and the bounds: the methods note, `docs/methods-note.pdf`.
+shapes and the bounds: the methods note, `docs/methods-note/methods-note.pdf`.
 
 The other levers:
 
@@ -499,10 +499,10 @@ Well-explained assets have little room; assets the factors barely touch have
 almost the whole interval.
 """),
        ('code', r'''
-pd.DataFrame({"R2": sim.model.r2, "unexplained share 1 - R2": 1 - sim.model.r2, "half-width of a pair's range": np.sqrt(1 - sim.model.r2)}).round(2)
+pd.DataFrame({"R2": sim.model.r2, "unexplained share 1 - R2": 1 - sim.model.r2, "sqrt(1 - R2)": np.sqrt(1 - sim.model.r2)}).round(2)
 '''),
        ('md', r"""
-A pair's half-width is the product of the two in the last column: 0.12 for
+A pair's half-width is the product of the two last-column entries: 0.12 for
 SPY and QQQ, 0.28 for GLD and TLT.
 """),
        ('sec', ('s3', '3. What you give', 'One row in the pairs sheet.')),
