@@ -1,0 +1,54 @@
+"""Builds examples/inputs/universe_full.xlsx: one file holding every kind of knowledge."""
+import numpy as np, pandas as pd, sys, os
+sys.path.insert(0, os.getcwd())
+from cvinemarketgen import MarketSpec
+
+FACTORS = ["Equity DM", "Equity EM", "Real premia", "Inflation", "Credit", "Commodity", "Small cap", "Illiquidity"]
+TAGS = {
+    "equity_dm": ("XLK XLV XLI XLP XLY SPY DIA QQQ IWD IWF EFA EWJ EWG EWU EWQ EWL EWP EWI EWD EWN EWH EWS EPP", ["Equity DM"]),
+    "equity_dm_commodity": ("XLE XOP XLB EWA EWC", ["Equity DM", "Commodity"]),
+    "financials": ("XLF", ["Equity DM", "Real premia", "Credit"]),
+    "banks": ("KBE KRE", ["Equity DM", "Real premia", "Credit", "Small cap"]),
+    "rate_sensitive_equity": ("XLU VNQ PFF XHB ITB", ["Equity DM", "Real premia", "Credit"]),
+    "small_cap": ("SMH IBB XRT IWM IJR IWN IWO MDY", ["Equity DM", "Small cap"]),
+    "equity_em": ("EEM VWO EWY EWT FXI EWM", ["Equity DM", "Equity EM"]),
+    "equity_em_commodity": ("EWZ EWW", ["Equity DM", "Equity EM", "Commodity"]),
+    "treasury": ("TLT IEF IEI TLH SHY TIP", ["Real premia", "Inflation"]),
+    "aggregate_credit": ("AGG BND MBB LQD", ["Real premia", "Inflation", "Credit"]),
+    "high_yield": ("HYG", ["Real premia", "Inflation", "Credit", "Equity DM"]),
+    "precious_metals": ("GLD SLV", ["Real premia", "Inflation", "Commodity"]),
+    "gold_miners": ("GDX", ["Real premia", "Inflation", "Commodity", "Equity DM"]),
+    "commodity": ("DBC USO", ["Commodity", "Inflation"]),
+}
+assets = [{"ticker": t, "tag": tag} for tag, (tk, _) in TAGS.items() for t in tk.split()]
+tags = [{"tag": tag, **{f: ("fit" if f in fs else np.nan) for f in FACTORS}} for tag, (_, fs) in TAGS.items()]
+A = pd.DataFrame(assets)
+for col in ("mean", "vol", "skew", "kurt"):
+    A[col] = np.nan
+def put(ticker, **kw):
+    for k, v in kw.items(): A.loc[A["ticker"] == ticker, k] = v
+put("SPY", mean=0.07)                                   # an expected return of our own
+put("TLT", vol=0.14)                                    # a volatility of our own
+put("GLD", skew=-0.5, kurt=5.0)                          # a shape of our own
+A = pd.concat([A, pd.DataFrame([                         # two funds with no history at all
+    {"ticker": "Private credit", "tag": "private_credit", "mean": 0.07, "vol": 0.10},
+    {"ticker": "Multi-strategy", "tag": "multi_strategy", "mean": 0.06, "vol": 0.09, "skew": -0.6, "kurt": 5.5},
+])], ignore_index=True)
+T = pd.DataFrame(tags + [
+    {"tag": "private_credit", "Credit": 0.6, "Equity DM": 0.2, "Illiquidity": 0.5},
+    {"tag": "multi_strategy", "Equity DM": 0.2, "Credit": 0.3, "Illiquidity": 0.2},
+])[["tag"] + FACTORS]
+spec = MarketSpec(
+    assets=A, tags=T,
+    exposures=pd.DataFrame({"ticker": ["HYG", "HYG", "HYG", "GLD"],
+                            "factor": ["Credit", "Real premia", "Illiquidity", "Inflation"],
+                            "beta": [0.8, 0.5, 0.3, np.nan], "corr": [np.nan, np.nan, np.nan, 0.30]}),
+    pairs=pd.DataFrame({"ticker_1": ["KBE", "ITB", "EWA", "QQQ", "Multi-strategy"],
+                        "ticker_2": ["KRE", "XHB", "EPP", "XLK", "HYG"],
+                        "corr": [0.90, 0.85, 0.85, 0.85, 0.75]}),
+    factors=pd.DataFrame({"factor": ["Equity DM", "Illiquidity"], "mean": [0.05, 0.03], "vol": [np.nan, 0.06]}),
+    factor_corr=pd.DataFrame({"factor_1": ["Equity DM", "Illiquidity", "Illiquidity"],
+                              "factor_2": ["Real premia", "Equity DM", "Credit"], "corr": [-0.30, 0.35, 0.45]}))
+spec.write("examples/inputs/universe_full.xlsx")
+print(f"universe_full.xlsx: {len(A)} assets ({int(A['mean'].notna().sum())} with a mean, {int(A['vol'].notna().sum())} with a volatility), "
+      f"{len(T)} tags, {len(spec.exposures)} exposure rows, {len(spec.pairs)} pairs, {len(spec.factors)} factor rows, {len(spec.factor_corr)} factor correlations")
