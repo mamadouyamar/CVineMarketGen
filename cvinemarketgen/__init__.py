@@ -9,6 +9,7 @@ from .markets import FleishmanMarket, CVineMarket, Diagnostics, partial_correlat
 from .paths import Paths, price_level, deflate, yoy
 from .factors import FactorModel
 from .simulator import MarketSpec, FactorMarket
+from .excel_view import show_workbook, show_sheet, show_change, sheet_view, draw_sheet
 from .dynamics import AR1, AR1GARCH, AssetDynamics, GarchFamily, parse_spec
 from .selection import select_dynamics, iid_tests, gof_bootstrap
 from .hmm import GaussianHMM
@@ -19,7 +20,7 @@ from .yieldcurve import NelsonSiegel, PCACurve, curve_returns, bond_price, par_y
 from .functions import (fit_johnson_su, johnson_su_moments, johnson_su_sample, fit_fleishman,
                         exceedance_curve, classify_pair, select_family, tail_asymmetry_test, johnson_su_cdf, johnson_su_from_normal, johnson_su_kurtosis_floor)
 
-__all__ = ['Targets', 'FleishmanMarket', 'CVineMarket', 'Diagnostics', 'Paths', 'price_level', 'deflate', 'yoy', 'FactorModel', 'MarketSpec', 'FactorMarket', 'AR1', 'AR1GARCH',
+__all__ = ['Targets', 'FleishmanMarket', 'CVineMarket', 'Diagnostics', 'Paths', 'price_level', 'deflate', 'yoy', 'FactorModel', 'MarketSpec', 'FactorMarket', 'show_workbook', 'show_sheet', 'show_change', 'sheet_view', 'draw_sheet', 'AR1', 'AR1GARCH',
            'AssetDynamics', 'GarchFamily', 'GaussianHMM', 'BlockVECM', 'BlockVAR', 'Structural', 'Bridge', 'growth_to_level', 'recession_probability', 'NelsonSiegel', 'PCACurve', 'curve_returns', 'bond_price', 'par_yield', 'parse_spec', 'select_dynamics', 'iid_tests', 'gof_bootstrap',
            'fit_johnson_su', 'johnson_su_moments', 'johnson_su_sample', 'johnson_su_cdf', 'johnson_su_from_normal', 'johnson_su_kurtosis_floor', 'fit_fleishman', 'complete_correlation',
            'exceedance_curve', 'classify_pair', 'select_family', 'tail_asymmetry_test', 'partial_correlations',

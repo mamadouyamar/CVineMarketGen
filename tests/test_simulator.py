@@ -170,3 +170,22 @@ def test_a_factor_correlation_is_solved_against_the_asset_own_volatility():
     sp2 = MarketSpec(exposures=pd.DataFrame({'ticker': ['A'], 'factor': ['credit'], 'beta': [np.nan], 'corr': [0.99]}))
     with pytest.raises(ValueError, match='not attainable while its volatility cell is empty'):
         FactorMarket(R, F, spec=sp2, generator='fleishman').fit()
+
+
+def test_excel_view_draws_a_sheet_with_the_file_row_numbers():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from cvinemarketgen.excel_view import draw_sheet, show_workbook, show_change, informative
+    sp = MarketSpec(assets=pd.DataFrame({'ticker': ['A', 'B', 'C'], 'tag': ['x', 'y', 'z'], 'mean': [np.nan, 0.07, np.nan]}),
+                    tags=pd.DataFrame({'tag': ['x', 'y', 'z'], 'eq': ['fit', 'fit', np.nan]}))
+    fig, ax = plt.subplots()
+    draw_sheet(ax, sp.assets, 'assets')
+    text = [c.get_text().get_text() for c in ax.tables[0].get_celld().values()]
+    assert 'ticker' in text and 'A' in text and '2' in text and '4' in text       # header row 1, then the file's rows 2..4
+    assert '' in text and 'nan' not in text                                       # an empty cell is empty
+    plt.close(fig)
+    assert list(informative(sp.assets, 1)['ticker']) == ['B']                     # the row that carries the most
+    show_workbook(sp, max_rows=3)
+    show_change(sp.add('assets', {'ticker': 'A', 'mean': 0.05}), 'assets', {'ticker': 'A'})
+    plt.close('all')
