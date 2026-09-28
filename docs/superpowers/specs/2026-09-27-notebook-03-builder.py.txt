@@ -98,6 +98,11 @@ import seaborn as sns
 A = lambda m: m * 1200                     # monthly mean -> percent a year
 V = lambda v: v * np.sqrt(12) * 100        # monthly vol  -> percent a year
 INPUTS = os.path.join(ROOT, "examples", "inputs")
+WORKBOOK = os.path.join(INPUTS, "universe_full.xlsx")
+if not os.path.exists(WORKBOOK):                     # Google Colab: the repository is not on disk
+    import urllib.request
+    os.makedirs(INPUTS, exist_ok=True)
+    urllib.request.urlretrieve("https://raw.githubusercontent.com/mamadouyamar/CVineMarketGen/main/examples/inputs/universe_full.xlsx", WORKBOOK)
 def var_es(r, alpha=0.05):
     q = np.quantile(r, alpha); return -q, -r[r <= q].mean()
 ''')
@@ -124,7 +129,7 @@ it. An asset or factor with no history must have a mean and a volatility.
 Here is the file this notebook reads.
 """)
 code(r'''
-spec = MarketSpec.read(os.path.join(INPUTS, "universe_full.xlsx"))
+spec = MarketSpec.read(WORKBOOK)
 show_workbook(spec, max_rows=5)
 ''')
 md("""Five of the seventy asset rows hold a target: a mean on SPY, a volatility on

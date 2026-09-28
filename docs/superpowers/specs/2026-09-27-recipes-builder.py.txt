@@ -33,7 +33,13 @@ from cvinemarketgen import load_etf_monthly, load_factor_data, MarketSpec, Facto
 FACTORS = ["Equity DM", "Equity EM", "Real premia", "Inflation", "Credit", "Commodity"]
 A = lambda m: m * 1200                               # monthly mean -> percent a year
 V = lambda v: v * np.sqrt(12) * 100                  # monthly vol  -> percent a year
-spec = MarketSpec.read(os.path.join(ROOT, "examples", "inputs", "recipe_base.xlsx"))
+INPUTS = os.path.join(ROOT, "examples", "inputs")
+BASE = os.path.join(INPUTS, "recipe_base.xlsx")
+if not os.path.exists(BASE):                         # Google Colab: the repository is not on disk
+    import urllib.request
+    os.makedirs(INPUTS, exist_ok=True)
+    urllib.request.urlretrieve("https://raw.githubusercontent.com/mamadouyamar/CVineMarketGen/main/examples/inputs/recipe_base.xlsx", BASE)
+spec = MarketSpec.read(BASE)
 tick = list(spec.assets["ticker"])
 R = load_etf_monthly(tick, start="2007-04", cache=os.path.join(ROOT, "data", "etf_cache_universe.csv"))[tick]
 F = load_factor_data(cache=os.path.join(ROOT, "data", "factors_cache.csv"))[FACTORS]
