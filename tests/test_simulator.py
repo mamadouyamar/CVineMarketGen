@@ -154,6 +154,8 @@ def test_add_edits_a_row_in_place_and_keeps_its_cells():
     assert list(sp3.assets['ticker']) == ['A', 'B', 'C', 'D'] and sp3.assets.loc[1, 'vol'] == 0.2
     sp4 = sp3.add('tags', pd.DataFrame({'tag': ['y'], 'credit': [0.5]}))        # a new column on an existing tag
     assert list(sp4.tags.index) == ['x', 'y', 'z'] and sp4.tags.loc['y', 'credit'] == 0.5 and sp4.tags.loc['y', 'eq'] == 'fit'
+    sp4b = sp4.add('assets', {'ticker': 'B', 'mean': 0.04})                     # one row, given as a dict
+    assert list(sp4b.assets['ticker']) == ['A', 'B', 'C', 'D'] and sp4b.assets.loc[1, 'mean'] == 0.04 and sp4b.assets.loc[1, 'vol'] == 0.2
     sp5 = sp4.add('exposures', pd.DataFrame({'ticker': ['A'], 'factor': ['eq'], 'beta': [0.8]}))
     sp5 = sp5.add('exposures', pd.DataFrame({'ticker': ['A'], 'factor': ['eq'], 'beta': [1.0]}))
     assert len(sp5.exposures) == 1 and sp5.exposures.loc[0, 'beta'] == 1.0      # the same pair is one row, edited

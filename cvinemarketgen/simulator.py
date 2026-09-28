@@ -179,7 +179,7 @@ class MarketSpec:
 
     def add(self, sheet, rows):
         """
-        A copy with ``rows`` (a DataFrame or a list of dicts) written into ``sheet``.
+        A copy with ``rows`` (a dict, a list of dicts or a DataFrame) written into ``sheet``.
 
         A row whose key is already in the sheet is *edited in place*: the values given
         are written into that row's cells, the cells not given are left as they are, and
@@ -189,6 +189,8 @@ class MarketSpec:
         """
         if sheet not in _SHEETS:
             raise ValueError(f'unknown sheet {sheet!r}')
+        if isinstance(rows, dict):
+            rows = [rows]                                           # one row, given as a dict
         new = self.copy()
         add = pd.DataFrame(rows).copy()
         key = SHEET_KEY[sheet]
