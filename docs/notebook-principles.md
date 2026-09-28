@@ -1,13 +1,25 @@
 # How the notebooks of this course are written
 
-The rules below were settled while writing notebook 03 and hold for every
-notebook of the series, 01, 02 and 04 onward. They are not style preferences.
+Two parts: how a notebook is built, and how its sentences are written. The
+rules were settled while writing notebooks 03 and 04, and hold for every
+notebook of the series. They are not style preferences.
 Each one exists because breaking it produced a notebook that misled a reader,
 and several of them caught defects in the package itself.
 
 A notebook is read by an analyst who will act on it: an asset manager, a
 trader, a structurer, a risk manager, an econometrician. They are competent
 and impatient. They will not read a paragraph to find out what a table is.
+
+**Size.** The published examples in this field run ten to twenty code blocks
+and a runtime in seconds. A tutorial that has grown past about twenty-five is
+doing more than one job: the worked case belongs in the notebook, the recipes
+in a gallery of standalone pages, the derivations in the methods note. Nothing
+inside a notebook chains state across sections; each section can be read on
+its own.
+
+---
+
+# How to build a notebook
 
 ---
 
@@ -148,6 +160,67 @@ a check that reloading reproduces them exactly.
 
 ---
 
+# How to write the sentences
+
+Measured against the published notebooks in this field: skfolio's example
+gallery, Riskfolio-Lib's numbered tutorials, the `arch` documentation. Their
+prose is a manual's. Ours drifted into an essay's. The rules below close that
+gap, and each one names the habit it replaces.
+
+## S1. Announce a code block in fifteen words or fewer
+
+skfolio: *"Let's generate 10,000 synthetic returns from the vine copula
+model."* Ten words, one verb.
+
+Not an inventory of what the cell contains. If the sentence lists the objects
+the cell will print, the reader reads the list and then reads the same list
+again in the output.
+
+## S2. Comment a result in four sentences or fewer
+
+skfolio, under a plot: *"We notice that the conditioning has been respected
+and has impacted the other assets following the vine structure. This allows
+the creation of Stress Tests that are both extreme and plausible."* Thirty
+words.
+
+State the fact, then its consequence. Stop. A reading of two hundred words
+buries the one number that mattered. Where a result needs more, the extra
+belongs in the methods note, not under the table.
+
+## S3. Do not rank your own paragraphs
+
+Banned: "the useful part", "this needs its own explanation", "the reader
+should slow down here", "is a warning, not a result", "worth knowing".
+Telling the reader how to feel about a number is not information. Write the
+number and what follows from it, and let it carry its own weight.
+
+## S4. Use a plain voice
+
+"We fit", "the model gives", the imperative. Not "one caveat governs the next
+step", not "the reader will notice". Present tense, subject then verb then
+object.
+
+## S5. Bold marks a term, not the start of a paragraph
+
+A bold label on every cell stops being structure and becomes a tic. Keep it
+where it marks a repeated slot a reader navigates by, and nowhere else.
+
+## S6. Justify nowhere but the user guide and the methods note
+
+A tutorial says what the rule is and shows it working. It does not argue for
+it. Every "this is why the order is not the usual one" is a sentence that
+belongs somewhere else, and its absence makes the notebook shorter and the
+argument easier to find.
+
+## S7. Keep the judgment, cut the rhetoric
+
+Published examples rarely say when a method fails. A course that teaches
+judgment must: the infinite kurtosis, the shape that will not land closer
+than two tenths, the copula that cannot be identified. These are the most
+valuable sentences in the course. Three of them, not fifteen.
+
+---
+
 ## The shape of a notebook
 
 1. **The problem.** What the reader needs and why it is hard.
@@ -180,3 +253,20 @@ a check that reloading reproduces them exactly.
 - [ ] Every promise in the prose produced by a cell.
 - [ ] The whole notebook re-read after the last semantic change.
 - [ ] Runtime stated in the opening if it exceeds a minute.
+- [ ] Every code block announced in fifteen words or fewer; every result
+      commented in four sentences or fewer.
+- [ ] No sentence ranking another paragraph's importance; no justification
+      that belongs in the user guide or the methods note.
+
+---
+
+## Sources for the style
+
+- skfolio's example gallery, in particular *Vine Copula & Stress Test*:
+  fifteen short sections, ten code blocks, ten seconds of runtime, standalone.
+  <https://skfolio.org/auto_examples/index.html>
+- Riskfolio-Lib, fifty-eight numbered standalone tutorials, one topic each.
+  <https://github.com/dcajasn/Riskfolio-Lib/tree/master/examples>
+- The `arch` documentation, *ARCH Modeling*: thirteen sections, twenty code
+  blocks, one to five sentences of prose between them.
+  <https://arch.readthedocs.io/en/latest/univariate/univariate_volatility_modeling.html>
