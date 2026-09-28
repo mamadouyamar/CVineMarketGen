@@ -37,6 +37,21 @@ def check(path):
         if i and cells[i - 1]['cell_type'] == 'markdown':
             ss = sentences(''.join(cells[i - 1]['source']))
             if ss and words(ss[-1]) > 20: bad.append(f'cell {i}: announcement of {words(ss[-1])} words')
+    for i, c in enumerate(cells):                          # myst-nb reads $$ inside a paragraph as inline math
+        if c['cell_type'] != 'markdown':
+            continue
+        lines = ''.join(c['source']).split('\n')
+        inside = False
+        for k, ln in enumerate(lines):
+            if ln.strip() != '$$':
+                continue
+            if not inside and k and lines[k - 1].strip():
+                bad.append(f'cell {i}: display $$ opens after a non-blank line')
+            if inside and k + 1 < len(lines) and lines[k + 1].strip():
+                bad.append(f'cell {i}: display $$ closes before a non-blank line')
+            inside = not inside
+        if inside:
+            bad.append(f'cell {i}: unclosed $$')
     ss = sentences(text)
     long = [s for s in ss if words(s) > 40]
     banned = [b for b in ('the useful part', 'worth knowing', 'the reader should', 'needs its own explanation',
