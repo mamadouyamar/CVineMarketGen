@@ -17,6 +17,20 @@ in a gallery of standalone pages, the derivations in the methods note. Nothing
 inside a notebook chains state across sections; each section can be read on
 its own.
 
+**The three places.** A *course notebook* is one worked case, read in order,
+motivated by what the previous notebook could not do. A *recipe* is one page
+per lever: six to eight code blocks, a runtime of seconds, no dependence on
+any other page, and it ends on the refusal that marks the lever's boundary. The
+*methods note* carries every derivation, every bound and every proof, so that a
+notebook can state a rule and show it working without arguing for it. A
+sentence that justifies belongs there; a sentence that demonstrates belongs in
+a notebook.
+
+**The shape of a recipe.** The base (the same file for every recipe, nothing
+imposed), the mathematics of the lever, what you give drawn as the sheet, what
+the simulator does with it, the check against the simulation, and what is
+refused. Six sections, one screen of prose each.
+
 ---
 
 # How to build a notebook
@@ -205,6 +219,11 @@ object.
 A bold label on every cell stops being structure and becomes a tic. Keep it
 where it marks a repeated slot a reader navigates by, and nowhere else.
 
+The purpose line under a heading is a sentence, not a label: *"Eight funds, six
+factors, nothing imposed."*, not *"**What this section is for.** Eight
+funds..."*. A reading under a table opens with the fact, not with *"**What the
+table says.**"*.
+
 ## S6. Justify nowhere but the user guide and the methods note
 
 A tutorial says what the rule is and shows it working. It does not argue for
@@ -240,6 +259,13 @@ valuable sentences in the course. Three of them, not fifteen.
 10. **What this misses, and what comes next.**
 
 ## Before committing a notebook
+
+The mechanical half of this list is a script, kept beside the design notes as
+`docs/superpowers/specs/2026-09-27-notebook-checklist.py.txt`: it counts the
+cells, the code blocks and the words, resolves every link against an anchor,
+and fails on a code cell with no output or no sentence above it, an
+announcement over twenty words, a sentence over forty, a cell emitting more
+than two exhibits, and the banned phrases of S3. Run it before every commit.
 
 - [ ] Executed end to end, no errors, outputs in the file.
 - [ ] Contents at the top, every section numbered and anchored, a link back

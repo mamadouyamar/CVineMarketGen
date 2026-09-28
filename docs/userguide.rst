@@ -318,13 +318,16 @@ The simulator for a universe
 
 .. code-block:: python
 
-   spec = MarketSpec.read('universe_inputs.xlsx')             # six sheets: assets, tags, exposures, pairs, factors, factor_corr
+   spec = MarketSpec.read('universe_full.xlsx')               # six sheets: assets, tags, exposures, pairs, factors, factor_corr
+   show_workbook(spec)                                        # the file drawn as the Excel sheets it is
    sim = FactorMarket(asset_returns, factor_returns, spec, generator='cvine', central='Equity DM').fit()
    sim.report                                                 # per asset: history?, tag, betas by state, source of each moment, pairs, flags
    sim.factor_report                                          # per factor: history?, source of each moment, correlations given / completed
    X = sim.simulate(25000, seed=1); Fs = sim.last_factors     # scenario months, and the factor months behind them
    chk = sim.check(X)                                         # given vs simulated: factors, assets (with source and MC error), pairs
-   sim2 = sim.with_spec(spec.add('pairs', [{'ticker_1': 'KBE', 'ticker_2': 'KRE', 'corr': 0.9}]))   # refits only what changed
+   spec2 = spec.add('pairs', {'ticker_1': 'KBE', 'ticker_2': 'KRE', 'corr': 0.9})                   # one row, edited in place if its key exists
+   show_change(spec2, 'pairs', {'ticker_1': 'KBE', 'ticker_2': 'KRE'})                              # the sheet as it now stands, the new row shaded
+   sim2 = sim.with_spec(spec2)                                # refits only what changed
    sim.save('sim'); FactorMarket.load('sim')
 
 What you know about each asset and factor goes in the workbook (notebook 03).
@@ -358,6 +361,11 @@ semidefinite); mean (alpha). Factors without a history have their missing
 correlations completed by maximum determinant and are attached to the C-vine by
 a Gaussian conditional draw. ``pip install cvinemarketgen[excel]`` for the
 workbook.
+
+One lever at a time, from the empty cell to the checked scenario and to the
+refusal that bounds it: the six recipes in ``examples/recipes/``. The
+derivations, the feasible shapes and every bound named above:
+``docs/methods-note``.
 
 Assets on factors
 -----------------

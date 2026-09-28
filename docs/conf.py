@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath('..'))
 project = 'CVineMarketGen'
 author = 'Mamadou Yamar Thioub'
 copyright = '2026, Mamadou Yamar Thioub'
-release = '0.2.0'
+release = '0.3.0'
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -29,6 +29,12 @@ os.makedirs(_dst, exist_ok=True)
 for _f in os.listdir(_src):
     if _f.endswith('.ipynb'):
         shutil.copy(os.path.join(_src, _f), os.path.join(_dst, _f))
+_rsrc = os.path.join(_src, 'recipes')                      # the recipe gallery, one lever each
+_rdst = os.path.join(_dst, 'recipes')
+os.makedirs(_rdst, exist_ok=True)
+for _f in os.listdir(_rsrc):
+    if _f.endswith('.ipynb'):
+        shutil.copy(os.path.join(_rsrc, _f), os.path.join(_rdst, _f))
 nb_execution_mode = 'off'
 myst_enable_extensions = ['dollarmath', 'colon_fence']
 

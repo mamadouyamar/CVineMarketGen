@@ -154,17 +154,23 @@ Pieces on their own: `fit_johnson_su`, `fit_fleishman`, `exceedance_curve`,
 
 ## Notebooks
 
-Ten tutorials in [`examples/`](examples/), a course in which each notebook is
-motivated by what the previous one could not do, all executed, each with a
-Colab badge. Start with the first. (The series is being rebuilt notebook by
-notebook; the early numbers follow the new course, the later ones the previous
-series until they are absorbed.)
+A course in [`examples/`](examples/) and a gallery of recipes in
+[`examples/recipes/`](examples/recipes/), all executed, each with a Colab
+badge. The course runs in order, each notebook motivated by what the previous
+one could not do. A recipe is standalone and changes one thing. The
+derivations are in the methods note,
+[`docs/methods-note`](docs/methods-note/methods-note.pdf), so a notebook shows
+a rule working instead of arguing for it. Notebooks are written to one
+standard, [`docs/notebook-principles.md`](docs/notebook-principles.md).
+
+(The course is being rebuilt notebook by notebook; 01 to 04 follow it, the
+later numbers are the previous series until they are absorbed.)
 
 | | Notebook | What it shows |
 |---|---|---|
 | 01 | [`01_matching_moments_and_correlations`](examples/01_matching_moments_and_correlations.ipynb) | targets, fit, check, use: the moments and correlations of six ETFs matched by the Fleishman generator, a portfolio's tail against the normal, a change of one target, paths, and the exceedance profile that shows what is missing |
 | 02 | [`02_tail_dependence`](examples/02_tail_dependence.ipynb) | copula versus marginals, tail dependence with a direction (Clayton, Gumbel) and without (Student t), the exceedance profile, the noise in the family classification and the symmetry test, the C-vine generator on the same six ETFs, the two portfolios of 01 with their tails recovered where the data identify them |
-| 03 | [`03_many_assets_factors`](examples/03_many_assets_factors.ipynb) | the simulator for a universe: what you know about each asset and factor goes in one workbook, one call fits the factors and the map to 68 assets, and every gap is filled by a stated rule; seventeen levers, one cell each, from the a-priori table to assets and factors without a history, moments, and pair correlations with their eligible range; every input checked against the simulation, scenarios and paths exported |
+| 03 | [`03_many_assets_factors`](examples/03_many_assets_factors.ipynb) | one file in, one simulator out: a single workbook holds what you know about 70 assets and 8 factors, one call fits it, every gap is filled by a stated rule and the report names the rule that fired for each number; every input checked against 25,000 simulated months, then the scenarios, the paths and the saved simulator, and two portfolios' tails against the sample and against a normal |
 | 04 | [`04_time_series_of_a_factor`](examples/04_time_series_of_a_factor.ipynb) | one factor as a time series: the tests of independence over time, the GARCH family and the hidden Markov model as invertible filters to an i.i.d. generalized error, selection among 28 candidates, the bootstrap goodness-of-fit test, paths from the last observed state, monthly and daily |
 | 05 | [`05_ltcma_targeting`](examples/05_ltcma_targeting.ipynb) | complete workflow with J.P. Morgan's 2024 assumptions as targets |
 | 10 | [`10_block_filters_vecm`](examples/10_block_filters_vecm.ipynb) | a VECM on the nominal and real 10-year yields as one block of the residual layer, paths in levels, the breakeven kept anchored |
@@ -172,6 +178,18 @@ series until they are absorbed.)
 | 12 | [`12_yield_curve_fixed_income`](examples/12_yield_curve_fixed_income.ipynb) | the Treasury curve as Nelson-Siegel level, slope and curvature (PCA as benchmark), the factors filtered as a block, simulated curves, constant-maturity bond returns priced along the paths |
 | 13 | [`13_inflation`](examples/13_inflation.ipynb) | headline and core CPI inflation as children of oil, unemployment and expectations: the equation, paths of inflation and price levels, an oil scenario, real returns of SPY |
 | 14 | [`14_gdp_bridge`](examples/14_gdp_bridge.ipynb) | quarterly GDP growth from monthly paths through a bridge equation on payrolls, industrial production and unemployment: the equation with and without the pandemic quarters, eight-quarter fans, recession probabilities, a payroll scenario |
+
+Recipes, about twelve seconds each, all from the same base workbook
+`examples/inputs/recipe_base.xlsx` (eight funds, six factors, nothing imposed):
+
+| | Recipe | The lever |
+|---|---|---|
+| r1 | [`r1_exposures`](examples/recipes/r1_exposures.ipynb) | what an asset loads on: `fit`, a beta, or a correlation with a factor, and where a correlation saturates |
+| r2 | [`r2_asset_without_history`](examples/recipes/r2_asset_without_history.ipynb) | a fund with no history: the two cells that cannot be empty, and the shape it inherits from its factors |
+| r3 | [`r3_asset_targets`](examples/recipes/r3_asset_targets.ipynb) | an asset's mean, volatility or shape: where the difference goes, and how precisely a shape is delivered |
+| r4 | [`r4_pair_correlation`](examples/recipes/r4_pair_correlation.ipynb) | a correlation between two assets: the eligible range, the residual correlation, the two refusals |
+| r5 | [`r5_factor_views`](examples/recipes/r5_factor_views.ipynb) | a view on a factor: one number, and the universe reprices through the betas |
+| r6 | [`r6_factor_without_history`](examples/recipes/r6_factor_without_history.ipynb) | a factor with no history: the correlations you state, and the maximum-determinant completion of the rest |
 
 ## Data
 

@@ -2,6 +2,21 @@
 
 ## 0.4.0 (unreleased)
 
+- The course restructured: notebook 03 is one worked case (one workbook in, one
+  simulator out, thirteen code blocks) and its levers become six standalone
+  recipes in `examples/recipes/`, one per kind of knowledge, twelve seconds
+  each, all from the same base workbook `examples/inputs/recipe_base.xlsx`. The
+  derivations move to a methods note, `docs/methods-note`: the fixed order of
+  the rule, the saturation bound `1/sqrt(2 - R2)` of a correlation with a
+  factor, the Johnson SU feasible region and its kurtosis floor, the eligible
+  range of a pair, the maximum-determinant completion with its feasibility
+  condition `r_S' R_SS^-1 r_S <= 1`, why a copula family cannot be identified at
+  rho = 0.1, and goodness-of-fit then BIC. `docs/notebook-principles.md` holds
+  the standard both obey.
+- `cvinemarketgen.excel_view`: a workbook draws itself as the file it is
+  (column letters, the sheet's own row numbers, empty cells empty), with
+  `show_workbook`, `show_sheet`, `show_change` (an edit shown in its context)
+  and `sheet_view`. `MarketSpec.add` and `show_change` take one row as a dict.
 - Simulator corrections found by executing notebook 03: `MarketSpec.add` edits a row
   whose key already exists in place, keeping its position and the cells not restated
   (it used to delete and append, moving the row and clearing them); a correlation given

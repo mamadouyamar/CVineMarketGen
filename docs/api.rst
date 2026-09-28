@@ -73,11 +73,23 @@ Factors
 .. automodule:: cvinemarketgen.factors
    :members: FactorModel
 
+The simulator for a universe
+----------------------------
+
+.. automodule:: cvinemarketgen.simulator
+   :members: MarketSpec, FactorMarket
+
+A workbook drawn as its sheets
+------------------------------
+
+.. automodule:: cvinemarketgen.excel_view
+   :members: show_workbook, show_sheet, show_change, sheet_view, draw_sheet, informative
+
 Functions
 ---------
 
 .. automodule:: cvinemarketgen.functions
-   :members: fit_johnson_su, johnson_su_moments, johnson_su_sample, fit_fleishman, exceedance_curve, classify_pair, select_family
+   :members: fit_johnson_su, johnson_su_moments, johnson_su_sample, johnson_su_cdf, johnson_su_from_normal, johnson_su_kurtosis_floor, fit_fleishman, exceedance_curve, classify_pair, select_family, tail_asymmetry_test
 
 Market data
 -----------
