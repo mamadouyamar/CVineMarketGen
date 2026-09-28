@@ -1,0 +1,805 @@
+# -*- coding: utf-8 -*-
+"""Builds examples/recipes/*.ipynb: six standalone pages, one lever each. Run from the repo root."""
+import json, os, sys
+
+OUT = 'examples/recipes'
+FILES = [('r1_exposures', 'what an asset loads on'),
+         ('r2_asset_without_history', 'a fund with no history'),
+         ('r3_asset_targets', "an asset's mean, volatility and shape"),
+         ('r4_pair_correlation', 'a correlation between two assets'),
+         ('r5_factor_views', 'a view on a factor'),
+         ('r6_factor_without_history', 'a factor with no history')]
+
+BACK = '<sub>[back to contents](#toc)</sub>'
+BASE = r'''
+import os, sys, warnings
+import numpy as np
+import pandas as pd
+warnings.filterwarnings("ignore")
+pd.set_option("display.width", 200); pd.set_option("display.max_columns", 30); pd.set_option("display.max_colwidth", 200)
+
+ROOT = os.getcwd()                                   # the repo root, from wherever the notebook is opened
+while not os.path.isdir(os.path.join(ROOT, "cvinemarketgen")) and os.path.dirname(ROOT) != ROOT:
+    ROOT = os.path.dirname(ROOT)
+sys.path.insert(0, ROOT)
+try:
+    import cvinemarketgen
+except ImportError:                                  # Google Colab
+    import subprocess
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "git+https://github.com/mamadouyamar/CVineMarketGen.git", "openpyxl"], check=True)
+    import cvinemarketgen
+from cvinemarketgen import load_etf_monthly, load_factor_data, MarketSpec, FactorMarket, show_workbook, show_change, show_sheet
+
+FACTORS = ["Equity DM", "Equity EM", "Real premia", "Inflation", "Credit", "Commodity"]
+A = lambda m: m * 1200                               # monthly mean -> percent a year
+V = lambda v: v * np.sqrt(12) * 100                  # monthly vol  -> percent a year
+spec = MarketSpec.read(os.path.join(ROOT, "examples", "inputs", "recipe_base.xlsx"))
+tick = list(spec.assets["ticker"])
+R = load_etf_monthly(tick, start="2007-04", cache=os.path.join(ROOT, "data", "etf_cache_universe.csv"))[tick]
+F = load_factor_data(cache=os.path.join(ROOT, "data", "factors_cache.csv"))[FACTORS]
+idx = R.index.intersection(F.index); R, F = R.loc[idx], F.loc[idx]
+sim = FactorMarket(R, F, spec, generator="fleishman").fit()
+print(sim)
+show_workbook(spec, max_rows=8)
+'''
+
+BASE_MD = """
+The base is `examples/inputs/recipe_base.xlsx`: eight funds, six factors, and
+not one number imposed. Every mean, volatility, shape and beta below comes
+from the monthly histories since June 2007.
+
+`tags` says which factors each class may load on. `fit` means regressed, an
+empty cell means a beta of zero, and the four other sheets are empty.
+"""
+
+BASE_READ = """
+Eight assets on six factors, all from the histories. The generator is
+Fleishman, which fits in a second; notebook 03 uses the C-vine, which takes
+the tail dependence of the factors with it.
+"""
+
+
+def build(name, title, lead, toc, body):
+    cells = []
+    md = lambda s: cells.append({'cell_type': 'markdown', 'metadata': {}, 'source': s.strip('\n')})
+    code = lambda s: cells.append({'cell_type': 'code', 'metadata': {}, 'execution_count': None, 'outputs': [], 'source': s.strip('\n')})
+    rows = '\n'.join(f'| **[{a}](#{b})** | {c} |' for a, b, c in toc)
+    md(f'''# {title}
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/{OUT}/{name}.ipynb)
+
+{lead}
+
+<a id="toc"></a>
+## Contents
+
+| | |
+|---|---|
+{rows}
+| **[Where to look next](#next)** | the other recipes and the derivations |''')
+    md(f'---\n\n<a id="s1"></a>\n## 1. The base\n\n{BACK}\n\nEight funds, six factors, nothing imposed.')
+    md(BASE_MD)
+    code(BASE)
+    md(BASE_READ)
+    for kind, text in body:
+        if kind == 'sec':
+            anchor, head, purpose = text
+            md(f'---\n\n<a id="{anchor}"></a>\n## {head}\n\n{BACK}\n\n{purpose}')
+        elif kind == 'md':
+            md(text)
+        else:
+            code(text)
+    others = '\n'.join(f'- [{t}]({f}.ipynb)' for f, t in FILES if f != name)
+    md(f'''---
+
+<a id="next"></a>
+## Where to look next
+
+{BACK}
+
+The whole universe in one file, fitted, checked and written out:
+[notebook 03](../03_many_assets_factors.ipynb). The derivations, the feasible
+shapes and the bounds: the methods note, `docs/methods-note.pdf`.
+
+The other levers:
+
+{others}''')
+    nb = {'cells': cells, 'metadata': {'kernelspec': {'display_name': 'Python 3', 'language': 'python', 'name': 'python3'},
+                                       'language_info': {'name': 'python'}}, 'nbformat': 4, 'nbformat_minor': 5}
+    for i, c in enumerate(nb['cells']):
+        c['source'] = c['source'].splitlines(keepends=True); c['id'] = f'c{i:03d}'
+    os.makedirs(OUT, exist_ok=True)
+    path = os.path.join(OUT, name + '.ipynb')
+    json.dump(nb, open(path, 'w'), indent=1, ensure_ascii=False); open(path, 'a').write('\n')
+    n = sum(1 for c in nb['cells'] if c['cell_type'] == 'code')
+    print(f'written {path}: {len(cells)} cells, {n} code blocks')
+
+# ------------------------------------------------------------------ recipe 1
+build('r1_exposures', 'Recipe 1 — Set what an asset loads on',
+      'You want an asset to carry a factor the regression will not give it, or to carry it by a stated amount.',
+      [('1. The base', 's1', 'eight funds, six factors, nothing imposed'),
+       ('2. The three ways to fix a beta', 's2', 'the tag row, the exposures sheet, a correlation'),
+       ('3. What you give', 's3', 'one row in the exposures sheet'),
+       ('4. What the fit does with it', 's4', 'the imposed beta, and the others re-regressed'),
+       ('5. Check', 's5', 'the beta and the correlation in the scenarios'),
+       ('6. A correlation instead of a beta', 's6', 'and where it saturates')],
+      [('sec', ('s2', '2. The three ways to fix a beta', 'What the cells mean.')),
+       ('md', r"""
+The model is
+
+$$
+r_j = \alpha_j + \sum_{k=1}^{K} \beta_{jk} f_k + e_j ,
+$$
+
+and the betas are the first thing the fit settles. Four cells, four outcomes.
+
+| Where | Cell | The beta |
+|---|---|---|
+| `tags`, row of the asset's class | `fit` | regressed: OLS of the asset on the `fit` factors |
+| `tags`, row of the asset's class | a number | that number, for every asset of the class |
+| `tags`, row of the asset's class | empty | zero |
+| `exposures`, row (ticker, factor) | `beta` | that number, for that asset only |
+| `exposures`, row (ticker, factor) | `corr` | the beta that delivers this correlation with the factor |
+
+The base fits GLD on Real premia, Inflation and Commodity. The history gives
+it a *negative* Inflation beta, which is not what a gold fund is bought for.
+"""),
+       ('code', r'''
+print(sim.model.beta.loc[["GLD"]].round(2).to_string(), "   R2", round(sim.model.r2["GLD"], 2))
+'''),
+       ('sec', ('s3', '3. What you give', 'One row in the exposures sheet.')),
+       ('md', r"""
+A beta of 0.6 on Inflation for GLD, and nothing else touched.
+"""),
+       ('code', r'''
+row = {"ticker": "GLD", "factor": "Inflation", "beta": 0.6}
+spec_1 = spec.add("exposures", row)
+show_change(spec_1, "exposures", row)
+'''),
+       ('md', r"""
+The sheet was empty, so the file now has one row. A row for a (ticker, factor)
+already in the sheet is edited in place instead of appended.
+"""),
+       ('sec', ('s4', '4. What the fit does with it', 'The imposed beta, and the others re-regressed.')),
+       ('md', r"""
+The imposed beta is subtracted from the asset before the remaining `fit`
+factors are regressed:
+
+$$
+r_j - \beta_{j,\text{Inflation}} f_{\text{Inflation}}
+  = \alpha_j + \sum_{k \in \text{fit}} \beta_{jk} f_k + e_j .
+$$
+
+The other betas move with it, and $R^2$ falls unless the imposed value is the
+one least squares would have chosen.
+
+The betas, before and after.
+"""),
+       ('code', r'''
+sim_1 = sim.with_spec(spec_1)
+pd.DataFrame({"base": sim.model.beta.loc["GLD"], "imposed": sim_1.model.beta.loc["GLD"]}).T.round(3)
+'''),
+       ('md', r"""
+And what the fit report says about GLD.
+"""),
+       ('code', r'''
+print(sim_1.report.loc[["GLD"], ["tag", "value", "fit", "zero", "resid vol"]].to_string())
+print("R2 %.2f -> %.2f   residual volatility %.1f%% -> %.1f%% a year"
+      % (sim.model.r2["GLD"], sim_1.model.r2["GLD"], V(sim.model.resid_vol["GLD"]), V(sim_1.model.resid_vol["GLD"])))
+'''),
+       ('md', r"""
+One beta given, two regressed, three zero. Inflation goes from -0.60 to the
+0.60 asked for, Real premia falls from 1.34 to 1.20, Commodity from 0.30 to
+0.13. $R^2$ falls from 0.31 to 0.24, because the history does not support the
+view and the residual absorbs the difference.
+"""),
+       ('sec', ('s5', '5. Check', 'The beta and the correlation in the scenarios.')),
+       ('md', r"""
+Regress the simulated asset on the simulated factors and the betas must come back.
+"""),
+       ('code', r'''
+X = sim_1.simulate(20000, seed=3); Fs = sim_1.last_factors
+b_hat = np.linalg.lstsq(np.column_stack([np.ones(len(Fs))] + [Fs[f].values for f in FACTORS]), X["GLD"].values, rcond=None)[0][1:]
+pd.DataFrame({"asked": sim_1.model.beta.loc["GLD"], "recovered from the scenarios": pd.Series(b_hat, index=FACTORS)}).round(3)
+'''),
+       ('md', r"""
+The correlation of GLD with Inflation follows the beta.
+"""),
+       ('code', r'''
+X0 = sim.simulate(20000, seed=3)
+print("corr(GLD, Inflation)   base %.2f   imposed %.2f   history %.2f"
+      % (X0["GLD"].corr(sim.last_factors["Inflation"]), X["GLD"].corr(Fs["Inflation"]), R["GLD"].corr(F["Inflation"])))
+'''),
+       ('sec', ('s6', '6. A correlation instead of a beta', 'And where it saturates.')),
+       ('md', r"""
+Fill `corr` rather than `beta` and the fit solves for the beta that delivers
+it. With $S$ the constrained factors and $\sigma_j$ the asset's volatility,
+
+$$
+\boldsymbol\Sigma_{SS}\, \boldsymbol\beta_S
+ = \rho_S\, \sigma_j\, \boldsymbol\sigma_S - \boldsymbol\Sigma_{S,-S}\, \boldsymbol\beta_{-S} .
+$$
+
+A correlation fixes a ratio, not a scale. When the asset's `vol` cell is empty
+its volatility grows with the beta, and the correlation cannot pass
+
+$$
+\rho_{\max} = \frac{1}{\sqrt{2 - R_j^2}} ,
+$$
+
+$R_j^2$ being the share of the asset's variance the factors explain in the
+base. Above it the request is refused, and the message names the value the
+betas do reach.
+"""),
+       ('code', r'''
+for rho in (0.30, 0.55, 0.80):
+    try:
+        s = sim.with_spec(spec.add("exposures", {"ticker": "GLD", "factor": "Inflation", "corr": rho}))
+        Xr = s.simulate(20000, seed=3)
+        print("corr %.2f -> beta %.2f, GLD volatility %.0f%% a year, simulated correlation %.2f"
+              % (rho, s.model.beta.loc["GLD", "Inflation"], V(Xr["GLD"].std()), Xr["GLD"].corr(s.last_factors["Inflation"])))
+    except ValueError as err:
+        print("corr %.2f -> refused: %s" % (rho, err))
+print("\nbound 1/sqrt(2 - R2) with R2 = %.2f: %.2f" % (sim.model.r2["GLD"], 1 / np.sqrt(2 - sim.model.r2["GLD"])))
+'''),
+       ('md', r"""
+0.30 and 0.55 are both delivered, and the second is expensive: the beta that
+reaches it is 3.02, which carries GLD to a volatility of 25 percent a year.
+0.80 is refused, with the message naming 0.70 as where the betas settle. Give
+the asset a volatility in the `assets` sheet and the residual is pinned, which
+makes any correlation up to the bound reachable.
+""")])
+
+# ------------------------------------------------------------------ recipe 2
+build('r2_asset_without_history', 'Recipe 2 — Add a fund with no history',
+      'A private fund, a new product, a mandate that does not exist yet: you know what it earns, how much it moves and what drives it.',
+      [('1. The base', 's1', 'eight funds, six factors, nothing imposed'),
+       ('2. What you give', 's2', 'two sheets, four numbers'),
+       ('3. What the simulator does', 's3', 'the residual, and the shape it inherits'),
+       ('4. Check', 's4', 'the fund in the scenarios'),
+       ('5. What is refused', 's5', 'the two cells that cannot be empty')],
+      [('sec', ('s2', '2. What you give', 'Two sheets, four numbers.')),
+       ('md', r"""
+A row in `assets` with the ticker, a tag, a mean and a volatility, and a row in
+`tags` giving that tag a beta on every factor it carries. Numbers, not `fit`:
+there is no history to regress.
+"""),
+       ('code', r'''
+asset_row = {"ticker": "Private credit", "tag": "private_credit", "mean": 0.07, "vol": 0.10}
+tag_row = {"tag": "private_credit", "Equity DM": 0.2, "Credit": 0.6}
+spec_2 = spec.add("assets", asset_row).add("tags", tag_row)
+show_change(spec_2, "assets", asset_row, max_rows=10)
+'''),
+       ('md', r"""
+And the tag row that gives it its betas.
+"""),
+       ('code', r'''
+show_change(spec_2, "tags", tag_row, max_rows=10)
+'''),
+       ('md', r"""
+Nine rows in `assets` now, eight of them the listed funds. The `tags` sheet has
+a row with two numbers and four empty cells, and an empty cell is a beta of zero.
+"""),
+       ('sec', ('s3', '3. What the simulator does', 'The residual, and the shape it inherits.')),
+       ('md', r"""
+The factors carry $\boldsymbol\beta' \boldsymbol\Sigma_f \boldsymbol\beta$ of
+the variance, and the residual takes the rest:
+
+$$
+\sigma_e^2 = v^2 - \boldsymbol\beta' \boldsymbol\Sigma_f \boldsymbol\beta ,
+\qquad \alpha = m - \boldsymbol\beta' \boldsymbol\mu_f ,
+$$
+
+with $m$ and $v$ the mean and volatility you gave. With no history there is no
+residual shape to estimate, so the residual is drawn close to normal, skewness
+0 and kurtosis 3.1, the flattest a Johnson SU reaches.
+
+The report says which rule fired.
+"""),
+       ('code', r'''
+sim_2 = sim.with_spec(spec_2)
+sim_2.report.loc[["Private credit"], ["history", "value", "fit", "zero", "mean source", "vol source", "skew source", "resid vol"]]
+'''),
+       ('md', r"""
+Two betas from the tag row, four factors at zero, mean and volatility from the
+workbook, shape from the fallback.
+"""),
+       ('sec', ('s4', '4. Check', 'The fund in the scenarios.')),
+       ('md', r"""
+Simulate, and read the fund's four moments against what was asked.
+"""),
+       ('code', r'''
+X2 = sim_2.simulate(20000, seed=4)
+c = sim_2.check(X2)["assets"].loc[["Private credit"]].astype({"mean target": float, "vol target": float})
+pd.DataFrame({"mean (%/yr)": [A(float(c["mean target"])), A(float(c["mean simulated"]))],
+              "vol (%/yr)": [V(float(c["vol target"])), V(float(c["vol simulated"]))],
+              "skewness": [np.nan, float(c["skew simulated"])], "kurtosis": [np.nan, float(c["kurt simulated"])]},
+             index=["asked", "simulated"]).round(2)
+'''),
+       ('md', r"""
+Both numbers come back: 6.84 against the 7.00 percent a year asked, 9.98
+against 10.00. The shape was never given, and it is not normal either,
+skewness -0.53 and kurtosis 4.95. It comes from Equity DM and Credit through
+the two betas, so a fund with no history is not a Gaussian fund.
+"""),
+       ('sec', ('s5', '5. What is refused', 'The two cells that cannot be empty.')),
+       ('md', r"""
+An asset with no history has nothing to estimate a scale from. The mean and
+the volatility are required, and `fit` has no meaning.
+"""),
+       ('code', r'''
+for label, sp in [("no volatility", spec.add("assets", {"ticker": "Private credit", "tag": "private_credit", "mean": 0.07}).add("tags", tag_row)),
+                  ("fit in the tag row", spec.add("assets", {"ticker": "New fund", "tag": "equity_dm", "mean": 0.07, "vol": 0.10}))]:
+    try:
+        sim.with_spec(sp); print(label, "-> accepted")
+    except ValueError as err:
+        print(label, "-> refused:", err)
+'''),
+       ('md', r"""
+To tie the new fund to a listed one, a correlation between the two, see
+[recipe 4](r4_pair_correlation.ipynb). To give it a shape of its own, see
+[recipe 3](r3_asset_targets.ipynb).
+""")])
+
+# ------------------------------------------------------------------ recipe 3
+build('r3_asset_targets', "Recipe 3 — Impose an asset's mean, volatility or shape",
+      'A capital-market assumption on one fund, a volatility from a risk model, a tail you have measured elsewhere.',
+      [('1. The base', 's1', 'eight funds, six factors, nothing imposed'),
+       ('2. The order of the rule', 's2', 'why the betas come first'),
+       ('3. What you give', 's3', 'three cells in the assets sheet'),
+       ('4. Where the difference goes', 's4', 'the residual'),
+       ('5. Check', 's5', 'the four moments in the scenarios'),
+       ('6. What is refused', 's6', 'a volatility below the betas, a shape no residual can carry')],
+      [('sec', ('s2', '2. The order of the rule', 'Why the betas come first.')),
+       ('md', r"""
+An asset is the factors it carries plus an independent residual, so a moment
+you impose is delivered by the residual, not by the asset:
+
+$$
+\sigma_e^2 = v^2 - \boldsymbol\beta' \boldsymbol\Sigma_f \boldsymbol\beta ,
+\qquad
+\kappa_{3,e} = s\,v^3 - \kappa_3(\boldsymbol\beta' \mathbf f) ,
+\qquad
+\kappa_{4,e} = (k - 3)\,v^4 - \kappa_4(\boldsymbol\beta' \mathbf f) ,
+\qquad
+\alpha = m - \boldsymbol\beta' \boldsymbol\mu_f ,
+$$
+
+with $m, v, s, k$ the mean, volatility, skewness and kurtosis you gave.
+Cumulants of independent terms add, which is what makes the shape line work.
+
+The order is fixed: betas, then volatility, then shape, then the mean. The
+residual's scale needs the betas, and its shape needs the scale.
+"""),
+       ('sec', ('s3', '3. What you give', 'Three cells in the assets sheet.')),
+       ('md', r"""
+The sheet as it stands: a ticker and a tag, every moment empty.
+"""),
+       ('code', r'''
+show_sheet(spec.assets, "sheet assets, before", max_rows=10)
+'''),
+       ('md', r"""
+A mean for SPY, a volatility for TLT, a shape for GLD. Annual, as every moment
+in the workbook is.
+"""),
+       ('code', r'''
+rows = [{"ticker": "SPY", "mean": 0.07}, {"ticker": "TLT", "vol": 0.14}, {"ticker": "GLD", "skew": -0.5, "kurt": 5.0}]
+spec_3 = spec
+for r_ in rows:
+    spec_3 = spec_3.add("assets", r_)
+show_change(spec_3, "assets", rows, max_rows=10)
+'''),
+       ('md', r"""
+The three rows keep their place in the file and their tags; only the cells
+given are written.
+"""),
+       ('sec', ('s4', '4. Where the difference goes', 'The residual.')),
+       ('md', r"""
+The report names the source of every moment and the residual the rule ended up with.
+"""),
+       ('code', r'''
+sim_3 = sim.with_spec(spec_3)
+show = ["SPY", "TLT", "GLD"]
+pd.concat([sim_3.report.loc[show, ["mean source", "vol source", "skew source", "kurt source"]],
+           pd.DataFrame({"resid vol (%/yr)": V(sim_3.model.resid_vol[show]), "base resid vol (%/yr)": V(sim.model.resid_vol[show]),
+                         "resid skew": sim_3.report.loc[show, "resid skew"].astype(float),
+                         "resid kurt": sim_3.report.loc[show, "resid kurt"].astype(float)}).round(2)], axis=1)
+'''),
+       ('md', r"""
+SPY's residual is untouched at 4.03 percent a year, because a mean is absorbed
+by the alpha alone. TLT's target of 14 percent is below what its betas and its
+sample residual produce, so its residual falls from 4.78 to 4.38. GLD's
+residual carries the whole shape: skewness -0.71 and kurtosis 6.87 for an
+asset asked for -0.5 and 5.0, since the residual is two thirds of its
+variance.
+"""),
+       ('sec', ('s5', '5. Check', 'The four moments in the scenarios.')),
+       ('md', r"""
+Simulate once and read the given moments against the simulated ones.
+"""),
+       ('code', r'''
+X3 = sim_3.simulate(40000, seed=5)
+c3 = sim_3.check(X3)["assets"].loc[show]
+pd.DataFrame({"mean asked": A(c3["mean target"].astype(float)), "mean simulated": A(c3["mean simulated"].astype(float)),
+              "vol asked": V(c3["vol target"].astype(float)), "vol simulated": V(c3["vol simulated"].astype(float)),
+              "skew asked": c3["skew target"].astype(float), "skew simulated": c3["skew simulated"].astype(float),
+              "kurt asked": c3["kurt target"].astype(float), "kurt simulated": c3["kurt simulated"].astype(float)}).round(2)
+'''),
+       ('md', r"""
+A shape is not delivered to the precision of a mean. Four seeds show how wide
+the landing zone is.
+"""),
+       ('code', r'''
+pd.DataFrame({f"seed {sd}": [x.skew(), x.kurtosis() + 3] for sd in (5, 6, 7, 8) for x in [sim_3.simulate(40000, seed=sd)["GLD"]]},
+             index=["skewness", "kurtosis"]).round(2)
+'''),
+       ('md', r"""
+The mean and the volatility land within a tenth of a percent a year. The shape
+does not: over four seeds GLD's skewness runs -0.45 to -0.53 and its kurtosis
+4.55 to 5.31, for -0.5 and 5.0 asked. Read a given shape as a target to within
+about a tenth in skewness and half a point in kurtosis.
+"""),
+       ('sec', ('s6', '6. What is refused', 'A volatility below the betas, a shape no residual can carry.')),
+       ('md', r"""
+The residual variance and the residual cumulants are differences, so a target
+can ask for a negative variance or for a shape outside the Johnson SU family.
+Both are refused with the numbers that make them infeasible.
+"""),
+       ('code', r'''
+for label, row in [("XLF at 6% a year", {"ticker": "XLF", "vol": 0.06}),
+                   ("GLD flat: skew -0.5, kurt 3", {"ticker": "GLD", "skew": -0.5, "kurt": 3.0}),
+                   ("SPY skew -2.5, kurt 6", {"ticker": "SPY", "skew": -2.5, "kurt": 6.0})]:
+    try:
+        sim.with_spec(spec.add("assets", row)); print(label, "-> accepted\n")
+    except ValueError as err:
+        print(label, "-> refused:", err, "\n")
+'''),
+       ('md', r"""
+XLF's betas alone give 19.3 percent a year, so a target of 6 leaves the
+residual a negative variance. GLD asked to be flatter than its factors make it
+needs a residual kurtosis of 2.7, which no Johnson SU has. SPY's residual is 7
+percent of its variance, so a skewness of -2.5 would need -112 from it: the
+more of an asset the factors explain, the less of its shape you can set.
+""")])
+
+# ------------------------------------------------------------------ recipe 4
+build('r4_pair_correlation', 'Recipe 4 — Set the correlation between two assets',
+      'Two funds you know move together more than a factor model will say: two share classes, a fund and its benchmark, a hedge and its underlying.',
+      [('1. The base', 's1', 'eight funds, six factors, nothing imposed'),
+       ('2. What is free and what is not', 's2', 'the eligible range'),
+       ('3. What you give', 's3', 'one row in the pairs sheet'),
+       ('4. What the simulator does', 's4', 'the residual correlation'),
+       ('5. Check', 's5', 'the correlation in the scenarios'),
+       ('6. Outside the range', 's6', 'the two refusals, and what to do instead')],
+      [('sec', ('s2', '2. What is free and what is not', 'The eligible range.')),
+       ('md', r"""
+Two assets are correlated through their factors and through their residuals:
+
+$$
+\rho_{ij} = \underbrace{\frac{\boldsymbol\beta_i' \boldsymbol\Sigma_f \boldsymbol\beta_j}{\sigma_i \sigma_j}}_{\rho_{ij}^{\text{sys}}}
+          + \rho_{e,ij} \sqrt{(1 - R_i^2)(1 - R_j^2)} .
+$$
+
+The betas are already fixed, so only $\rho_{e,ij}$ is free, and it lives in
+$[-1, 1]$. The reachable correlations are therefore
+
+$$
+\rho_{ij} \in \Big[\rho_{ij}^{\text{sys}} - \sqrt{(1 - R_i^2)(1 - R_j^2)},\;
+                   \rho_{ij}^{\text{sys}} + \sqrt{(1 - R_i^2)(1 - R_j^2)}\Big] ,
+$$
+
+and the residual correlation the target needs is
+
+$$
+\rho_{e,ij} = \frac{\rho_{ij}\,\sigma_i \sigma_j - \boldsymbol\beta_i' \boldsymbol\Sigma_f \boldsymbol\beta_j}
+                   {\sigma_{e,i}\, \sigma_{e,j}} .
+$$
+
+Well-explained assets have little room; assets the factors barely touch have
+almost the whole interval.
+"""),
+       ('code', r'''
+pd.DataFrame({"R2": sim.model.r2, "unexplained share 1 - R2": 1 - sim.model.r2, "half-width of a pair's range": np.sqrt(1 - sim.model.r2)}).round(2)
+'''),
+       ('md', r"""
+A pair's half-width is the product of the two in the last column: 0.12 for
+SPY and QQQ, 0.28 for GLD and TLT.
+"""),
+       ('sec', ('s3', '3. What you give', 'One row in the pairs sheet.')),
+       ('md', r"""
+A correlation of 0.95 between SPY and QQQ, whose history shows 0.92.
+"""),
+       ('code', r'''
+pair = {"ticker_1": "SPY", "ticker_2": "QQQ", "corr": 0.95}
+spec_4 = spec.add("pairs", pair)
+show_change(spec_4, "pairs", pair)
+'''),
+       ('sec', ('s4', '4. What the simulator does', 'The residual correlation.')),
+       ('md', r"""
+The pair report shows the range, the target in it, and the residual
+correlation used.
+"""),
+       ('code', r'''
+sim_4 = sim.with_spec(spec_4)
+sim_4.pair_report.round(3)
+'''),
+       ('md', r"""
+The betas alone already give 0.85, and the residuals can move that by 0.12
+either way, so 0.95 is inside the range. It is bought with a residual
+correlation of 0.815, which is what the two residuals are made to share.
+"""),
+       ('sec', ('s5', '5. Check', 'The correlation in the scenarios.')),
+       ('md', r"""
+Simulate and measure the pair, against the target and against the sample.
+"""),
+       ('code', r'''
+X4 = sim_4.simulate(20000, seed=6); X0 = sim.simulate(20000, seed=6)
+pd.DataFrame({"correlation": [float(sim_4.pair_report["target"]), X4["SPY"].corr(X4["QQQ"]), X0["SPY"].corr(X0["QQQ"]), R["SPY"].corr(R["QQQ"])]},
+             index=["asked", "simulated", "simulated without the row", "in the sample"]).round(3)
+'''),
+       ('md', r"""
+The row is delivered: 0.950 simulated against 0.950 asked, where the same
+simulator without the row gives 0.850. The sample sits between the two at
+0.915.
+"""),
+       ('sec', ('s6', '6. Outside the range', 'The two refusals, and what to do instead.')),
+       ('md', r"""
+A target below the range, and one above it.
+"""),
+       ('code', r'''
+for i, j, rho in [("SPY", "QQQ", 0.50), ("GLD", "TLT", 0.60)]:
+    try:
+        sim.with_spec(spec.add("pairs", {"ticker_1": i, "ticker_2": j, "corr": rho})); print(f"{i}/{j} {rho} -> accepted\n")
+    except ValueError as err:
+        print(f"{i}/{j} {rho} -> refused:", err, "\n")
+'''),
+       ('md', r"""
+Both are refused, with the range and the two $R^2$ that produced it. The range
+is narrow exactly where the factors explain the two assets well, so a target
+outside it is a statement about the betas: change those, and the systematic
+correlation itself moves.
+""")])
+
+# ------------------------------------------------------------------ recipe 5
+build('r5_factor_views', 'Recipe 5 — Put a view on a factor',
+      'Equities return five percent, credit has a fatter left tail, equities and real rates move the other way: a view on a driver, not on sixty-eight funds.',
+      [('1. The base', 's1', 'eight funds, six factors, nothing imposed'),
+       ('2. How a view reaches an asset', 's2', 'through the betas'),
+       ('3. What you give', 's3', 'the factors sheet'),
+       ('4. What it does to the assets', 's4', 'one line per beta'),
+       ('5. Check', 's5', 'the factor moments in the scenarios'),
+       ('6. A correlation between two factors', 's6', 'the factor_corr sheet'),
+       ('7. What is refused', 's7', 'a view an asset target cannot hold')],
+      [('sec', ('s2', '2. How a view reaches an asset', 'Through the betas.')),
+       ('md', r"""
+The `factors` sheet sets the targets of the generator: what the factors' own
+moments are before any asset is fitted. An asset's mean and variance follow,
+
+$$
+m_j = \alpha_j + \boldsymbol\beta_j' \boldsymbol\mu_f ,
+\qquad
+\sigma_j^2 = \boldsymbol\beta_j' \boldsymbol\Sigma_f \boldsymbol\beta_j + \sigma_{e,j}^2 ,
+$$
+
+so a change $\Delta \mu_k$ in one factor's mean moves asset $j$ by
+$\beta_{jk}\, \Delta \mu_k$ and leaves the others where they were. The alpha
+and the residual are estimated from the history and do not move with the view.
+"""),
+       ('sec', ('s3', '3. What you give', 'The factors sheet.')),
+       ('md', r"""
+Five percent a year on Equity DM with an 18 percent volatility, and a fatter
+left tail on Credit.
+"""),
+       ('code', r'''
+views = [{"factor": "Equity DM", "mean": 0.05, "vol": 0.18}, {"factor": "Credit", "skew": -1.0, "kurt": 8.0}]
+spec_5 = spec
+for v_ in views:
+    spec_5 = spec_5.add("factors", v_)
+show_change(spec_5, "factors", views)
+'''),
+       ('md', r"""
+The sheet was empty, so a factor missing from it is entirely the history's. A
+factor listed with some cells empty keeps the history's value for those.
+"""),
+       ('code', r'''
+sim_5 = sim.with_spec(spec_5)
+pd.concat([pd.DataFrame({"mean (%/yr)": A(sim.targets.mean), "vol (%/yr)": V(sim.targets.vol), "skew": sim.targets.skew, "kurt": sim.targets.kurt}).round(2).add_suffix(", history"),
+           pd.DataFrame({"mean (%/yr)": A(sim_5.targets.mean), "vol (%/yr)": V(sim_5.targets.vol), "skew": sim_5.targets.skew, "kurt": sim_5.targets.kurt}).round(2).add_suffix(", target")], axis=1)
+'''),
+       ('md', r"""
+Equity DM goes from the sample's 7.60 percent a year to 5.00, and from 16.15
+percent of volatility to 18.00. Credit's skewness and kurtosis go from -1.86
+and 16.71 to -1.00 and 8.00. Every cell left empty keeps the history's value,
+and a factor absent from the sheet is entirely the history's.
+"""),
+       ('sec', ('s4', '4. What it does to the assets', 'One line per beta.')),
+       ('md', r"""
+Each asset's mean moves by its Equity DM beta times the change in that factor's mean.
+"""),
+       ('code', r'''
+m0 = sim.model.alpha + sim.model.beta @ sim.targets.mean.loc[sim.model.factors]
+m1 = sim_5.model.alpha + sim_5.model.beta @ sim_5.targets.mean.loc[sim_5.model.factors]
+d_mu = sim_5.targets.mean["Equity DM"] - sim.targets.mean["Equity DM"]
+pd.DataFrame({"beta on Equity DM": sim.model.beta["Equity DM"], "mean before (%/yr)": A(m0), "mean after (%/yr)": A(m1),
+              "change (%/yr)": A(m1 - m0), "beta x change in the factor": A(sim.model.beta["Equity DM"] * d_mu)}).round(2)
+'''),
+       ('md', r"""
+An asset's mean moves by its beta times the change in the factor's mean, to the
+cent: XLF by -3.39 percent a year on a beta of 1.30. The four assets with no
+Equity DM exposure do not move at all. That is what a view on a factor buys:
+one number, and the universe reprices consistently.
+"""),
+       ('sec', ('s5', '5. Check', 'The factor moments in the scenarios.')),
+       ('md', r"""
+The generator reproduces the targets it was given; the assets follow from them.
+"""),
+       ('code', r'''
+chk5 = sim_5.check(n=20000, seed=9); fac = chk5["factors"]
+print("largest correlation error %.4f" % fac.attrs["max_abs_corr_error"])
+pd.DataFrame({"mean asked (%/yr)": A(fac["mean target"]), "mean simulated (%/yr)": A(fac["mean simulated"]),
+              "vol asked (%/yr)": V(fac["vol target"]), "vol simulated (%/yr)": V(fac["vol simulated"]),
+              "skew asked": fac["skew target"], "skew simulated": fac["skew simulated"],
+              "kurt asked": fac["kurt target"], "kurt simulated": fac["kurt simulated"]}).round(2)
+'''),
+       ('md', r"""
+The generator reproduces every target to the second decimal and the largest
+correlation error is 0.0067. The assets inherit those moments through their
+betas, with nothing else to say about them.
+"""),
+       ('sec', ('s6', '6. A correlation between two factors', 'The factor_corr sheet.')),
+       ('md', r"""
+One row per pair, and the rest of the matrix stays the history's. The edited
+matrix is projected onto the nearest positive-definite one if an edit breaks it.
+"""),
+       ('code', r'''
+fc_row = {"factor_1": "Equity DM", "factor_2": "Real premia", "corr": -0.30}
+sim_5b = sim.with_spec(spec.add("factor_corr", fc_row))
+Xb = sim_5b.simulate(20000, seed=10); fb = sim_5b.last_factors
+print("corr(Equity DM, Real premia)   sample %.2f   asked %.2f   simulated %.2f"
+      % (F["Equity DM"].corr(F["Real premia"]), fc_row["corr"], fb["Equity DM"].corr(fb["Real premia"])))
+print("\nwhat it does to the assets, volatility in %/yr:")
+print(pd.DataFrame({"base": V(sim.check(n=20000, seed=10)["assets"]["vol simulated"].astype(float)),
+                    "with the edited correlation": V(sim_5b.check(Xb)["assets"]["vol simulated"].astype(float))}).round(2).to_string())
+'''),
+       ('md', r"""
+The sample has Equity DM and Real premia at +0.31, the row asks for -0.30, and
+the simulation gives -0.31. XLF is the only asset that moves much, 22.5 to
+25.3 percent a year: it is long Equity DM and short Real premia, so the two
+exposures stop cancelling.
+"""),
+       ('sec', ('s7', '7. What is refused', 'A view an asset target cannot hold.')),
+       ('md', r"""
+A view on a factor changes what the betas alone deliver, so an asset with a
+volatility of its own can become infeasible. Raising Equity DM to 40 percent
+while SPY is pinned at 15 is refused.
+"""),
+       ('code', r'''
+try:
+    sim.with_spec(spec.add("factors", {"factor": "Equity DM", "mean": 0.05, "vol": 0.40}).add("assets", {"ticker": "SPY", "vol": 0.15}))
+    print("accepted")
+except ValueError as err:
+    print("refused:", err)
+'''),
+       ('md', r"""
+Either the target on the asset goes, or its betas do. To change the betas, see
+[recipe 1](r1_exposures.ipynb).
+""")])
+
+# ------------------------------------------------------------------ recipe 6
+build('r6_factor_without_history', 'Recipe 6 — Add a factor with no history',
+      'Illiquidity, a manager skill premium, a regulatory driver: something you believe in that no series measures.',
+      [('1. The base', 's1', 'eight funds, six factors, nothing imposed'),
+       ('2. What has to be said, and what is completed', 's2', 'the maximum-determinant rule'),
+       ('3. What you give', 's3', 'a factor row and two correlations'),
+       ('4. The completed column', 's4', 'the four correlations you did not give'),
+       ('5. An asset that loads on it', 's5', 'the only way the new factor reaches a portfolio'),
+       ('6. What is refused', 's6', 'correlations with no valid completion')],
+      [('sec', ('s2', '2. What has to be said, and what is completed', 'The maximum-determinant rule.')),
+       ('md', r"""
+A factor with no history needs a mean and a volatility; its skewness and
+kurtosis fall back to 0 and 3. Its correlations with the existing factors are
+the real question: you will state one or two, and $K$ are needed.
+
+Write $S$ for the factors whose correlation with the new one you gave and $U$
+for the others. The completion used is the one that maximises the determinant
+of the correlation matrix, and it is
+
+$$
+\mathbf r_U = \mathbf R_{US}\, \mathbf R_{SS}^{-1}\, \mathbf r_S ,
+$$
+
+the unique completion whose partial correlations with the new factor, given
+$S$, are zero. It says nothing you did not say: the new factor is related to
+the rest of the world only through the correlations you stated.
+"""),
+       ('sec', ('s3', '3. What you give', 'A factor row and two correlations.')),
+       ('md', r"""
+Illiquidity, 3 percent a year at a 6 percent volatility, correlated 0.35 with
+Equity DM and 0.45 with Credit.
+"""),
+       ('code', r'''
+f_row = {"factor": "Illiquidity", "mean": 0.03, "vol": 0.06}
+c_rows = [{"factor_1": "Illiquidity", "factor_2": "Equity DM", "corr": 0.35},
+          {"factor_1": "Illiquidity", "factor_2": "Credit", "corr": 0.45}]
+spec_6 = spec.add("factors", f_row)
+for r_ in c_rows:
+    spec_6 = spec_6.add("factor_corr", r_)
+show_change(spec_6, "factors", f_row)
+'''),
+       ('md', r"""
+And the two correlations.
+"""),
+       ('code', r'''
+show_change(spec_6, "factor_corr", c_rows)
+'''),
+       ('md', r"""
+Two rows given out of six correlations. A factor named in `factor_corr` must be
+one with a history or one listed earlier in the `factors` sheet.
+"""),
+       ('sec', ('s4', '4. The completed column', 'The four correlations you did not give.')),
+       ('md', r"""
+The factor report counts what was given and what was completed.
+"""),
+       ('code', r'''
+sim_6 = sim.with_spec(spec_6)
+sim_6.factor_report.loc[["Illiquidity"]]
+'''),
+       ('md', r"""
+Then the column itself, beside the formula computed by hand.
+"""),
+       ('code', r'''
+given = ["Equity DM", "Credit"]; rho_S = np.array([0.35, 0.45])
+R_SS = sim.targets.corr.loc[given, given].values
+r_U = sim.targets.corr.loc[FACTORS, given].values @ np.linalg.solve(R_SS, rho_S)
+pd.DataFrame({"from the fit": sim_6.targets.corr.loc[FACTORS, "Illiquidity"],
+              "R_US R_SS^-1 r_S": pd.Series(r_U, index=FACTORS),
+              "given": [f in given for f in FACTORS]}).round(3)
+'''),
+       ('md', r"""
+Two correlations given, four completed, and the completed column is exactly
+$\mathbf R_{US} \mathbf R_{SS}^{-1} \mathbf r_S$. Inflation ends at 0.276 and
+Real premia at 0.031, neither of them stated: the completion passes the two
+stated correlations through the existing matrix, and Inflation is close to
+Credit while Real premia is not.
+"""),
+       ('sec', ('s5', '5. An asset that loads on it', 'The only way the new factor reaches a portfolio.')),
+       ('md', r"""
+A factor nobody loads on changes nothing. Give the new tag a beta on it, here a
+fund with no history at all.
+"""),
+       ('code', r'''
+spec_6b = (spec_6.add("tags", {"tag": "private_credit", "Equity DM": 0.2, "Credit": 0.6, "Illiquidity": 0.5})
+                 .add("assets", {"ticker": "Private credit", "tag": "private_credit", "mean": 0.07, "vol": 0.10}))
+sim_6b = sim.with_spec(spec_6b)
+X6 = sim_6b.simulate(20000, seed=12); f6 = sim_6b.last_factors
+print("Illiquidity simulated: mean %.2f%%/yr, vol %.2f%%/yr, corr with Equity DM %.2f, with Credit %.2f"
+      % (A(f6["Illiquidity"].mean()), V(f6["Illiquidity"].std()), f6["Illiquidity"].corr(f6["Equity DM"]), f6["Illiquidity"].corr(f6["Credit"])))
+print("Private credit simulated: mean %.2f%%/yr, vol %.2f%%/yr, corr with Illiquidity %.2f"
+      % (A(X6["Private credit"].mean()), V(X6["Private credit"].std()), X6["Private credit"].corr(f6["Illiquidity"])))
+'''),
+       ('md', r"""
+The new factor arrives with the mean and volatility asked and the correlations
+stated, 0.36 and 0.45 against 0.35 and 0.45. The fund that loads 0.5 on it
+ends 0.64 correlated with it, and it is the only asset in the file that feels
+the new factor at all.
+"""),
+       ('sec', ('s6', '6. What is refused', 'Correlations with no valid completion.')),
+       ('md', r"""
+The stated correlations must be jointly possible. Equity DM and Credit
+correlate 0.61 in the sample. No factor can be 0.9 with one and -0.9 with the
+other.
+"""),
+       ('code', r'''
+print("corr(Equity DM, Credit) in the sample: %.2f" % F["Equity DM"].corr(F["Credit"]))
+try:
+    sim.with_spec(spec.add("factors", f_row)
+                      .add("factor_corr", {"factor_1": "Illiquidity", "factor_2": "Equity DM", "corr": 0.90})
+                      .add("factor_corr", {"factor_1": "Illiquidity", "factor_2": "Credit", "corr": -0.90}))
+    print("accepted")
+except ValueError as err:
+    print("refused:", err)
+'''),
+       ('md', r"""
+Loosen one of the two, or state fewer correlations and let the completion do
+the rest.
+""")])

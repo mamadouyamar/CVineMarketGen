@@ -1,0 +1,20 @@
+# -*- coding: utf-8 -*-
+"""examples/inputs/recipe_base.xlsx: eight funds, six factors, not one target. Every recipe starts here."""
+import numpy as np, pandas as pd, sys, os
+sys.path.insert(0, os.getcwd())
+from cvinemarketgen import MarketSpec
+
+FACTORS = ["Equity DM", "Equity EM", "Real premia", "Inflation", "Credit", "Commodity"]
+TAGS = {"equity_dm": (["SPY", "QQQ"], ["Equity DM"]),
+        "financials": (["XLF"], ["Equity DM", "Real premia", "Credit"]),
+        "treasury": (["TLT"], ["Real premia", "Inflation"]),
+        "aggregate_credit": (["LQD"], ["Real premia", "Inflation", "Credit"]),
+        "precious_metals": (["GLD"], ["Real premia", "Inflation", "Commodity"]),
+        "equity_em": (["EEM"], ["Equity DM", "Equity EM"]),
+        "commodity": (["DBC"], ["Commodity", "Inflation"])}
+A = pd.DataFrame([{"ticker": t, "tag": tag, "mean": np.nan, "vol": np.nan, "skew": np.nan, "kurt": np.nan}
+                  for tag, (tk, _) in TAGS.items() for t in tk])
+T = pd.DataFrame([{"tag": tag, **{f: ("fit" if f in fs else np.nan) for f in FACTORS}} for tag, (_, fs) in TAGS.items()])[["tag"] + FACTORS]
+spec = MarketSpec(assets=A, tags=T)
+spec.write("examples/inputs/recipe_base.xlsx")
+print(f"recipe_base.xlsx: {len(A)} assets, {len(T)} tags, {len(FACTORS)} factors, no targets")

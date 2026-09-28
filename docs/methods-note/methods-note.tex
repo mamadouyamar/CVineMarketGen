@@ -1,0 +1,405 @@
+%% Compile: pdflatex -interaction=nonstopmode methods-note.tex  (twice, for the references)
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue]{hyperref}
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\Cov}{Cov}
+\DeclareMathOperator{\Corr}{Corr}
+\newcommand{\bbeta}{\boldsymbol\beta}
+\newcommand{\bSigma}{\boldsymbol\Sigma}
+\newcommand{\bmu}{\boldsymbol\mu}
+\newcommand{\bff}{\mathbf f}
+\newcommand{\bR}{\mathbf R}
+\newcommand{\br}{\mathbf r}
+
+\title{A specification layer for factor-based market simulation\\
+\large Derivations for the CVineMarketGen notebooks}
+\author{Mamadou Yamar Thioub}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent An analyst who wants scenarios for a universe of assets rarely has a
+complete description of it. They have a history for some assets, a mean or a
+volatility for others, exposures for an asset class, a correlation they insist
+on, a view on a driver. This note states the rule that turns any such partial
+description into one simulator, and derives the boundaries of what can be
+asked: the feasible residual variance, the feasible residual shape, the range
+of a pair correlation, the largest correlation an asset can have with a factor,
+the completion of the correlations of a factor with no history. It closes with
+two selection questions: which copula family a pair of near-orthogonal factors
+can identify, and how the dynamics of a factor are chosen. Numbers appear only
+where one makes a statement concrete; the notebooks carry the numbers.
+\end{abstract}
+
+\section{The object}
+
+The simulator draws $K$ common factors and maps each simulated factor month to
+$N$ assets,
+\begin{equation}\label{eq:model}
+  r_j = \alpha_j + \bbeta_j' \bff + e_j, \qquad j = 1, \dots, N,
+\end{equation}
+with $\bff$ the factor vector, $e_j$ independent of $\bff$ and, except where a
+pair is targeted, of the other residuals. Writing $\mathbf B$ for the $N \times
+K$ matrix of betas and $\mathbf D$ for the diagonal matrix of residual
+variances, the implied covariance is
+\begin{equation}\label{eq:cov}
+  \bSigma_r = \mathbf B\, \bSigma_f\, \mathbf B' + \mathbf D ,
+\end{equation}
+which is what makes the exercise possible at all: $K(K+1)/2$ factor
+correlations and $NK$ betas in place of $N(N-1)/2$ asset correlations, and an
+asset with no history reduced to a row of $\mathbf B$ and one variance.
+
+The factor vector is drawn by a generator that reproduces the factors' means,
+volatilities, skewnesses, kurtoses, correlations, and, in the C-vine case,
+their pairwise tail dependence. The specification layer sits above it: it
+decides what the generator is asked for, and what each asset carries.
+
+\section{The four dimensions of knowledge, and one order}
+
+What an analyst can supply falls in four groups: a \emph{history} (of an asset,
+of a factor, of neither); \emph{moments} (a mean, a volatility, a skewness, a
+kurtosis, for an asset or for a factor); \emph{exposures} (a beta, or a
+correlation with a factor, stated for an asset or for a whole class); and
+\emph{pair correlations} between two assets or two factors. Any subset may be
+given, in any combination.
+
+The rule is a fixed order, each step taking the previous ones as given:
+\begin{enumerate}
+  \item \textbf{betas} --- stated values; correlations with a factor solved for
+        the beta; regression on the factors marked as fitted; zero elsewhere;
+  \item \textbf{volatility} --- the residual variance is the target variance
+        minus the systematic variance, or the history's residual variance when
+        no target is given;
+  \item \textbf{shape} --- the residual cumulants are the target cumulants
+        minus the systematic cumulants, or the history's residual shape;
+  \item \textbf{pair correlations} --- the residual correlation that delivers
+        the target, inside its feasible range;
+  \item \textbf{mean} --- the intercept absorbs it.
+\end{enumerate}
+The order is forced: the residual's scale cannot be computed before the betas,
+its shape not before its scale, a pair's room not before both, and the
+intercept is free of all of them. An empty cell is not a missing value but an
+instruction: estimate it. What is estimated is the model's own quantity --- the
+beta, the residual, the intercept --- and not the asset's moment, which is why a
+view on a factor reaches an asset whose cells are empty.
+
+\section{Betas}
+
+\subsection{A correlation with a factor as a linear constraint}
+
+Let $S$ be the set of factors for which a correlation $\rho_k$ with asset $j$
+is stated rather than a beta. Since $\Cov(r_j, f_k) = (\bSigma_f
+\bbeta_j)_k$, the constraint $\Corr(r_j, f_k) = \rho_k$ for $k \in S$ reads
+\begin{equation}\label{eq:corr_beta}
+  \bSigma_{SS}\, \bbeta_S \;=\; \sigma_j\, \big(\rho_k \sigma_{f_k}\big)_{k \in S}
+     \;-\; \bSigma_{S,-S}\, \bbeta_{-S} ,
+\end{equation}
+a linear system in $\bbeta_S$ once $\sigma_j$ and the other betas are known.
+When the asset has a volatility of its own, $\sigma_j$ is given and
+\eqref{eq:corr_beta} is solved once. When it does not, $\sigma_j$ is itself a
+function of the betas, and \eqref{eq:corr_beta} is iterated with
+\begin{equation}\label{eq:fixed_point}
+  \sigma_j^2 \;=\; \bbeta_j' \bSigma_f \bbeta_j + \Var(e_j), \qquad
+  e_j \;=\; r_j - \bbeta_j' \bff ,
+\end{equation}
+the residual being re-estimated at each pass. The iteration converges quickly
+in practice, but not every target is reachable.
+
+\subsection{The saturation bound}
+
+\begin{proposition}\label{prop:sat}
+Let asset $j$ have a history, no volatility target, and one factor $f$ with
+$\Corr(r_j, f) = \rho_0$ in the sample. If the beta on $f$ is set to $b$ and
+the residual is the empirical residual $e = r_j - bf$, then the correlation the
+model delivers is maximised at $b^\star = \sigma_{r_j} / (\rho_0 \sigma_f)$ and
+equals
+\begin{equation}\label{eq:rho_max}
+  \rho_{\max} \;=\; \frac{1}{\sqrt{2 - R_j^2}}, \qquad R_j^2 = \rho_0^2 .
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Write $x = b \sigma_f / \sigma_{r_j}$. The residual variance is
+$\Var(e) = \sigma_{r_j}^2 - 2b\,\Cov(r_j, f) + b^2 \sigma_f^2$, so by
+\eqref{eq:fixed_point} the asset's variance under the imposed beta is
+$\sigma_j^2 = 2b^2\sigma_f^2 - 2b\,\Cov(r_j,f) + \sigma_{r_j}^2$, and
+\[
+  \rho(x) \;=\; \frac{b \sigma_f^2}{\sigma_f \sigma_j}
+           \;=\; \frac{x}{\sqrt{1 - 2\rho_0 x + 2x^2}} .
+\]
+Setting the derivative of $\rho^2$ to zero gives $2x(1 - \rho_0 x) = 0$, hence
+$x^\star = 1/\rho_0$ and $\rho(x^\star) = (1/\rho_0) / \sqrt{2/\rho_0^2 - 1} =
+1/\sqrt{2 - \rho_0^2}$.
+\end{proof}
+
+\begin{remark}
+The bound is the price of leaving the volatility cell empty: raising the beta
+raises the covariance, but it raises the asset's own variance twice as fast,
+because the residual no longer fits. With several factors, $R_j^2$ is the share
+of variance the factors explain and \eqref{eq:rho_max} is an upper bound rather
+than an identity. A volatility in the assets sheet pins $\Var(e_j)$ through
+$\sigma_{e}^2 = v^2 - \bbeta'\bSigma_f\bbeta$ and removes the bound: any
+correlation up to the variance-feasibility limit is then attainable.
+\end{remark}
+
+\section{Volatility}
+
+With a target volatility $v$ and the betas fixed,
+\begin{equation}\label{eq:vol}
+  \sigma_e^2 \;=\; v^2 - \bbeta'\bSigma_f\bbeta \;>\; 0 ,
+\end{equation}
+so a target is feasible if and only if it exceeds the volatility the betas
+alone produce. This is the one refusal an analyst meets most often, and it is
+informative: it says the exposures and the volatility are inconsistent, and the
+refusal names the two largest contributors to $\bbeta'\bSigma_f\bbeta$ so that
+one knows which beta to lower. With no target, $\sigma_e$ is the sample residual
+standard deviation and the asset's volatility follows from \eqref{eq:cov}: a
+view on a factor then moves the asset's volatility, as it should.
+
+\section{Shape}
+
+\subsection{The cumulant rule}
+
+Cumulants of independent random variables add. With $s$ and $k$ the target
+skewness and kurtosis of $r_j$, $v$ its volatility and $\kappa_3, \kappa_4$ the
+third and fourth cumulants,
+\begin{equation}\label{eq:cumulants}
+  \kappa_{3,e} \;=\; s\,v^3 - \kappa_3(\bbeta'\bff), \qquad
+  \kappa_{4,e} \;=\; (k - 3)\,v^4 - \kappa_4(\bbeta'\bff),
+\end{equation}
+and the residual's standardised shape is $s_e = \kappa_{3,e}/\sigma_e^3$,
+$k_e = 3 + \kappa_{4,e}/\sigma_e^4$. The systematic cumulants are read off a
+large pilot draw of the fitted factor generator, which costs nothing and avoids
+assuming anything about the factors' joint law.
+
+Two things follow. First, the residual must carry the whole difference between
+what is asked and what the factors already give, so the smaller the residual
+share $\sigma_e^2/v^2$, the larger the shape the residual must have: dividing
+by $\sigma_e^3$ and $\sigma_e^4$ magnifies the demand. Second, the demand may
+leave the family of distributions the residual is drawn from.
+
+\subsection{The Johnson $S_U$ feasible region}
+
+The residual is drawn from a Johnson $S_U$ law,
+$X = \xi + \lambda \sinh\!\big((Z - \gamma)/\delta\big)$ with $Z$ standard
+normal, whose $(s, k)$ region is bounded below by the lognormal line: with
+$w = e^{1/\delta^2}$,
+\begin{equation}\label{eq:jsu_boundary}
+  |s| \;=\; (w + 2)\sqrt{w - 1}, \qquad
+  k \;=\; w^4 + 2w^3 + 3w^2 - 3 .
+\end{equation}
+Given $|s|$, the first equation has one root $w > 1$ (the left side is
+increasing) and the second gives the smallest kurtosis the family reaches at
+that skewness. The floor is $3$ at $s = 0$ and grows quickly: about $3.8$ at
+$|s| = 0.6$ and $7.6$ at $|s| = 1.5$. A pair $(s_e, k_e)$ below the line is
+refused, and the refusal reports $s_e$, $k_e$, the residual share and the shape
+the factors already give, which together say whether to soften the target or to
+lower the exposures.
+
+\begin{remark}
+The same floor acts silently in the other direction. When no shape is given and
+the sample residual of an asset is flatter than the family allows --- a residual
+kurtosis of $2.9$ at a skewness of $-0.3$, say --- the kurtosis is raised to the
+floor and the asset is flagged. The change is small, and hiding it would be
+worse than making it.
+\end{remark}
+
+\subsection{How precisely a shape is delivered}
+
+A mean and a volatility are matched by construction, up to Monte Carlo error. A
+shape is not: it is matched through a fitted marginal whose parameters solve
+\eqref{eq:cumulants} at the third and fourth moment, and the sample skewness
+and kurtosis of a finite draw of a heavy-tailed variable are themselves noisy.
+In the notebooks, a target skewness of $-0.5$ and kurtosis of $5$ on an asset
+whose residual is two thirds of its variance lands within about one tenth in
+skewness and half a point in kurtosis across seeds. A shape is a target, not an
+identity, and should be read at that resolution.
+
+\section{The correlation between two assets}
+
+\subsection{The eligible range}
+
+From \eqref{eq:model}, for two assets $i \ne j$,
+\begin{equation}\label{eq:pair}
+  \rho_{ij} \;=\; \underbrace{\frac{\bbeta_i' \bSigma_f \bbeta_j}{\sigma_i \sigma_j}}_{\rho^{\text{sys}}_{ij}}
+   \;+\; \rho_{e,ij}\sqrt{(1 - R_i^2)(1 - R_j^2)} ,
+\end{equation}
+where $R_i^2 = \bbeta_i'\bSigma_f\bbeta_i / \sigma_i^2$. The betas are already
+fixed by step 1, so the only free quantity is $\rho_{e,ij} \in [-1, 1]$, and
+\begin{equation}\label{eq:range}
+  \rho_{ij} \in \Big[\rho^{\text{sys}}_{ij} - w_{ij},\;
+                     \rho^{\text{sys}}_{ij} + w_{ij}\Big], \qquad
+  w_{ij} = \sqrt{(1 - R_i^2)(1 - R_j^2)} ,
+\end{equation}
+with the residual correlation that delivers a feasible target given by
+\begin{equation}\label{eq:rho_e}
+  \rho_{e,ij} \;=\; \frac{\rho_{ij}\,\sigma_i\sigma_j - \bbeta_i'\bSigma_f\bbeta_j}
+                         {\sigma_{e,i}\,\sigma_{e,j}} .
+\end{equation}
+Two well-explained assets have almost no room; two assets the factors barely
+touch have almost the whole interval. This is the honest answer to ``can I set
+the correlation between these two funds'': partly, and how much is a number you
+can compute before asking.
+
+\subsection{Several pairs at once}
+
+Each target writes one off-diagonal entry of the residual correlation matrix
+$\bR_e$ through \eqref{eq:rho_e}. Individually feasible targets may be jointly
+infeasible, and the condition is the one the matrix imposes: $\bR_e \succeq 0$.
+The smallest eigenvalue is checked once every pair has been written, and a
+negative one is reported with the assets involved rather than projected away,
+because a projection would silently move targets the analyst stated.
+
+\section{A factor with no history}
+
+A factor known only by a view needs a mean and a volatility --- there is nothing
+to estimate them from --- and its skewness and kurtosis fall back to the normal.
+Its correlations are the real question: an analyst will state one or two, and
+$K$ are needed.
+
+\begin{proposition}\label{prop:completion}
+Let $\bR$ be the correlation matrix of the $K$ existing factors, $S$ the set of
+factors whose correlation $\br_S$ with the new factor is stated, and $U$ the
+rest. Among all $\br_U$ making the extended matrix positive semidefinite, the
+determinant of that matrix is maximised by
+\begin{equation}\label{eq:completion}
+  \br_U \;=\; \bR_{US}\, \bR_{SS}^{-1}\, \br_S ,
+\end{equation}
+which is also the unique completion whose partial correlations between the new
+factor and $U$ given $S$ are zero. A completion exists if and only if
+$\br_S' \bR_{SS}^{-1} \br_S \le 1$.
+\end{proposition}
+
+\begin{proof}
+The extended matrix has determinant $\det(\bR)\,(1 - \br'\bR^{-1}\br)$ with
+$\br = (\br_S, \br_U)$, so maximising it is minimising the quadratic form
+$\br'\bR^{-1}\br$ over $\br_U$. Writing $\mathbf Q = \bR^{-1}$ in blocks, the
+first-order condition is $\mathbf Q_{US}\br_S + \mathbf Q_{UU}\br_U = 0$, hence
+$\br_U = -\mathbf Q_{UU}^{-1}\mathbf Q_{US}\br_S$; the block-inverse identities
+$\mathbf Q_{UU} = (\bR_{UU} - \bR_{US}\bR_{SS}^{-1}\bR_{SU})^{-1}$ and
+$\mathbf Q_{US} = -\mathbf Q_{UU}\bR_{US}\bR_{SS}^{-1}$ turn this into
+\eqref{eq:completion}. The conditional covariance of the new factor with $U$
+given $S$ is $\br_U - \bR_{US}\bR_{SS}^{-1}\br_S$, zero exactly at
+\eqref{eq:completion}. At the optimum $\br'\bR^{-1}\br = \br_S'\bR_{SS}^{-1}\br_S$,
+so the extended matrix is positive semidefinite for some $\br_U$ if and only if
+that quantity does not exceed one.
+\end{proof}
+
+The completion adds nothing to what was said: the new factor is related to the
+factors nobody mentioned only through the ones that were. The feasibility
+condition is also the whole story behind the refusal an analyst meets here. If
+two existing factors correlate $0.61$ with each other, a new factor cannot
+correlate $+0.9$ with one and $-0.9$ with the other: the quadratic form is then
+$4.6$, far above one.
+
+Once the correlations are settled, the new factor is attached to the fitted
+generator by a Gaussian conditional draw. Let $\mathbf z$ be the normal scores
+of the simulated existing factors and $\br$ the vector of target correlations.
+The new factor's normal score is drawn as
+\begin{equation}\label{eq:attach}
+  z_{new} \mid \mathbf z \;\sim\; \mathcal N\!\big(\br'\bR^{-1}\mathbf z,\;
+     1 - \br'\bR^{-1}\br\big),
+\end{equation}
+and mapped through the quantile function of its own marginal. The existing
+factors keep the joint law the vine gave them --- the attachment does not touch
+them --- and the new factor is joined to them by a Gaussian dependence, which is
+the least one can assume when only correlations were stated.
+
+\section{Why the copula layer is quiet on near-orthogonal factors}
+
+A factor model is built so that its factors are nearly uncorrelated, and a
+copula is then hard to identify. The reason is a matter of orders. Expand a
+bivariate copula density in the Hermite basis of the normal scores; for the
+Gaussian copula, Mehler's formula gives
+\begin{equation}\label{eq:mehler}
+  c_\rho(u,v) \;=\; \sum_{m \ge 0} \frac{\rho^m}{m!}\, H_m(x)\,H_m(y),
+  \qquad x = \Phi^{-1}(u),\; y = \Phi^{-1}(v).
+\end{equation}
+Every one-parameter family reduces to the independence copula at zero
+dependence, and matching two families on the Pearson correlation $\rho$ forces
+their first Hermite coefficient to agree. Families therefore differ only from
+the second coefficient on: their densities differ by $O(\rho^2)$, and the
+expected log-likelihood gap per observation, a Kullback-Leibler divergence
+between two densities at distance $O(\rho^2)$, is $O(\rho^4)$.
+
+Put numbers on it. At $\rho = 0.1$ and $n = 230$ monthly observations, the
+expected gap is of order $n\rho^4 \approx 0.02$ in log-likelihood, while the BIC
+penalty for one extra parameter is $\tfrac12\log n \approx 2.7$ and the sampling
+standard deviation of the gap is larger still. No selection rule can separate
+the families there, and none should pretend to. The consequence for practice is
+not that the copula is useless but that it earns its place elsewhere: between
+asset classes, where correlations are $0.5$ and above and a Student t or a
+rotated Gumbel is chosen against a Gaussian with a clear margin, and in the
+tails of a regime model. At the premia level, a Gaussian dependence with the
+right marginals is an honest answer.
+
+Whether a pair's dependence is asymmetric is a separate question, and the
+package answers it with a statistic rather than a family fit: the mean
+exceedance correlation below $-1$ standard deviation minus the mean above $+1$,
+computed on normal scores, with a bootstrap interval. A pair whose interval
+contains zero is given a symmetric family and nothing else is read into it.
+
+\section{Choosing the dynamics of a factor}
+
+A one-period generator has no memory, and a factor's history has one. The
+dynamics of a factor is chosen among a grid of candidates --- a constant or an
+AR(1) mean, a constant variance, a GARCH, a GJR-GARCH or an EGARCH at orders up
+to two, a Gaussian hidden Markov model with two or three regimes --- by one rule
+in two steps.
+
+\paragraph{Step 1: goodness of fit.} Every candidate is filtered, and its
+generalized error is mapped to a uniform,
+\begin{equation}\label{eq:rosenblatt}
+  v_t \;=\; F\!\left(\varepsilon_t \mid \mathcal F_{t-1}; \hat{\boldsymbol\theta}\right) ,
+\end{equation}
+the Rosenblatt transform of the observation under the fitted model. If the
+model is correctly specified, $(v_t)$ is i.i.d.\ uniform on $(0,1)$. The
+discrepancy is measured by the Cramér-von Mises statistic
+\begin{equation}\label{eq:cvm}
+  S_n \;=\; \frac{1}{12n} + \sum_{i=1}^{n}\left(v_{(i)} - \frac{i - 1/2}{n}\right)^{\!2} ,
+\end{equation}
+whose null distribution depends on the estimated parameters, so the $p$-value
+is obtained by parametric bootstrap: $B$ series are simulated from the fitted
+model, each is refitted, its own statistic computed, and the $p$-value is the
+share of bootstrap statistics above the observed one. A candidate is admissible
+when that $p$-value is at least the level. For a GARCH filter whose innovation
+is a Johnson $S_U$ --- what the generator actually simulates --- the uniforms are
+taken through that marginal, and the bootstrap refits the marginal as well;
+testing such a model against a Gaussian $F$ would reject it for a defect it
+does not have.
+
+\paragraph{Step 2: BIC among the admissible.} Among the candidates that pass,
+the one with the lowest BIC is kept. The order matters and is not
+interchangeable: the test asks whether a model is adequate, an information
+criterion only ranks models against each other and will happily return the best
+of a set of bad ones. Ljung-Box statistics on the generalized error and on its
+square, and an ARCH-LM statistic, are reported alongside, as diagnostics of
+\emph{what} a rejected model got wrong. They do not enter the rule.
+
+If no candidate passes, the lowest BIC overall is returned with a warning
+saying so, which is the honest output: the grid does not contain a model this
+series cannot reject.
+
+\section{What the rule does not do}
+
+Three limits are worth stating plainly. The betas are estimated by ordinary
+least squares on the factors marked as fitted, with no shrinkage and no
+variable selection: an asset with a short history and many factors will
+overfit, and the remedy in the specification layer is to state fewer factors
+per class rather than to regress more. The residuals are independent except
+where a pair is targeted, so a cluster of assets that move together for a
+reason no factor captures needs one pair per link, and the joint
+positive-semidefinite condition of \S6.2 will eventually bind. And the
+scenarios are exchangeable months: the layer above, a filter per factor with
+its errors drawn jointly, is what gives them an order in time.
+
+\end{document}

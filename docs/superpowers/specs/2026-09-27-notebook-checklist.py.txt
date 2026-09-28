@@ -1,0 +1,53 @@
+# -*- coding: utf-8 -*-
+"""The checklist of docs/notebook-principles.md, run on a notebook."""
+import json, re, sys
+
+def words(s):
+    return len([w for w in re.split(r'\s+', s.strip()) if w])
+
+def sentences(md):
+    md = re.sub(r'\$\$.*?\$\$', ' EQ ', md, flags=re.S)
+    md = re.sub(r'`[^`]*`', ' CODE ', md)
+    md = re.sub(r'\|.*\|', ' ', md)                        # tables
+    md = re.sub(r'<[^>]+>', ' ', md)
+    out = []
+    for para in md.split('\n\n'):
+        p = para.strip()
+        if not p or p.startswith(('#', '-', '*', '|', '1.', '2.', '3.', '4.')) or p == '---':
+            continue
+        out += [s.strip() for s in re.split(r'(?<=[.!?])\s+', p) if s.strip()]
+    return out
+
+def check(path):
+    nb = json.load(open(path)); cells = nb['cells']
+    bad = []
+    n_err = sum(1 for c in cells for o in c.get('outputs', []) if o.get('output_type') == 'error')
+    if n_err: bad.append(f'{n_err} errors in the outputs')
+    code = [i for i, c in enumerate(cells) if c['cell_type'] == 'code']
+    if not all(cells[i].get('outputs') for i in code): bad.append('a code cell has no output')
+    text = '\n'.join(''.join(c['source']) for c in cells if c['cell_type'] == 'markdown')
+    ids = set(re.findall(r'<a id="([^"]+)"></a>', text))
+    for a in set(re.findall(r'\]\(#([^)]+)\)', text)):
+        if a not in ids: bad.append(f'link #{a} has no anchor')
+    for i in code:
+        if i == 0 or cells[i - 1]['cell_type'] != 'markdown': bad.append(f'cell {i}: no sentence above the code')
+        n_ex = sum(1 for o in cells[i].get('outputs', []) if o.get('output_type') in ('display_data', 'execute_result'))
+        n_ex += sum(1 for o in cells[i].get('outputs', []) if o.get('output_type') == 'stream')
+        if n_ex > 2: bad.append(f'cell {i}: {n_ex} exhibits')
+        if i and cells[i - 1]['cell_type'] == 'markdown':
+            ss = sentences(''.join(cells[i - 1]['source']))
+            if ss and words(ss[-1]) > 20: bad.append(f'cell {i}: announcement of {words(ss[-1])} words')
+    ss = sentences(text)
+    long = [s for s in ss if words(s) > 40]
+    banned = [b for b in ('the useful part', 'worth knowing', 'the reader should', 'needs its own explanation',
+                          'is a warning, not a result') if b in text.lower()]
+    if banned: bad.append(f'banned phrases {banned}')
+    print(f'{path}: {len(cells)} cells, {len(code)} code blocks, {words(text)} markdown words, '
+          f'mean sentence {sum(words(s) for s in ss) / max(len(ss), 1):.1f} words, {len(long)} over 40')
+    for s in long: print('   long:', s[:110])
+    for b in bad: print('   FAIL:', b)
+    return not bad
+
+if __name__ == '__main__':
+    ok = all([check(p) for p in sys.argv[1:]])
+    print('PASS' if ok else 'FAIL')
