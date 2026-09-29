@@ -13,6 +13,9 @@
   condition `r_S' R_SS^-1 r_S <= 1`, why a copula family cannot be identified at
   rho = 0.1, and goodness-of-fit then BIC. `docs/notebook-principles.md` holds
   the standard both obey.
+- A GARCH fit that does not converge no longer writes to stderr: `arch` prepends
+  `filterwarnings('always', '', ConvergenceWarning)` inside its own fit, which no
+  caller can override, so both fits now pass `show_warning=False`.
 - `cvinemarketgen.excel_view`: a workbook draws itself as the file it is
   (column letters, the sheet's own row numbers, empty cells empty), with
   `show_workbook`, `show_sheet`, `show_change` (an edit shown in its context)
