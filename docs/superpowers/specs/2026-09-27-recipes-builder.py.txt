@@ -615,12 +615,11 @@ pd.concat([pd.DataFrame({"mean (%/yr)": A(sim.targets.mean), "vol (%/yr)": V(sim
        ('md', r"""
 Equity DM goes from the sample's 7.60 percent a year to 5.00, and from 16.15
 percent of volatility to 18.00. Credit's skewness and kurtosis go from -1.86
-and 16.71 to -1.00 and 8.00. Every cell left empty keeps the history's value,
-and a factor absent from the sheet is entirely the history's.
+and 16.71 to -1.00 and 8.00. Nothing else moved.
 """),
        ('sec', ('s4', '4. What it does to the assets', 'One line per beta.')),
        ('md', r"""
-Each asset's mean moves by its Equity DM beta times the change in that factor's mean.
+Every asset's mean, before and after.
 """),
        ('code', r'''
 m0 = sim.model.alpha + sim.model.beta @ sim.targets.mean.loc[sim.model.factors]
