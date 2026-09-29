@@ -13,6 +13,11 @@
   condition `r_S' R_SS^-1 r_S <= 1`, why a copula family cannot be identified at
   rho = 0.1, and goodness-of-fit then BIC. `docs/notebook-principles.md` holds
   the standard both obey.
+- The documentation builds without a warning: in-notebook links are
+  `<a href="#anchor">` (myst-nb reads `[text](#anchor)` as a cross-reference it
+  cannot resolve, so every contents entry warned), `conf.py` clears its copy of
+  `examples/` before the build, the notebook standard is in the toctree, and four
+  docstrings that broke docutils are fixed.
 - A GARCH fit that does not converge no longer writes to stderr: `arch` prepends
   `filterwarnings('always', '', ConvergenceWarning)` inside its own fit, which no
   caller can override, so both fits now pass `show_warning=False`.
