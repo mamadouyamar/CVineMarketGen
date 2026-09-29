@@ -35,8 +35,6 @@ refused. Six sections, one screen of prose each.
 
 # How to build a notebook
 
----
-
 ## 1. Open on the problem, not on the tool
 
 The first cell states the problem the reader already has, in their words, and

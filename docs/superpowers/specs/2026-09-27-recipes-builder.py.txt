@@ -10,7 +10,7 @@ FILES = [('r1_exposures', 'what an asset loads on'),
          ('r5_factor_views', 'a view on a factor'),
          ('r6_factor_without_history', 'a factor with no history')]
 
-BACK = '<sub>[back to contents](#toc)</sub>'
+BACK = '<sub><a href="#toc">back to contents</a></sub>'
 BASE = r'''
 import os, sys, warnings
 import numpy as np
@@ -82,7 +82,7 @@ def build(name, title, lead, toc, body):
 | | |
 |---|---|
 {rows}
-| **[Where to look next](#next)** | the other recipes and the derivations |''')
+| **<a href="#next">Where to look next</a>** | the other recipes and the derivations |''')
     md(f'---\n\n<a id="s1"></a>\n## 1. The base\n\n{BACK}\n\nEight funds, six factors, nothing imposed.')
     md(BASE_MD)
     code(BASE)

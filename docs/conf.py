@@ -25,6 +25,7 @@ extensions = [
 _here = os.path.dirname(__file__)
 _src = os.path.join(_here, '..', 'examples')
 _dst = os.path.join(_here, 'examples')
+shutil.rmtree(_dst, ignore_errors=True)            # the copies of notebooks that no longer exist warn as orphans
 os.makedirs(_dst, exist_ok=True)
 for _f in os.listdir(_src):
     if _f.endswith('.ipynb'):

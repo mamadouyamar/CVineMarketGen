@@ -248,6 +248,8 @@ class FactorMarket:
     market_kwargs : dict
         Passed to the generator (families, symmetry_level, ...).
 
+    Notes
+    -----
     After ``fit``: ``targets`` (factor Targets), ``market`` (the generator), ``model``
     (a :class:`~cvinemarketgen.factors.FactorModel` ready to simulate), ``report``
     (per asset), ``factor_report`` (per factor).

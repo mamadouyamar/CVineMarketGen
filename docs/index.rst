@@ -59,6 +59,7 @@ and the notebooks show them with outputs.
    method
    examples
    api
+   notebook-principles
    changelog
 
 Citation

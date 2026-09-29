@@ -785,9 +785,13 @@ class CVineGenerator(MomentMatch, CopulaTools):
 
     @staticmethod
     def gaussian_hinv1(u1, p, rho):
-        """Inverse :math:`h`-function of the Gaussian copula in closed form:
-        :math:`\Phi(\rho\,\Phi^{-1}(u_1) + \sqrt{1-\rho^2}\,\Phi^{-1}(p))`. pyvinecopulib's is
-        a hundred times slower than Clayton's and dominated the calibration."""
+        r"""
+        Inverse :math:`h`-function of the Gaussian copula, in closed form.
+
+        :math:`\Phi(\rho \Phi^{-1}(u_1) + \sqrt{1 - \rho^2} \Phi^{-1}(p))`.
+        pyvinecopulib's is a hundred times slower than Clayton's and dominated the
+        calibration.
+        """
         from scipy.special import ndtr, ndtri
         eps = 1e-10
         x1 = ndtri(np.clip(np.asarray(u1, float), eps, 1 - eps)); q = ndtri(np.clip(np.asarray(p, float), eps, 1 - eps))

@@ -4,7 +4,7 @@ import json, sys, os
 cells = []
 def md(s): cells.append({"cell_type": "markdown", "metadata": {}, "source": s.strip("\n")})
 def code(s): cells.append({"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip("\n")})
-BACK = '<sub>[back to contents](#toc)</sub>'
+BACK = '<sub><a href="#toc">back to contents</a></sub>'
 def sec(anchor, title, purpose):
     md(f'---\n\n<a id="{anchor}"></a>\n## {title}\n\n{BACK}\n\n{purpose}')
 
@@ -18,15 +18,15 @@ md(r"""
 
 | | |
 |---|---|
-| **[1. The problem](#s1)** | a universe is too big to describe asset by asset |
-| **[2. How it works](#s2)** | draw a few factors, map them to every asset |
-| **[3. The workbook](#s3)** | one file holds everything you know |
-| **[4. The data](#s4)** | the two return histories |
-| **[5. Fit](#s5)** | one call, and where every number came from |
-| **[6. Check](#s6)** | the simulation against what you asked for |
-| **[7. Scenarios out](#s7)** | the cross-section, the paths, the saved simulator |
-| **[8. The answer](#s8)** | what your portfolio's tail looks like |
-| **[9. What this misses](#s9)** | and what comes next |
+| **<a href="#s1">1. The problem</a>** | a universe is too big to describe asset by asset |
+| **<a href="#s2">2. How it works</a>** | draw a few factors, map them to every asset |
+| **<a href="#s3">3. The workbook</a>** | one file holds everything you know |
+| **<a href="#s4">4. The data</a>** | the two return histories |
+| **<a href="#s5">5. Fit</a>** | one call, and where every number came from |
+| **<a href="#s6">6. Check</a>** | the simulation against what you asked for |
+| **<a href="#s7">7. Scenarios out</a>** | the cross-section, the paths, the saved simulator |
+| **<a href="#s8">8. The answer</a>** | what your portfolio's tail looks like |
+| **<a href="#s9">9. What this misses</a>** | and what comes next |
 
 Each thing you can put in the workbook has its own short recipe in
 `examples/recipes/`. The derivations are in the methods note,

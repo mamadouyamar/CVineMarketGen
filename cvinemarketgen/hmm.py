@@ -36,6 +36,8 @@ class GaussianHMM:
     max_iter, eps, ninit : EM settings passed to GenHMM1d (``ninit`` EM steps are
         always run, then up to ``max_iter`` until the relative parameter change is below ``eps``).
 
+    Notes
+    -----
     Attributes after ``fit``: ``mu``, ``sigma``, ``Q``, ``eta_T`` (filtered
     probabilities at the last observation), ``regimes`` (filtered probabilities of
     the sample), ``cvm`` (Cramér-von Mises statistic of the uniforms), ``loglik``,

@@ -2,7 +2,7 @@
 """
 The structural layer: a child variable driven by parent variables of the same
 market plus its own innovation, which is the child's residual layer. On a path
-the parents are simulated first and the child is rebuilt from them.
+the parents are simulated first and the child is rebuilt from them::
 
     ecm    (levels):  Delta s_t = c + kappa s_{t-1} + b' z_{t-1} + gamma' Delta z_t + sum_i phi_i Delta s_{t-i} + sigma eps_t
                       long-run relation theta = -b / kappa, adjustment kappa < 0

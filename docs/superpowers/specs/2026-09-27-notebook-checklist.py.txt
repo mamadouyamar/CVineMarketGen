@@ -27,7 +27,9 @@ def check(path):
     if not all(cells[i].get('outputs') for i in code): bad.append('a code cell has no output')
     text = '\n'.join(''.join(c['source']) for c in cells if c['cell_type'] == 'markdown')
     ids = set(re.findall(r'<a id="([^"]+)"></a>', text))
-    for a in set(re.findall(r'\]\(#([^)]+)\)', text)):
+    links = set(re.findall(r'\]\(#([^)]+)\)', text)) | set(re.findall(r'href="#([^"]+)"', text))
+    if not links: bad.append('no in-page links at all')
+    for a in links:
         if a not in ids: bad.append(f'link #{a} has no anchor')
     for i in code:
         if i == 0 or cells[i - 1]['cell_type'] != 'markdown': bad.append(f'cell {i}: no sentence above the code')
