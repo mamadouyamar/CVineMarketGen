@@ -251,7 +251,7 @@ fl = sim.report.loc[sim.report["flags"] != "", "flags"]; print(f"{len(fl)} flags
 fl.to_frame()
 ''')
 md("""The factor means, volatilities and skewnesses come back to the second decimal
-and the correlations are within 0.033. Two kurtoses land above target, Equity
+and the correlations to within 0.04. Two kurtoses land above target, Equity
 EM at 3.10 against 2.98 and Small cap at 3.29 against 2.96: those are exactly
 the Johnson SU floors at their skewnesses, and no member of the family is
 flatter. On the assets the largest mean difference is 1.00 %/yr against a
@@ -315,9 +315,9 @@ for name, w in [("equal weight, 68 funds", w_eq), ("60/40", w_bal)]:
                                                  "ES 5% (%)": -(m - s * stats.norm.pdf(stats.norm.ppf(0.05)) / 0.05) * 100}
 pd.DataFrame(rows).T.round(2)
 ''')
-md("""Both simulated portfolios are slightly quieter than the sample, 3.88 percent a
+md("""Both simulated portfolios are slightly quieter than the sample, 3.9 percent a
 month against 4.12 for equal weight, and their shape is the sample's:
-skewness -0.62 against -0.63, kurtosis 4.76 against 5.30. A normal with the
+skewness -0.62 against -0.63, kurtosis 4.8 against 5.30. A normal with the
 same mean and volatility puts the expected shortfall 1.4 points too low on
 equal weight and 1.1 too low on 60/40. That gap is what the factor shapes and
 the residual copula add to the answer.""")
