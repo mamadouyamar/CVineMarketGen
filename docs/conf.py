@@ -35,6 +35,10 @@ os.makedirs(_rdst, exist_ok=True)
 for _f in os.listdir(_rsrc):
     if _f.endswith('.ipynb'):
         shutil.copy(os.path.join(_rsrc, _f), os.path.join(_rdst, _f))
+_note = os.path.join(_here, 'methods-note', 'methods-note.pdf')      # the derivations, served with the docs
+if os.path.exists(_note):
+    os.makedirs(os.path.join(_here, '_static'), exist_ok=True)
+    shutil.copy(_note, os.path.join(_here, '_static', 'methods-note.pdf'))
 nb_execution_mode = 'off'
 myst_enable_extensions = ['dollarmath', 'colon_fence']
 
