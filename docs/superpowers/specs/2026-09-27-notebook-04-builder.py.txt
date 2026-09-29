@@ -6,14 +6,14 @@ def md(s): cells.append({"cell_type": "markdown", "metadata": {}, "source": s.st
 def code(s): cells.append({"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip("\n")})
 
 READINGS = {
- "READ_STEP1": "**What the tests say.** Nothing to predict in the level: the Ljung-Box\n$p$-value on the returns is 0.48, and the bars in the left panel stay inside\nthe band. Everything to predict in the size: 0.0001 on the squares and 0.001\nfor ARCH-LM, and the right panel is outside the band for the first four lags.\n\nSo the filter has one job. It has to take the size out, and it can leave the\nlevel alone.",
- "READ_GARCH": "**What the fit says.** Persistence 0.80, which puts the half-life of a shock\nat about three months, and an unconditional volatility of 16.3 percent a year\nagainst 16.1 in the sample. The fitted volatility runs from 10 percent in the\ncalm stretches to above 40 in late 2008.\n\nThe error is what matters. Its three $p$-values are 0.87, 0.53 and 0.60,\nagainst 0.48, 0.0001 and 0.001 for the returns. What was in the squares is\ngone. The filter did its one job.",
- "READ_HMM": "**What the fit says.** Two regimes: one at $-0.4$ percent a year with a\nvolatility of 21, one at 16 percent a year with a volatility of 8. Both last\nabout ten months. That is a crisis state and a normal state, and the picture\nshows the chain sitting in the first one through 2008, 2020 and 2022.\n\nThree regimes fit something else. The middle state is the normal one, but the\nother two last 2.5 and 1.2 months and have means of $-57$ and $+93$ percent a\nyear. Those are not volatility states, they are outlier catchers: with twelve\nparameters on 230 months, the likelihood is maximised by putting a state on a\nhandful of extreme months.\n\nThat shows up in the error. The Rosenblatt transform divides out the model's\npredictive variance, so a variance that spikes for one month and reverts does\nnot track the long turbulent stretches of 2008, 2020 and 2022, and they stay\nin the error: ARCH-LM gives 0.028, a rejection at 5 percent, and the squares\n0.056, on the line. The two-regime error is clear on all three, 0.71, 0.58\nand 0.56.",
- "READ_GOF": "**What the test says.** Two of the three pass. The GARCH with the error it\nwill actually simulate has a $p$-value of 0.16: its uniforms are as far from\nflat as 16 percent of the series the fitted model generates itself. The\ntwo-regime hidden Markov model passes at 0.33.\n\nThe same GARCH with a Gaussian error is rejected outright, $p = 0.00$. The\nmiddle histogram shows why: too much mass in the lowest bin, too little in\nthe highest, which is a skewness of $-0.67$ that no normal can carry. The\nfilter is right and the error's distribution is wrong, and that is enough to\nreject the pair.\n\nOne caveat carries into the next section. The statistic looks at the\n*distribution* of the pseudo-observations, not at their order in time. A\nmodel whose error is still clustered can pass it if the marginal is right.",
- "READ_SELECT": "**What the table says.** Twenty-seven of the twenty-eight are admissible. The\nonly rejection is the three-regime hidden Markov model at 0.04, the model\nthat spent two of its states on a handful of outliers.\n\nAmong the twenty-seven the BIC decides, and it takes the GJR(1,1) with a\nconstant mean. It beats the plain GARCH by 14.5 units for one extra\nparameter, which costs 5.4, so the asymmetry term earns its place: $\\alpha$ is\nzero and $\\gamma$ is 0.45, so only falls raise next month's variance. The\ntwo-regime hidden Markov model is eleventh, 20 units behind, and admissible,\nso the next section keeps it as the alternative description.\n\nTwo constant-variance models are admissible as well, at 0.30 and 0.18. That\nis a fact about the test, not about them: it compares the distribution of the\npseudo-observations with the uniform and never looks at their order in time,\nso a model that leaves the clustering in its error can still pass. The BIC\nputs them last anyway, 38 units behind.",
- "READ_PATHS": "**What the paths say.** The two-year volatility is 23 percent for the GJR\nagainst 22 in the history, 28 for the hidden Markov model and 27 for\nindependent draws. The GJR is closest because it starts from the calm\nvariance of mid-2026, which holds its first months down. The hidden Markov\nmodel is wide for a different reason: its two regimes are 16 percentage\npoints apart in mean, so a path that stays in one of them for two years ends\nfar from a path that stays in the other.\n\nThe autocorrelation of the squares is 0.07 and 0.03 along the paths against\n0.31 in the history. Both are too low, and the history's 0.31 is one episode,\n2008 to 2009, measured over 230 months; the path figure is measured over 24.\n\n**The kurtosis column is a warning, not a result.** The GJR paths pool to 19\nagainst 4.6 in the history, but the median path has a kurtosis of 2.8 and the\n95th percentile 5.3. The pooled figure comes from a few explosive paths: 6\npercent of them contain a month worse than the worst in the sample, and the\nlargest simulated month is 89 percent.\n\nThe second table says why. The fourth-moment condition of this model is 1.02,\njust above one, so its unconditional kurtosis is infinite and any pooled\nestimate grows with the number of paths. The persistence of 0.85 is not the\nproblem; the size of $\\gamma$ is. Neither the likelihood nor the\ngoodness-of-fit test can see this, because both look at 230 standardized\nerrors and this is a property of the recursion. The hidden Markov model, whose\nvariance is bounded in each state, pools to 5.4.\n\nIf you use the paths, compute that condition and count the paths that exceed\nthe worst observed month. Notebook 05 returns to it with seven factors\nrunning at once.",
- "READ_DAILY": "**What the daily data say.** The test discriminates here. Ten of the\ntwenty-seven pass and every one of them is a GJR; the best GARCH without the\nasymmetry term is rejected at $p = 0.00$ despite a BIC only 190 units worse.\nDay to day, the fall-raises-variance effect is not a refinement, it is what\nthe data insist on. The winner is again the GJR(1,1) with a constant mean,\n$\\gamma = 0.22$ and $\\beta = 0.86$, a persistence of 0.97 and a shock\nhalf-life of about a month of trading days.\n\nOn the paths the model does the trader's job. The autocorrelation of the\nsquares is 0.17 along a path against 0.25 in the history and $-0.01$ for\nindependent draws: the clustering survives the inversion. The median worst\nday of a year is $-3.9$ percent against $-3.8$ in the rolling history, where\nindependent draws give $-5.2$. Without clustering the fat tail spends its\nextreme days at random and every year gets one; with clustering the extreme\ndays arrive together and most years get none.\n\nThe one-year volatility is 18.8 against 16.8 and the 5 percent quantile\n$-23.5$ against $-19.1$: too wide, for the reason above. The fourth-moment\ncondition here is 1.07 and the pooled kurtosis 47 against 17. A year of daily\nsteps gives the recursion 252 chances to run away, so the check matters more\nhere than at the monthly frequency.",
- "READ_SAVE": "**What the file holds.** The parameters, the last observed return and\nvariance, which is where a path starts, and the shape of the error, skewness\n$-0.67$ and kurtosis 3.47, which is what the Johnson SU is fitted to. The\nreloaded model reproduces the paths exactly, so the file is the object and\nnot a summary of it."
+ "READ_STEP1": "Nothing to predict in the level: the Ljung-Box\n$p$-value on the returns is 0.48, and the bars in the left panel stay inside\nthe band. Everything to predict in the size: 0.0001 on the squares and 0.001\nfor ARCH-LM, and the right panel is outside the band for the first four lags.\n\nSo the filter has one job. It has to take the size out, and it can leave the\nlevel alone.",
+ "READ_GARCH": "Persistence 0.80, which puts the half-life of a shock\nat about three months, and an unconditional volatility of 16.3 percent a year\nagainst 16.1 in the sample. The fitted volatility runs from 10 percent in the\ncalm stretches to above 40 in late 2008.\n\nThe error is what matters. Its three $p$-values are 0.87, 0.53 and 0.60,\nagainst 0.48, 0.0001 and 0.001 for the returns. What was in the squares is\ngone. The filter did its one job.",
+ "READ_HMM": "Two regimes: one at $-0.4$ percent a year with a\nvolatility of 21, one at 16 percent a year with a volatility of 8. Both last\nabout ten months. That is a crisis state and a normal state, and the picture\nshows the chain sitting in the first one through 2008, 2020 and 2022.\n\nThree regimes fit something else. The middle state is the normal one, but the\nother two last 2.5 and 1.2 months and have means of $-57$ and $+93$ percent a\nyear. Those are not volatility states, they are outlier catchers: with twelve\nparameters on 230 months, the likelihood is maximised by putting a state on a\nhandful of extreme months.\n\nThat shows up in the error. The Rosenblatt transform divides out the model's\npredictive variance, and a variance that spikes for one month and reverts does\nnot track the long turbulent stretches of 2008, 2020 and 2022. They stay in\nthe error: ARCH-LM rejects at 0.028 and the squares sit on the line at 0.056. The two-regime error is clear on all three, 0.71, 0.58\nand 0.56.",
+ "READ_GOF": "Two of the three pass. The GARCH with the error it\nwill actually simulate has a $p$-value of 0.16: its uniforms are as far from\nflat as 16 percent of the series the fitted model generates itself. The\ntwo-regime hidden Markov model passes at 0.33.\n\nThe same GARCH with a Gaussian error is rejected outright, $p = 0.00$. The\nmiddle histogram shows why: too much mass in the lowest bin, too little in\nthe highest, which is a skewness of $-0.67$ that no normal can carry. The\nfilter is right and the error's distribution is wrong, and that is enough to\nreject the pair.\n\nOne caveat carries into the next section. The statistic looks at the\n*distribution* of the pseudo-observations, not at their order in time. A\nmodel whose error is still clustered can pass it if the marginal is right.",
+ "READ_SELECT": "Twenty-seven of the twenty-eight are admissible. The\nonly rejection is the three-regime hidden Markov model at 0.04, the model\nthat spent two of its states on a handful of outliers.\n\nAmong the twenty-seven the BIC decides, and it takes the GJR(1,1) with a\nconstant mean. It beats the plain GARCH by 14.5 units for one extra\nparameter, which costs 5.4, so the asymmetry term earns its place: $\\alpha$ is\nzero and $\\gamma$ is 0.45, so only falls raise next month's variance. The\ntwo-regime hidden Markov model is twelfth, 20 units behind, and admissible,\nso the next section keeps it as the alternative description.\n\nTwo constant-variance models are admissible as well, at 0.30 and 0.18. The\ntest compares the distribution of the pseudo-observations with the uniform and\nnever looks at their order in time. A model that leaves the clustering in its\nerror can therefore pass, and the BIC puts these two last anyway, 38 units\nbehind.",
+ "READ_PATHS": "The two-year volatility is 23 percent for the GJR\nagainst 22 in the history, 28 for the hidden Markov model and 27 for\nindependent draws. The GJR is closest because it starts from the calm\nvariance of mid-2026, which holds its first months down. The hidden Markov model is wide for another reason. Its two regimes are 16\npercentage points apart in mean, so a path that stays in one for two years\nends far from a path that stays in the other.\n\nThe autocorrelation of the squares is 0.07 and 0.03 along the paths against\n0.31 in the history. Both are too low, and the history's 0.31 is one episode,\n2008 to 2009, measured over 230 months; the path figure is measured over 24.\n\nThe kurtosis column does not describe a typical path. The GJR paths pool to 19\nagainst 4.6 in the history, while the median path has a kurtosis of 2.8 and\nthe 95th percentile 5.3. The pooled figure comes from a few explosive paths: 6\npercent of them contain a month worse than the worst in the sample, and the\nlargest simulated month is 89 percent.\n\nThe second table says why. The fourth-moment condition of this model is 1.02,\njust above one, so its unconditional kurtosis is infinite and any pooled\nestimate grows with the number of paths. The persistence of 0.85 is not the\nproblem; the size of $\\gamma$ is. Neither the likelihood nor the\ngoodness-of-fit test can see this, because both look at 230 standardized\nerrors and this is a property of the recursion. The hidden Markov model, whose\nvariance is bounded in each state, pools to 5.4.\n\nIf you use the paths, compute that condition and count the paths that exceed\nthe worst observed month. Notebook 05 returns to it with seven factors\nrunning at once.",
+ "READ_DAILY": "Ten of the twenty-seven pass, and the two\nhalves of the rule pull against each other. The eight GJR models pass; every\nGARCH and EGARCH without the asymmetry term is rejected at $p = 0.00$,\nthough the best of them sits only 187 BIC units behind. The other two passers\nhave a constant variance and no dynamics at all, which the test cannot see:\nit reads the distribution of the pseudo-observations, never their order in\ntime, and the BIC puts them 2,800 units behind. Day to day, the\nfall-raises-variance effect is not a refinement, it is what the data insist\non. The winner is again the GJR(1,1) with a constant mean,\n$\\gamma = 0.22$ and $\\beta = 0.86$, a persistence of 0.97 and a shock\nhalf-life of about a month of trading days.\n\nOn the paths the model does the trader's job. The autocorrelation of the\nsquares is 0.17 along a path against 0.25 in the history and $-0.01$ for\nindependent draws: the clustering survives the inversion. The median worst\nday of a year is $-3.9$ percent against $-3.8$ in the rolling history, where\nindependent draws give $-5.2$. Without clustering the fat tail spends its\nextreme days at random and every year gets one; with clustering the extreme\ndays arrive together and most years get none.\n\nThe one-year volatility is 18.8 against 16.8 and the 5 percent quantile\n$-23.5$ against $-19.1$: too wide, for the reason above. The fourth-moment\ncondition here is 1.07 and the pooled kurtosis 47 against 17. A year of daily\nsteps gives the recursion 252 chances to run away, so the check matters more\nhere than at the monthly frequency.",
+ "READ_SAVE": "The parameters, the last observed return and\nvariance, which is where a path starts, and the shape of the error, skewness\n$-0.67$ and kurtosis 3.47, which is what the Johnson SU is fitted to. The\nreloaded model reproduces the paths exactly, so the file is the object and\nnot a summary of it."
 }
 
 # ------------------------------------------------------------------ the problem
@@ -77,7 +77,7 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** The one idea the rest of the notebook rests on.
+The one idea the rest of the notebook rests on.
 
 A model of the dynamics is not used here to forecast. It is used to strip the
 predictable part out of the series and to put it back.
@@ -118,7 +118,7 @@ import os, sys, time, json, warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-warnings.filterwarnings("ignore")          # arch reports iteration limits on a few (2,2) refits
+warnings.filterwarnings("ignore")
 pd.set_option("display.width", 200)
 
 ROOT = os.path.dirname(os.getcwd()) if os.path.basename(os.getcwd()) == "examples" else os.getcwd()
@@ -150,14 +150,16 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** The input: one return series, and nothing else.
+The input: one return series, and nothing else.
 
 One series, at one frequency, long enough to fit a model of its dynamics.
 Here Equity DM, the developed-market equity excess return of notebook 03,
 monthly since June 2007, and its daily counterpart, the SPY return over the
 same period, which the last section uses. Nothing else: this notebook takes
-no targets and no views, because a filter is estimated from the series and
-from nothing else.
+no targets and no views: a filter is estimated from the series and from
+nothing else.
+
+The two series.
 """)
 code(r'''
 F = load_factor_data(cache=os.path.join(ROOT, "data", "factors_cache.csv")).loc["2007-06":"2026-07"]
@@ -189,7 +191,7 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** Find out what the filter has to remove, before choosing one.
+Find out what the filter has to remove, before choosing one.
 
 Two questions, each a test. They decide what the filter has to remove. They
 are not the selection rule: that is section 6, and it uses one test only.
@@ -210,8 +212,8 @@ code(r'''
 pd.Series(iid_tests(y.values)).round(4).rename({"lb_z": "Ljung-Box p, returns", "lb_z2": "Ljung-Box p, squared returns", "arch_lm": "ARCH-LM p"}).to_frame("Equity DM, monthly").T
 ''')
 md(r"""
-And the same thing as a picture: the two autocorrelation functions with the
-band $\pm 1.96/\sqrt n$ a series of independent draws would stay inside.
+The same thing as a picture. The dashed band is $\pm 1.96/\sqrt n$, where
+independent draws would stay.
 """)
 code(r'''
 K = 12; acf = lambda s: [s.autocorr(k) for k in range(1, K + 1)]
@@ -235,7 +237,7 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** Fit a model, and look at what it leaves behind.
+Fit a model, and look at what it leaves behind.
 
 <a id="s5-1"></a>
 ### 5.1 The GARCH family
@@ -250,12 +252,15 @@ $$
 the GARCH(1,1) of Bollerslev: a large move today raises tomorrow's variance
 through $\alpha$, and the variance decays at the rate $\beta$, with an
 unconditional level $\omega / (1 - \alpha - \beta)$ and a persistence
-$\alpha + \beta$. Variants in the same family: an AR(1) mean $a + b\,r_{t-1}$;
-the GJR term $\gamma\, e_{t-1}^2\, \mathbf 1\{e_{t-1} < 0\}$ that lets a fall
-raise the variance more than a rise; the EGARCH, the same on the log of the
-variance. Estimated by maximum likelihood with a Gaussian innovation, on
-returns times 100, the log-likelihood put back on the data's scale so that
-the comparisons of step 3 are like for like.
+$\alpha + \beta$. Three variants in the same family. An AR(1) mean $a + b\,r_{t-1}$. The GJR
+term $\gamma\, e_{t-1}^2\, \mathbf 1\{e_{t-1} < 0\}$, which lets a fall raise
+the variance more than a rise. The EGARCH, the same on the log of the variance.
+
+Estimated by maximum likelihood with a Gaussian innovation, on returns times
+100, the log-likelihood put back on the data's scale so that the comparisons
+of step 3 are like for like.
+
+Fit the GARCH(1,1).
 """)
 code(r'''
 g = GarchFamily("const", "garch", 1, 1).fit(y)
@@ -302,11 +307,11 @@ md(r"""
 The second model says the return comes from one of $K$ regimes,
 $r_t \mid s_t = k \sim N(\mu_k, \sigma_k^2)$, with $s_t$ a Markov chain of
 transition matrix $Q$: a calm state and a turbulent one, each persistent.
-Estimated by the EM algorithm (GenHMM1d). The state is never observed; what
+Estimated by the EM algorithm (GenHMM1d). The state is never observed. What
 the data give is its filtered probability
 $\eta_{t|t-1,k} = \Pr(s_t = k \mid r_1, \dots, r_{t-1})$, updated by Bayes'
-rule at each observation, so that the predictive distribution of the next
-return is the mixture
+rule at each observation. The predictive distribution of the next return is
+then the mixture
 
 $$
 F_t(r) = \sum_{k=1}^{K} \eta_{t|t-1,k}\, \Phi\!\left( \frac{r - \mu_k}{\sigma_k} \right).
@@ -362,7 +367,7 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** Test what a candidate simulates, then choose among those that pass.
+Test what a candidate simulates, then choose among those that pass.
 
 <a id="s6-1"></a>
 ### 6.1 The parametric-bootstrap goodness-of-fit test
@@ -382,10 +387,10 @@ S_n \;=\; n \int_0^1 \{D_n(u) - u\}^2 \, du \;=\; \sum_{i=1}^{n} \left( U_{(i)} 
 $$
 
 with $U_{(1)} < \dots < U_{(n)}$ the ordered pseudo-observations. Large values
-reject. Because the parameters are estimated, the null distribution of $S_n$
-depends on the family, so the $p$-value comes from a parametric bootstrap: $B$
-series of length $n$ are drawn from the fitted model, the model is *refitted*
-on each one, the statistic is recomputed, and
+reject. The parameters are estimated, so the null distribution of $S_n$ depends on the
+family and the $p$-value comes from a parametric bootstrap. $B$ series of
+length $n$ are drawn from the fitted model, the model is *refitted* on each
+one, the statistic is recomputed, and
 
 $$
 p \;=\; \frac{1}{B} \sum_{k=1}^{B} \mathbf 1\{ S_n^{(k)} > S_n \} .
@@ -444,10 +449,11 @@ md(r"""
 <a id="s6-2"></a>
 ### 6.2 Choosing among the candidates
 
-The candidate set is a grid: the mean is a constant or an AR(1), the variance
-is constant or a GARCH, GJR or EGARCH of orders up to (2, 2), and beside them
-the hidden Markov model with two or three regimes. That is what
-`select_dynamics` searches, and it is worth seeing rather than counting.
+The candidate set is a grid. The mean is a constant or an AR(1). The variance
+is constant, or a GARCH, GJR or EGARCH of orders up to (2, 2). Beside them sits
+the hidden Markov model with two or three regimes.
+
+`select_dynamics` fits all of them, tests all of them, and returns the table.
 """)
 code(r'''
 grid = pd.DataFrame(index=["const", "ar1"], columns=["const", "garch(p,q)", "gjr(p,q)", "egarch(p,q)"])
@@ -494,7 +500,7 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** Turn i.i.d. errors back into returns, starting from where the market is.
+Turn i.i.d. errors back into returns, starting from where the market is.
 
 The filter took returns to i.i.d. errors; its inverse takes i.i.d. errors to
 returns, starting from the state at the end of the sample. For the GARCH the
@@ -509,13 +515,15 @@ For the hidden Markov model the state is the filtered probability
 $\eta_{T|T}$, and each step draws
 $r_{T+h} = F_{T+h}^{-1}(\Phi(\varepsilon_{T+h}))$ and then updates it.
 
-The errors of a path are not normal draws. They come from a Johnson SU fitted
-to the generalized error's own skewness and kurtosis, the marginal of
-notebook 02, so that the shape of the error survives the inversion; in
-notebook 05 the errors of several factors are drawn together from the vine
-instead. The cell draws 2,000 paths of 24 months from the selected model, the
-same from the two-regime hidden Markov model, and the same number of
-independent draws in the manner of notebook 01.
+The errors of a path are not normal draws. They come from a Johnson SU fitted to the generalized error's own skewness and
+kurtosis, the marginal of notebook 02, so the shape of the error survives the
+inversion. In notebook 05 the errors of several factors are drawn together
+from the vine instead.
+
+Twenty-four months, 2,000 paths, three descriptions: the selected model, the
+two-regime hidden Markov model, and independent draws as in notebook 01.
+
+The three of them.
 """)
 code(r'''
 H, NP = 24, 2000
@@ -535,9 +543,9 @@ with sns.axes_style("whitegrid"):
     axes[0].set_ylabel("cumulative return"); plt.tight_layout(); plt.show()
 ''')
 md(r"""
-Three things to compare with the history: how far the two-year return
-spreads, how fat the monthly returns are, and whether the size of a move
-still predicts the next one along a path.
+How far the two-year return spreads, how fat the monthly returns are, and
+whether a move still predicts the next one along a path. All three against
+the history.
 """)
 code(r'''
 def stats_of(P):
@@ -587,7 +595,7 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** The same construction on a trader's data, and what changes.
+The same construction on a trader's data, and what changes.
 
 A trader's data are daily and the construction does not change: the same
 candidate grid without the three-regime hidden Markov model, whose daily
@@ -595,21 +603,20 @@ refits take twenty seconds each, the same test with $B = 50$, the same
 inverse. What changes is how much the data have to say, and how long the fits
 take.
 
-The selection first. Rather than the whole table, the five best by BIC among
-the candidates that pass, and the three best among those that fail, which is
-what makes the pattern visible.
+Every candidate that passes, by BIC, then three that fail.
 """)
 code(r'''
 t0 = time.time()
 sel_d = select_dynamics(D.to_frame(), states=(2,), B=50, seed=0, verbose=False)
 bd = sel_d.models["SPY"]; cd = sel_d.candidates.sort_values("bic")[["model", "n_params", "bic", "gof_pvalue", "passed"]]
 print(f"{len(cd)} candidates in {time.time() - t0:.0f} s | selected {bd.name} | passing the test: {int(cd['passed'].sum())} of {len(cd)}")
-pd.concat([cd[cd["passed"]].head(5), cd[~cd["passed"]].head(3)]).round(3).reset_index(drop=True)
+pd.concat([cd[cd["passed"]], cd[~cd["passed"]].head(3)]).round(3).reset_index(drop=True)
 ''')
 md(r"""
-Then a year of trading days from the last observed state, 1,000 paths,
-against independent draws. The last row is the one a trader reads: the worst
-day of a year, the number a stop-loss or a margin model is set against.
+The last row is the one a trader reads: the worst day of a year, the number a
+stop-loss or a margin model is set against.
+
+A year of trading days from the last observed state, 1,000 paths.
 """)
 code(r'''
 Hd = 252
@@ -639,13 +646,15 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** Save what notebook 05 will read.
+Save what notebook 05 will read.
 
 What leaves this notebook is the selected model: its parameters, its last
 observed state, and the shape of its error. Saved to JSON and reloaded
 without a refit, so that the same paths can be regenerated elsewhere with the
-same seed. Notebook 05 reads exactly this, one per factor, and hands the
-errors to the vine instead of drawing them one factor at a time.
+same seed. Notebook 05 reads exactly this, one per factor, and hands the errors to the
+vine instead of drawing them one factor at a time.
+
+Save, reload, and check that the paths come back.
 """)
 code(r'''
 out = os.path.join(ROOT, "examples", "output"); os.makedirs(out, exist_ok=True)
@@ -669,7 +678,7 @@ md(r"""
 
 <sub>[back to contents](#toc)</sub>
 
-**What this section is for.** 
+
 
 One factor at a time. Each of the seven has its own filter and its own
 generalized error, and those errors are not independent of each other: the
