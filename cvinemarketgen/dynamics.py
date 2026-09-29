@@ -145,7 +145,7 @@ class AR1GARCH:
         rows, last = {}, {}
         for a in r.columns:
             y = r[a].values * self.scale
-            res = arch_model(y, mean='AR', lags=1, vol='GARCH', p=1, q=1, dist='normal', rescale=False).fit(disp='off')
+            res = arch_model(y, mean='AR', lags=1, vol='GARCH', p=1, q=1, dist='normal', rescale=False).fit(disp='off', show_warning=False)
             p = res.params
             rows[a] = {'a': p['Const'], 'b': p[[k for k in p.index if k.startswith('y[1]') or k.endswith('[1]')][0]],
                        'omega': p['omega'], 'alpha': p['alpha[1]'], 'beta': p['beta[1]']}
@@ -294,7 +294,7 @@ class GarchFamily:
                'egarch': {'vol': 'EGARCH', 'p': self.p, 'o': 0, 'q': self.q}}[self.vol]
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            res = arch_model(v, dist='normal', rescale=False, **mkw, **vkw).fit(disp='off')
+            res = arch_model(v, dist='normal', rescale=False, **mkw, **vkw).fit(disp='off', show_warning=False)
         prm = res.params
         a = float(prm['mu']) if self.mean == 'const' else float(prm['Const'])
         b = 0.0 if self.mean == 'const' else float(prm[[k for k in prm.index if k.endswith('[1]')

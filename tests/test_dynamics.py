@@ -129,3 +129,16 @@ def test_hmm_refit_leaves_the_parent_unchanged():
     Q0, mu0, s0, eta0 = m.Q.copy(), m.mu.copy(), m.sigma.copy(), m.eta_T.copy()
     m.refit(pd.Series(m.simulate(2000, seed=0)))
     assert np.array_equal(m.Q, Q0) and np.array_equal(m.mu, mu0) and np.array_equal(m.sigma, s0) and np.array_equal(m.eta_T, eta0)
+
+
+def test_a_fit_that_does_not_converge_says_nothing_on_stderr():
+    """arch prepends an 'always' filter for its ConvergenceWarning, which no caller can silence."""
+    import contextlib
+    import io
+    rng = np.random.default_rng(0)
+    y = pd.Series(rng.standard_normal(200) * 0.04)                 # no ARCH: the richer models will not converge
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        for spec in (('const', 'gjr', 2, 2), ('const', 'egarch', 2, 2), ('ar1', 'gjr', 1, 2)):
+            GarchFamily(*spec).fit(y)
+    assert 'ConvergenceWarning' not in err.getvalue()
