@@ -47,12 +47,12 @@ Earlier notebooks
 
 Written against the previous structure of the package. They cover the layers
 the new course has not reached yet: block filters, the structural layer, the
-yield curve, inflation and the GDP bridge.
+yield curve, inflation and the GDP bridge. The LTCMA workflow they opened with
+is now the worked case of notebook 03.
 
 .. toctree::
    :maxdepth: 1
 
-   examples/05_ltcma_targeting
    examples/10_block_filters_vecm
    examples/11_structural_layer_fx
    examples/12_yield_curve_fixed_income
