@@ -30,8 +30,8 @@ TOC = [('s1', '1. The problem', 'one sample, and every number you need rests on 
        ('s4', '4. Targets', 'the numbers the synthetic data must reproduce'),
        ('s5', '5. Fit', 'a cubic of a normal per asset, the dependence in the normals'),
        ('s6', '6. Check', 'the draw against the targets'),
-       ('s7', '7. Use', 'a portfolio tail on 25,000 months, and why it is short'),
-       ('s8', '8. Views', 'change one target, read the consequence'),
+       ('s7', '7. Use', '<a href="#s7-1">7.1 The equity portfolio</a> · <a href="#s7-2">7.2 Why its tail is short</a> · <a href="#s7-3">7.3 Equity and bonds</a>'),
+       ('s8', '8. Views', '<a href="#s8-1">8.1 The equity correlations</a> · <a href="#s8-2">8.2 One asset\'s volatility</a>'),
        ('s9', '9. Paths, and the generator saved', 'the artifacts out'),
        ('s10', '10. What this misses', 'and what comes next')]
 
