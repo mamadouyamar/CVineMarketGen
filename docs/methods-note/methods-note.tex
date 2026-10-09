@@ -389,6 +389,27 @@ If no candidate passes, the lowest BIC overall is returned with a warning
 saying so, which is the honest output: the grid does not contain a model this
 series cannot reject.
 
+\paragraph{What the Johnson \texorpdfstring{$S_U$}{SU} error costs.} The
+GARCH literature fits a Gaussian or a Student $t$ innovation; the Johnson
+$S_U$ is available in software but rarely used, and two of the reasons matter
+here. First, its tails cannot be power-law: it is a $\sinh$ of a normal, so
+every moment is finite and no parameter value produces the regularly varying
+tail that a Student $t$ with $\nu$ degrees of freedom gives by construction.
+Second, its shape is matched by moments rather than estimated by likelihood,
+which is the Johnson system's own tradition and the same mechanism as
+\eqref{eq:cumulants}: the variance parameters are still fitted under
+normality, and the two shape parameters are solved from the generalized
+error's skewness and kurtosis. They are weakly identified in a short sample,
+so a shape read off 230 observations is a rough quantity.
+
+Both costs are accepted for the same reason: one marginal family carries the
+vine, the asset residuals and the error layer, so a scenario crosses no change
+of family. The finite fourth moment is also what makes the condition
+$\mathbb E[(\alpha \varepsilon^2 + \gamma \varepsilon^2 \mathbf 1\{\varepsilon < 0\}
++ \beta)^2] < 1$ computable at all; with a Student $t$ of four or fewer degrees
+of freedom the fourth moment of the process is infinite whatever the
+parameters, and the check says nothing.
+
 \section{What the rule does not do}
 
 Three limits are worth stating plainly. The betas are estimated by ordinary

@@ -453,6 +453,11 @@ The candidate set is a grid. The mean is a constant or an AR(1). The variance
 is constant, or a GARCH, GJR or EGARCH of orders up to (2, 2). Beside them sits
 the hidden Markov model with two or three regimes.
 
+Each candidate is tested with the error the generator will draw for it: a
+Johnson SU fitted to that candidate's own generalized error for the GARCH
+family, the Rosenblatt uniforms for the hidden Markov model. That is
+`innovation='auto'`, the default.
+
 `select_dynamics` fits all of them, tests all of them, and returns the table.
 """)
 code(r'''
