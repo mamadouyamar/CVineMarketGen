@@ -98,33 +98,35 @@ Variables in levels that share long-run relations go in one block:
 `dynamics={('DGS10', 'DFII10'): 'vecm', 'SPY': 'ar1-garch'}` fits a vector
 error-correction model on the block (needs `statsmodels`), feeds its
 standardized innovations to the vine, and simulates the block in levels from
-the last observed values; notebook 10 shows it on the nominal and real 10-year
-Treasury yields.
+the last observed values; `examples/legacy/10_block_filters_vecm` shows it on
+the nominal and real 10-year Treasury yields.
 
 A variable driven by others is a child: `'log_fx': 'ecm(rate_diff, log_oil)'`
 fits an error-correction equation of the exchange rate on the yield
 differential and oil, its innovation joins the residual layer, and on a path the
-parents are simulated first; notebook 11 shows it on USDCAD.
+parents are simulated first; `examples/legacy/11_structural_layer_fx` shows it
+on USDCAD.
 
 The yield curve is three factors: `NelsonSiegel(0.7308).fit(yields)` reads the
 Treasury curve as a level, a slope and a curvature date by date, the three
 factors go in a block like any other variables in levels, `ns.curve(paths)`
 turns simulated factors into whole curves, and `curve_returns` prices
-constant-maturity or zero-coupon bonds along the paths; notebook 12 shows it on
-the 1- to 30-year Treasury curve since 1993.
+constant-maturity or zero-coupon bonds along the paths;
+`examples/legacy/12_yield_curve_fixed_income` shows it on the 1- to 30-year
+Treasury curve since 1993.
 
 Inflation is a child too: `'pi': 'linear(d_log_oil, unrate, mich; lags=3)'` is a
 Phillips-curve equation of monthly CPI inflation on the change of oil, the
 unemployment rate and survey expectations; `yoy`, `price_level` and `deflate`
 read year-on-year rates, price levels and real asset returns off the paths;
-notebook 13 shows it with an oil scenario.
+`examples/legacy/13_inflation` shows it with an oil scenario.
 
 Quarterly output comes from the monthly paths through a bridge equation:
 `Bridge(['d_payems', 'd_indpro', 'd_unrate']).fit(gdp_growth, monthly_data)`
 regresses GDP growth on the quarterly means of payroll growth, industrial
 production and the change in unemployment, and `br.simulate(paths, history)`
 gives eight quarters of growth from 24 simulated months, with the level of
-output and the probability of a recession; notebook 14.
+output and the probability of a recession; `examples/legacy/14_gdp_bridge`.
 
 ## Assets on factors
 
@@ -163,20 +165,12 @@ derivations are in the methods note,
 a rule working instead of arguing for it. Notebooks are written to one
 standard, [`docs/notebook-principles.md`](docs/notebook-principles.md).
 
-(The course is being rebuilt notebook by notebook; 01 to 04 follow it, the
-later numbers are the previous series until they are absorbed.)
-
 | | Notebook | What it shows |
 |---|---|---|
 | 01 | [`01_matching_moments_and_correlations`](examples/01_matching_moments_and_correlations.ipynb) | targets, fit, check, use: the moments and correlations of six ETFs matched by the Fleishman generator, a portfolio's tail against the normal, a change of one target, paths, and the exceedance profile that shows what is missing |
 | 02 | [`02_tail_dependence`](examples/02_tail_dependence.ipynb) | copula versus marginals, tail dependence with a direction (Clayton, Gumbel) and without (Student t), the exceedance profile, the noise in the family classification and the symmetry test, the C-vine generator on the same six ETFs, the two portfolios of 01 with their tails recovered where the data identify them |
 | 03 | [`03_many_assets_factors`](examples/03_many_assets_factors.ipynb) | one file in, one simulator out: a single workbook holds what you know about 70 assets and 8 factors, one call fits it, every gap is filled by a stated rule and the report names the rule that fired for each number; every input checked against 25,000 simulated months, then the scenarios, the paths and the saved simulator, and two portfolios' tails against the sample and against a normal |
 | 04 | [`04_time_series_of_a_factor`](examples/04_time_series_of_a_factor.ipynb) | one factor as a time series: the tests of independence over time, the GARCH family and the hidden Markov model as invertible filters to an i.i.d. generalized error, selection among 28 candidates, the bootstrap goodness-of-fit test, paths from the last observed state, monthly and daily |
-| 10 | [`10_block_filters_vecm`](examples/10_block_filters_vecm.ipynb) | a VECM on the nominal and real 10-year yields as one block of the residual layer, paths in levels, the breakeven kept anchored |
-| 11 | [`11_structural_layer_fx`](examples/11_structural_layer_fx.ipynb) | USDCAD on the U.S. minus Canada 10-year differential and oil: the structural layer, a parent scenario, paths in levels |
-| 12 | [`12_yield_curve_fixed_income`](examples/12_yield_curve_fixed_income.ipynb) | the Treasury curve as Nelson-Siegel level, slope and curvature (PCA as benchmark), the factors filtered as a block, simulated curves, constant-maturity bond returns priced along the paths |
-| 13 | [`13_inflation`](examples/13_inflation.ipynb) | headline and core CPI inflation as children of oil, unemployment and expectations: the equation, paths of inflation and price levels, an oil scenario, real returns of SPY |
-| 14 | [`14_gdp_bridge`](examples/14_gdp_bridge.ipynb) | quarterly GDP growth from monthly paths through a bridge equation on payrolls, industrial production and unemployment: the equation with and without the pandemic quarters, eight-quarter fans, recession probabilities, a payroll scenario |
 
 Recipes, about twelve seconds each, all from the same base workbook
 `examples/inputs/recipe_base.xlsx` (eight funds, six factors, nothing imposed):
@@ -190,13 +184,19 @@ Recipes, about twelve seconds each, all from the same base workbook
 | r5 | [`r5_factor_views`](examples/recipes/r5_factor_views.ipynb) | a view on a factor: one number, and the universe reprices through the betas |
 | r6 | [`r6_factor_without_history`](examples/recipes/r6_factor_without_history.ipynb) | a factor with no history: the correlations you state, and the maximum-determinant completion of the rest |
 
+Five earlier notebooks live in [`examples/legacy/`](examples/legacy/), each the
+only worked example of a module the course has not reached: block filters, the
+structural layer, the yield curve, inflation and the GDP bridge. They do not
+follow the standard above, and when a course notebook absorbs one of those
+layers it is deleted from there.
+
 ## Data
 
 `data/jpm_ltcma_2024.csv` holds the arithmetic mean, volatility and correlation
 matrix of 59 asset classes from J.P. Morgan's 2024 Long-Term Capital Market
 Assumptions (USD), as published in the public report. Nothing else is shipped:
-notebooks 06 to 14 download their series at run time (Fama-French, FRED,
-Yahoo Finance) into a git-ignored cache. The paper's own historical data
+every notebook downloads its series at run time (Fama-French, FRED, Yahoo
+Finance) into a git-ignored cache. The paper's own historical data
 (Finaeon/GFD) is licensed and not included.
 
 ## Method

@@ -30,12 +30,13 @@ os.makedirs(_dst, exist_ok=True)
 for _f in os.listdir(_src):
     if _f.endswith('.ipynb'):
         shutil.copy(os.path.join(_src, _f), os.path.join(_dst, _f))
-_rsrc = os.path.join(_src, 'recipes')                      # the recipe gallery, one lever each
-_rdst = os.path.join(_dst, 'recipes')
-os.makedirs(_rdst, exist_ok=True)
-for _f in os.listdir(_rsrc):
-    if _f.endswith('.ipynb'):
-        shutil.copy(os.path.join(_rsrc, _f), os.path.join(_rdst, _f))
+for _sub in ('recipes', 'legacy'):                          # the recipe gallery, and the notebooks the course has not reached
+    _ssrc = os.path.join(_src, _sub)
+    _sdst = os.path.join(_dst, _sub)
+    os.makedirs(_sdst, exist_ok=True)
+    for _f in os.listdir(_ssrc):
+        if _f.endswith('.ipynb'):
+            shutil.copy(os.path.join(_ssrc, _f), os.path.join(_sdst, _f))
 _note = os.path.join(_here, 'methods-note', 'methods-note.pdf')      # the derivations, served with the docs
 if os.path.exists(_note):
     os.makedirs(os.path.join(_here, '_static'), exist_ok=True)

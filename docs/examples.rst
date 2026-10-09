@@ -45,16 +45,17 @@ recipe_base.xlsx``: eight funds, six factors, and nothing imposed.
 Earlier notebooks
 -----------------
 
-Written against the previous structure of the package. They cover the layers
-the new course has not reached yet: block filters, the structural layer, the
-yield curve, inflation and the GDP bridge. The LTCMA workflow they opened with
-is now the worked case of notebook 03.
+In ``examples/legacy/``, written against the previous structure of the package
+and not to the standard above. Each is the only worked example of a module the
+course has not reached yet: block filters, the structural layer, the yield
+curve, inflation and the GDP bridge. When a course notebook absorbs one of
+those layers, the notebook here is deleted.
 
 .. toctree::
    :maxdepth: 1
 
-   examples/10_block_filters_vecm
-   examples/11_structural_layer_fx
-   examples/12_yield_curve_fixed_income
-   examples/13_inflation
-   examples/14_gdp_bridge
+   examples/legacy/10_block_filters_vecm
+   examples/legacy/11_structural_layer_fx
+   examples/legacy/12_yield_curve_fixed_income
+   examples/legacy/13_inflation
+   examples/legacy/14_gdp_bridge
