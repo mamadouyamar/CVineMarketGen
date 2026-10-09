@@ -1,0 +1,488 @@
+# -*- coding: utf-8 -*-
+"""Notebook 01 to the standard of docs/notebook-principles.md: contents, numbered anchored
+sections, one beat per cell, sentences under forty words. The code is the executed notebook's,
+verbatim, except four cells split because they emitted three exhibits."""
+import json, sys
+
+SRC = 'examples/01_matching_moments_and_correlations.ipynb'
+PRISTINE = sys.argv[2] if len(sys.argv) > 2 else SRC      # the pre-rebuild notebook, so the script is idempotent
+old = json.load(open(PRISTINE))
+code = {i: ''.join(c['source']) for i, c in enumerate(old['cells']) if c['cell_type'] == 'code'}
+
+cells = []
+md = lambda s: cells.append({'cell_type': 'markdown', 'metadata': {}, 'source': s.strip('\n')})
+cd = lambda s: cells.append({'cell_type': 'code', 'metadata': {}, 'execution_count': None, 'outputs': [], 'source': s.strip('\n')})
+FIX_CODE = {'history (260 months)': 'history (261 months)'}   # the cache now holds 261 months
+def keep(i):
+    src = code[i]
+    for a, b in FIX_CODE.items():
+        src = src.replace(a, b)
+    cd(src)
+BACK = '<sub><a href="#toc">back to contents</a></sub>'
+def sec(a, title, purpose):
+    md(f'---\n\n<a id="{a}"></a>\n## {title}\n\n{BACK}\n\n{purpose}')
+def sub(a, title):
+    md(f'<a id="{a}"></a>\n### {title}')
+
+TOC = [('s1', '1. The problem', 'one sample, and every number you need rests on it'),
+       ('s2', '2. How it works', 'targets, fit, check, use'),
+       ('s3', '3. The history', 'six ETFs, twenty years of months'),
+       ('s4', '4. Targets', 'the numbers the synthetic data must reproduce'),
+       ('s5', '5. Fit', 'a cubic of a normal per asset, the dependence in the normals'),
+       ('s6', '6. Check', 'the draw against the targets'),
+       ('s7', '7. Use', 'a portfolio tail on 25,000 months, and why it is short'),
+       ('s8', '8. Views', 'change one target, read the consequence'),
+       ('s9', '9. Paths, and the generator saved', 'the artifacts out'),
+       ('s10', '10. What this misses', 'and what comes next')]
+
+md('# 01 Matching moments and correlations\n\n'
+   '[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)]'
+   '(https://colab.research.google.com/github/mamadouyamar/CVineMarketGen/blob/main/examples/01_matching_moments_and_correlations.ipynb)\n\n'
+   '<a id="toc"></a>\n## Contents\n\n| | |\n|---|---|\n'
+   + '\n'.join(f'| **<a href="#{a}">{t}</a>** | {p} |' for a, t, p in TOC)
+   + '\n\nFirst notebook of the course: it assumes nothing. Runtime under a minute.')
+
+# ---------------------------------------------------------------- 1. the problem
+sec('s1', '1. The problem', 'One sample, and every number you need rests on it.')
+md(r"""
+You have a few hundred monthly returns for a handful of assets. That is one
+sample, and it is the only one there is. You need more data that looks like
+it: to size a portfolio's risk, to test a rule, to answer a question about
+months that did not happen.
+
+Three things make the sample too small.
+
+1. A 5 percent quantile on 261 months rests on 13 observations. Add or drop
+   two months and the number moves.
+2. A stress you want to ask about may not be in the sample at all.
+3. You cannot vary anything. The sample has one set of correlations, and no
+   way to ask what a different one would cost.
+""")
+
+# ---------------------------------------------------------------- 2. how it works
+sec('s2', '2. How it works', 'Targets, fit, check, use.')
+md(r"""
+Four steps, and they are the same in every notebook of this course.
+
+| | Step | What it is |
+|---|---|---|
+| 1 | **Targets** | the numbers the synthetic data must reproduce |
+| 2 | **Fit** | a generator that reproduces them |
+| 3 | **Check** | the generator's draw against the targets |
+| 4 | **Use** | draw what you need, or change a target and redraw |
+
+Here the targets are the means, volatilities, skewnesses, kurtoses and
+correlations of the history, and the generator is the simplest one that
+matches them. The notebook ends by finding what it misses, which notebook 02
+fixes.
+""")
+md('## Import')
+keep(2)
+
+# ---------------------------------------------------------------- 3. the history
+sec('s3', '3. The history', 'Six ETFs, twenty years of months.')
+md(r"""
+Monthly total returns since January 2005: U.S. large and small caps (SPY,
+IWM), developed markets outside the U.S. (EFA), long and intermediate
+Treasuries (TLT, IEF) and gold (GLD). From adjusted closes,
+$r_t = P_t / P_{t-1} - 1$, cached locally.
+
+The loader is the only network call in the notebook. Put your own DataFrame
+in its place, one column per asset, one row per period.
+""")
+keep(4)
+md('What the six series look like: cumulative growth, and the two monthly series the notebook follows.')
+keep(5)
+
+# ---------------------------------------------------------------- 4. targets
+sec('s4', '4. Targets', 'The numbers the synthetic data must reproduce.')
+md(r"""
+From $n$ observations $r_{i,1}, \dots, r_{i,n}$ of asset $i$, the targets are
+the sample moments
+
+$$
+\mu_i = \frac{1}{n} \sum_t r_{i,t}, \qquad
+\sigma_i^2 = \frac{1}{n-1} \sum_t (r_{i,t} - \mu_i)^2, \qquad
+\gamma_{1,i} = \frac{\frac{1}{n}\sum_t (r_{i,t} - \mu_i)^3}{\hat s_i^3}, \qquad
+\gamma_{2,i} = \frac{\frac{1}{n}\sum_t (r_{i,t} - \mu_i)^4}{\hat s_i^4},
+$$
+
+with $\hat s_i$ the biased standard deviation, and the Pearson correlation
+matrix $\Sigma^*$ with entries $\Sigma^*_{ik} = \mathrm{Corr}(r_i, r_k)$.
+
+Four numbers per asset and one per pair, so $4N + N(N-1)/2$ targets, 39 here.
+The kurtosis is raw: the normal has $\gamma_2 = 3$, a value above 3 means
+fatter tails, a negative skewness means the large moves are falls.
+""")
+md('`Targets.from_history` computes them and keeps the history for the checks below.')
+cd("""
+t = Targets.from_history(X)
+print(t)
+t.moments.round(3)
+""")
+md(r"""
+Equity has negative skewness and kurtosis above 4. The Treasuries have
+positive skewness. Gold is close to normal.
+
+And the correlations.
+""")
+cd("""
+t.corr.round(2)
+""")
+md('The two Treasury funds move together at 0.92 and are nearly uncorrelated with equity.')
+
+# ---------------------------------------------------------------- 5. fit
+sec('s5', '5. Fit', 'A cubic of a normal per asset, the dependence in the normals.')
+md(r"""
+The simplest generator with these targets is Fleishman's (1978). Each asset is
+a cubic polynomial of a standard normal,
+
+$$
+X_i = a_i + b_i Z_i + c_i Z_i^2 + d_i Z_i^3, \qquad Z_i \sim N(0, 1).
+$$
+
+The moments of a polynomial of a normal are polynomials of its coefficients,
+so matching mean 0, variance 1 and the target skewness and kurtosis is three
+equations in $(b_i, c_i, d_i)$, with $a_i = -c_i$, solved numerically. The
+mean and volatility are applied afterwards, $r_i = \mu_i + \sigma_i X_i$. A
+solution exists when $\gamma_{2,i} - 3 \ge \gamma_{1,i}^2 - 2$, which every
+return series in practice satisfies.
+""")
+md(r"""
+The dependence goes in the normals. If $(Z_i, Z_k)$ have correlation
+$\rho_Z$, the cubics have correlation
+
+$$
+\mathrm{Corr}(X_i, X_k) = \rho_Z \,(b_i b_k + 3 b_i d_k + 3 d_i b_k + 9 d_i d_k) + \rho_Z^2\, (2 c_i c_k) + \rho_Z^3\, (6 d_i d_k),
+$$
+
+(Vale and Maurelli, 1983). For each pair the *intermediate* correlation
+$\rho_Z$ is the root of that cubic which makes $\mathrm{Corr}(X_i, X_k)$ equal
+the target $\Sigma^*_{ik}$. The matrix of intermediate correlations is made
+positive definite if needed, and the normals are drawn from it by a Cholesky
+factor.
+
+The fitted polynomial per asset.
+""")
+cd("""
+fm = FleishmanMarket(t).fit()
+print(fm)
+fm.coefficients.round(4)
+""")
+md('How far the normals had to move to deliver the targets.')
+cd("""
+print("intermediate correlations of the normals minus the target correlations (max abs):", round(float((fm.intermediate_corr - t.corr).abs().values.max()), 4))
+""")
+md('Four thousandths: the polynomials are close to linear here, so the two matrices nearly coincide.')
+
+# ---------------------------------------------------------------- 6. check
+sec('s6', '6. Check', 'The draw against the targets.')
+md(r"""
+`simulate(n)` draws $n$ joint observations, and the draw is compared with
+every target: four sample moments per asset, one correlation per pair.
+
+The generator refits its coefficients on the draw and accepts it only when
+every difference is inside tolerance, redrawing otherwise. The tolerances are
+$2 \times 10^{-4}$ on means and volatilities, $5 \times 10^{-2}$ on skewness
+and kurtosis, $0.02$ on correlations.
+
+Run this check every time a market is fitted. It says whether the synthetic
+data is what it was asked to be.
+""")
+keep(11)
+md('Every difference is inside tolerance, so the draw carries all 39 targets.')
+
+md(r"""
+SPY's monthly return against a normal, then SPY against EFA with the history
+on top.
+""")
+keep(13)
+md(r"""
+The left tail is heavier than the normal's and the peak higher, which is what
+negative skewness and kurtosis above 3 mean. The cloud has the history's
+correlation and its elongated shape.
+""")
+
+# ---------------------------------------------------------------- 7. use
+sec('s7', '7. Use', 'A portfolio tail on 25,000 months, and why it is short.')
+md(r"""
+From here the synthetic data replaces the history as the input to any
+calculation: a portfolio's risk, the performance of a rule, a stress. The gain
+is size. The history's 5 percent quantile rests on 13 months; the synthetic
+one rests on 1,250.
+""")
+
+sub('s7-1', '7.1 The equity portfolio')
+md(r"""
+Equal weights in U.S. large caps, U.S. small caps and developed markets
+outside the U.S. (SPY, IWM, EFA): diversification across markets, whose value
+is decided in bad months.
+
+A portfolio is a fixed vector of weights $\mathbf w$ and its return on each
+observation is $r_p = \mathbf w' \mathbf r$. Its monthly 5 percent value at
+risk and expected shortfall are
+
+$$
+\mathrm{VaR}_{5\%} = -q_{0.05}(r_p), \qquad \mathrm{ES}_{5\%} = -\mathbb E\big[r_p \mid r_p \le q_{0.05}(r_p)\big],
+$$
+
+minus the 5 percent quantile, and minus the mean of the returns below it.
+
+Both, three ways: simulated, in the sample, and under a normal.
+""")
+keep(15)
+md(r"""
+The normal gives the smallest tail, because it ignores the skewness and
+kurtosis of the assets. The synthetic data gives a larger one, since its
+marginals carry them. The history gives the largest, above the synthetic
+value, although the generator reproduced every target.
+""")
+
+sub('s7-2', '7.2 Why the synthetic tail is short')
+md(r"""
+The Cornish-Fisher expansion writes a quantile as a function of the first four
+moments: with $z = \Phi^{-1}(\alpha)$, skewness $\gamma_1$ and excess kurtosis
+$\kappa = \gamma_2 - 3$,
+
+$$
+q_\alpha \approx \mu + \sigma \left[ z + \frac{z^2 - 1}{6}\gamma_1 + \frac{z^3 - 3z}{24}\kappa - \frac{2z^3 - 5z}{36}\gamma_1^2 \right].
+$$
+
+So if the portfolio's four moments were matched, its VaR would be. The
+portfolio's four moments, its empirical VaR and its Cornish-Fisher VaR.
+""")
+cd(_SPLIT17A := '''
+def cf_var(r, alpha=0.05):
+    m, s, g1, k = r.mean(), r.std(), stats.skew(r), stats.kurtosis(r)                       # k: excess kurtosis
+    z = stats.norm.ppf(alpha); zc = z + (z**2 - 1) * g1 / 6 + (z**3 - 3 * z) * k / 24 - (2 * z**3 - 5 * z) * g1**2 / 36
+    return -(m + s * zc)
+rows = {}
+for name, r in [("history", rp_hist.values), ("synthetic (Fleishman)", rp_sim.values)]:
+    rows[name] = {"mean (%)": r.mean() * 100, "vol (%)": r.std() * 100, "skewness": stats.skew(r), "kurtosis": stats.kurtosis(r) + 3,
+                  "VaR 5%, empirical (%)": var_es(r)[0] * 100, "VaR 5%, Cornish-Fisher (%)": cf_var(r) * 100}
+pd.DataFrame(rows).T.round(2)
+''')
+md(r"""
+The mean and volatility agree, the skewness and kurtosis do not: $-0.62$ and
+4.7 against $-0.44$ and 4.2. Cornish-Fisher splits the gap in two. On the
+synthetic data it reproduces the empirical VaR, 7.30 against 7.31. On the
+history it gives 7.47 against the empirical 8.22, so the moments account for
+about 0.2 of VaR and the remaining 0.75 is the sampling noise of a quantile on
+13 months. The expected shortfall, which averages those 13 months instead of
+picking one, agrees to 0.2 as well.
+""")
+md(r"""
+So the real gap sits in the portfolio's third and fourth moments. Why are they
+not matched, when each asset's four are?
+
+Because a portfolio's skewness and kurtosis depend on how the assets move
+*together in the tails*, and no target described that. Each asset's moments
+describe it alone, and a correlation is one number per pair, an average over
+the whole distribution.
+
+The sharper question: how correlated are two equity markets when one of them
+falls? For a pair $(x, y)$ with $x$ standardized and a threshold $z$ in
+standard deviations, the exceedance correlation is
+
+$$
+\hat\rho(z) = \begin{cases} \mathrm{Corr}(x, y \mid x < z) & z < 0, \\ \mathrm{Corr}(x, y \mid x \ge z) & z \ge 0, \end{cases}
+$$
+
+the Pearson correlation on the observations where $x$ is below $z$, its bad
+months, or above it, its good ones.
+
+At $z = -1, 0, +1$, for SPY against EFA and IWM, with each asset's own tail beside it.
+""")
+cd('''
+rows = {}
+for name, D in [("history", X), ("synthetic (Fleishman)", S)]:
+    e = exceedance_curve(D["SPY"], D["EFA"], [-1.0, 0.0, 1.0]); i = exceedance_curve(D["SPY"], D["IWM"], [-1.0, 0.0, 1.0])
+    rows[name] = {"corr(SPY, EFA | SPY < -1 sd)": e.iloc[0], "corr(SPY, EFA | SPY >= 0)": e.iloc[1], "corr(SPY, EFA | SPY >= +1 sd)": e.iloc[2],
+                  "corr(SPY, IWM | SPY < -1 sd)": i.iloc[0], "corr(SPY, IWM | SPY >= +1 sd)": i.iloc[2],
+                  "SPY VaR 5% (%)": var_es(D["SPY"].values)[0] * 100, "EFA VaR 5% (%)": var_es(D["EFA"].values)[0] * 100}
+pd.DataFrame(rows).T.round(2)
+''')
+md(r"""
+In the history SPY correlates 0.81 with EFA in SPY's bad months and 0.34 in
+its good ones: diversification across markets works when it is not needed and
+fails when it is. In the synthetic data the profile is flat at the target, 0.62
+on both sides.
+
+The generator has the right correlation on average and the wrong one in the
+tail, and an equal-weight equity portfolio inherits the difference as missing
+skewness and kurtosis. Each asset's own tail, in the last two columns, is
+reproduced. The joint tail is not.
+""")
+
+sub('s7-3', '7.3 A second portfolio: equity and bonds')
+md(r"""
+Most portfolios are not equity only. A 60/40, 60 percent SPY and 40 percent
+TLT, relies on Treasuries to offset equity's bad months; in the sample the two
+are almost uncorrelated, $-0.09$.
+
+Its tail and its shape, the same three ways.
+""")
+cd('''
+w2 = pd.Series({"SPY": 0.6, "TLT": 0.4}).reindex(X.columns).fillna(0.0)
+rp2_sim, rp2_hist = (S @ w2).values, (X @ w2).values
+mu2, sd2 = rp2_hist.mean(), rp2_hist.std()
+rows = {"synthetic (Fleishman)": var_es(rp2_sim) + (stats.skew(rp2_sim), stats.kurtosis(rp2_sim) + 3),
+        "history (261 months)": var_es(rp2_hist) + (stats.skew(rp2_hist), stats.kurtosis(rp2_hist) + 3),
+        "normal, same mean and vol": (-(mu2 + sd2 * stats.norm.ppf(0.05)), -(mu2 - sd2 * stats.norm.pdf(stats.norm.ppf(0.05)) / 0.05), 0.0, 3.0)}
+tab = pd.DataFrame(rows, index=["VaR 5% (%)", "ES 5% (%)", "skewness", "kurtosis"]).T
+tab[["VaR 5% (%)", "ES 5% (%)"]] *= 100
+tab.round(2)
+''')
+md(r"""
+Again the mean and volatility agree and the skewness and kurtosis do not,
+$-0.68$ and 5.0 against $-0.31$ and 3.8, so the same gap in the tail. The
+cause, though, is different.
+""")
+md(r"""
+Here there is no asymmetry to reproduce. What the history has and the
+synthetic data has not is the *co-kurtosis*
+
+$$
+\mathbb E[s^2 b^2], \qquad s = \frac{r_{SPY} - \mu_{SPY}}{\sigma_{SPY}},\ \ b = \frac{r_{TLT} - \mu_{TLT}}{\sigma_{TLT}},
+$$
+
+the average product of the squared standardized returns, which equals
+$1 + 2\rho^2$ when the sizes of the two moves are independent.
+
+The exceedance correlations, TLT's own tail, and that co-kurtosis against its
+independent-sizes value.
+""")
+cd('''
+z_ = lambda v: (v - v.mean()) / v.std()                     # standardize
+rows = {}
+for name, D in [("history", X), ("synthetic (Fleishman)", S)]:
+    e = exceedance_curve(D["SPY"], D["TLT"], [-1.0, 0.0, 1.0]); s_, b_ = z_(D["SPY"]), z_(D["TLT"]); rho = np.corrcoef(s_, b_)[0, 1]
+    rows[name] = {"corr(SPY, TLT | SPY < -1 sd)": e.iloc[0], "corr(SPY, TLT | SPY >= 0)": e.iloc[1], "corr(SPY, TLT | SPY >= +1 sd)": e.iloc[2],
+                  "TLT VaR 5% (%)": var_es(D["TLT"].values)[0] * 100, "1 + 2 rho^2": 1 + 2 * rho**2, "co-kurtosis E[s^2 b^2]": np.mean(s_**2 * b_**2)}
+pd.DataFrame(rows).T.round(2)
+''')
+md(r"""
+The exceedance correlation is near zero on both sides, in the history and in
+the synthetic data alike: no asymmetry here. The co-kurtosis is 1.75 in the
+history against the independent-sizes value of 1.01. Large months of equity and
+large months of Treasuries coincide, in either direction, as in 2008, 2020 and
+2022, so the portfolio's variance is not the same every month and its tail is
+fatter than its correlation says. The synthetic data has the Gaussian value.
+
+Two portfolios, two properties of the joint tail that moments and correlations
+do not describe. For equity markets, dependence stronger in bad months than in
+good ones. For equity and bonds, large moves that coincide with no direction.
+Notebook 02 makes both a target.
+""")
+
+# ---------------------------------------------------------------- 8. views
+sec('s8', '8. Views', 'Change one target, read the consequence.')
+md(r"""
+The targets are inputs, not just statistics. A view is a change to one of them
+with everything else kept.
+""")
+
+sub('s8-1', '8.1 The correlations between equity markets')
+md(r"""
+The three equity markets correlate 0.77 to 0.89 in the sample. The view sets
+all three to 0.50, the level of the 1990s, and keeps every other target: the
+same means, volatilities, skewnesses and kurtoses, the same correlations with
+bonds and gold.
+
+Nothing should happen to any single asset, by construction, only to the way
+they add up. For $N$ assets with weights $w_i$,
+
+$$
+\sigma_p^2 = \sum_i w_i^2 \sigma_i^2 + \sum_{i \ne k} w_i w_k\, \rho_{ik}\, \sigma_i \sigma_k ,
+$$
+
+so lowering the three $\rho_{ik}$ from about 0.84 to 0.50 removes a third of
+the second sum.
+
+Everything below is simulated under each set of targets, except the implied
+portfolio volatility, which is the check.
+""")
+keep(21)
+md(r"""
+The assets' own volatilities are unchanged and the portfolio's matches the
+implied value. Its monthly volatility falls from 4.7 to 4.0 percent, 13
+percent less risk for the same assets, and the VaR and expected shortfall fall
+with it.
+""")
+
+sub('s8-2', '8.2 The volatility of one asset')
+md(r"""
+SPY's volatility target goes to 6 percent a month, 21 percent a year, against
+the sample's 4.3 percent, a rise of 40 percent. The other 38 targets are
+unchanged.
+
+In the variance formula above $\sigma_{SPY}$ enters its own term and its two
+cross terms, with a weight of one third. The portfolio volatility should rise
+by about 12 percent, far less than SPY's 40.
+
+The two sets of targets, side by side.
+""")
+keep(23)
+md(r"""
+It rises from 4.7 to 5.2 percent a month, and the simulated value matches the
+implied one. The VaR and expected shortfall rise a little more than the
+volatility, because the mean, unchanged, is subtracted from them.
+""")
+
+# ---------------------------------------------------------------- 9. paths and save
+sec('s9', '9. Paths, and the generator saved', 'The artifacts out.')
+md(r"""
+`simulate_paths(n_paths, horizon)` arranges draws into $n$ paths of $h$
+periods. The periods are independent here, since nothing ties month $t$ to
+month $t-1$, and a path's cumulative return is $\prod_{t=1}^{h}(1 + r_t) - 1$.
+
+The equity portfolio over five years: the median and the bands across 1,000 paths.
+""")
+keep(25)
+md(r"""
+Notebook 04 returns to the independence of the periods, which the data
+contradict.
+
+The fitted generator is a small JSON file, the targets and the coefficients.
+Reloaded, it simulates the same data without the history.
+""")
+keep(27)
+md('The acceptance check of section 6 needs a large draw, so for five observations it is switched off.')
+
+# ---------------------------------------------------------------- 10. what this misses
+sec('s10', '10. What this misses, and what comes next', '')
+md(r"""
+The tables above gave the exceedance correlation at three thresholds. Here is
+the whole profile, $\hat\rho(z)$ for $z$ from $-1$ to $+1$ standard deviations
+of SPY.
+
+The history in black, the synthetic data in blue.
+""")
+keep(29)
+md(r"""
+For SPY against EFA and IWM the history's profile falls from left to right,
+highest in SPY's worst months, and the synthetic profile is flat at the target
+correlation. For SPY against TLT and GLD both profiles are flat: the property
+the 60/40 misses, coinciding sizes of moves, does not show in a plot that
+conditions on the sign of SPY's move. It showed in the co-kurtosis.
+""")
+md(r"""
+Targets, fit, check, use. The generator reproduced every number it was given
+and missed what it was not given, in two forms. Equity markets move together
+more in bad months than in good ones. Equity and bonds have large moves that
+coincide in either direction. Both cost a portfolio its skewness and kurtosis,
+and so its tail.
+
+**Notebook 02** defines tail dependence for a pair, with and without a
+direction, measures both in the history, and introduces the generator that
+reproduces them. On this same equity portfolio it recovers the history's
+skewness, kurtosis and expected shortfall.
+""")
+
+nb = {'cells': cells, 'metadata': old['metadata'], 'nbformat': 4, 'nbformat_minor': 5}
+for i, c in enumerate(nb['cells']):
+    c['source'] = c['source'].splitlines(keepends=True); c['id'] = f'c{i:03d}'
+out = sys.argv[1] if len(sys.argv) > 1 else SRC
+json.dump(nb, open(out, 'w'), indent=1, ensure_ascii=False); open(out, 'a').write('\n')
+n_code = sum(1 for c in nb['cells'] if c['cell_type'] == 'code')
+print(f'written {out}: {len(cells)} cells, {n_code} code blocks')
