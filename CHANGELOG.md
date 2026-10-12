@@ -2,6 +2,16 @@
 
 ## 0.4.0 (unreleased)
 
+- Notebook 05 joins the cross-section of notebook 03 to the filters of notebook
+  04: a filter per factor, the generalized errors drawn jointly from the vine
+  rather than one factor at a time, each filter inverted from its own last
+  observed state, and the 68 assets carried along through their betas. It ships
+  `examples/inputs/universe_paths.xlsx`, the universe without the objects that
+  have no history, since a filter needs a series. Findings: three of the seven
+  selected filters have an infinite fourth moment and one of them produces a
+  month of -200 percent, so the notebook adds a stability check and reports what
+  the stable choice costs in BIC; and the factors' dependence does not rise with
+  the horizon as the history's does, which is the limit block filters address.
 - The course restructured: notebook 03 is one worked case (one workbook in, one
   simulator out, thirteen code blocks) and its levers become six standalone
   recipes in `examples/recipes/`, one per kind of knowledge, twelve seconds

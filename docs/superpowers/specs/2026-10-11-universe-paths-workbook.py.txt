@@ -1,0 +1,25 @@
+# -*- coding: utf-8 -*-
+"""examples/inputs/universe_paths.xlsx: universe_full.xlsx without the objects that have no
+history. A filter is estimated from a series, so a factor without one cannot have a filter,
+and an asset whose betas point at it cannot be carried along a path. Run from the repo root."""
+import os, sys
+sys.path.insert(0, os.getcwd())
+from cvinemarketgen import MarketSpec
+
+NO_HISTORY_FACTOR = 'Illiquidity'
+NO_HISTORY_ASSETS = ['Private credit', 'Multi-strategy']
+NO_HISTORY_TAGS = ['private_credit', 'multi_strategy']
+
+full = MarketSpec.read('examples/inputs/universe_full.xlsx')
+tags = full.tags.reset_index().drop(columns=[NO_HISTORY_FACTOR])
+spec = MarketSpec(
+    assets=full.assets[~full.assets['ticker'].isin(NO_HISTORY_ASSETS)].reset_index(drop=True),
+    tags=tags[~tags['tag'].isin(NO_HISTORY_TAGS)].reset_index(drop=True),
+    exposures=full.exposures[full.exposures['factor'] != NO_HISTORY_FACTOR].reset_index(drop=True),
+    pairs=full.pairs[~full.pairs['ticker_1'].isin(NO_HISTORY_ASSETS)
+                     & ~full.pairs['ticker_2'].isin(NO_HISTORY_ASSETS)].reset_index(drop=True),
+    factors=full.factors[full.factors['factor'] != NO_HISTORY_FACTOR].reset_index(drop=True),
+    factor_corr=full.factor_corr[(full.factor_corr['factor_1'] != NO_HISTORY_FACTOR)
+                                 & (full.factor_corr['factor_2'] != NO_HISTORY_FACTOR)].reset_index(drop=True))
+spec.write('examples/inputs/universe_paths.xlsx')
+print('universe_paths.xlsx:', spec)

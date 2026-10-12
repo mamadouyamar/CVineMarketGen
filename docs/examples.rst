@@ -24,6 +24,7 @@ The course
    examples/02_tail_dependence
    examples/03_many_assets_factors
    examples/04_time_series_of_a_factor
+   examples/05_paths_for_a_universe
 
 Recipes
 -------
