@@ -125,13 +125,13 @@ print("share of months in the lower-left corner (both below their 10% quantile) 
 print("  history %.2f / %.2f   Gaussian copula %.2f / %.2f" % (*corner(U["SPY"].values, U["EFA"].values, 0.10), *corner(G[:, 0], G[:, 1], 0.10)))
 ''')
 md(r"""
-The history has 0.84 of the expected mass in the lower-left corner, both
-assets in their worst months, against 0.65 in the upper-right. The Gaussian
-draw has 0.50 and 0.65: thinner on the left, the same on the right.
+The history piles more mass into the lower-left corner, both assets in their
+worst months, than into the upper-right. The Gaussian draw is thinner on the
+left and the same on the right.
 
-Its own 0.50 against 0.65 is sampling noise, since the copula that produced it
-is symmetric by construction. Twenty-six months land in each corner. Section 6
-is about exactly that.
+Its own two corners differ too, and that is sampling noise: the copula which
+produced it is symmetric by construction, and only twenty-six months land in
+each corner. Section 6 is about exactly that.
 """)
 
 # ---------------------------------------------------------------- 5
@@ -171,8 +171,8 @@ The Gumbel rotated by 180 degrees wins by 19 BIC units over the Gaussian, and
 the two upper-tail families lose by 38 and 102. That is the asymmetry of the
 scatter above, read as a likelihood.
 
-Clayton is the caution. It has a lower tail too, $\lambda_L = 0.78$, and it
-still sits 4 units worse than the Gaussian: a family is chosen on its whole
+Clayton is the caution. It has the largest lower-tail coefficient of all six
+and still sits 4 units worse than the Gaussian: a family is chosen on its whole
 shape, not on the corner it can reach.
 """)
 
@@ -202,12 +202,12 @@ its co-kurtosis.
 """)
 keep(10)
 md(r"""
-The Student t wins by 12 BIC units at 2.8 degrees of freedom, and its
-co-kurtosis is 2.25 against the history's 1.75, where the Gaussian gives 1.02.
+The Student t wins by 12 BIC units, and its co-kurtosis overshoots the
+history's where the Gaussian falls far short.
 
 So the family carries the property, and carries too much of it. The pair's
-correlation is $-0.08$, so $\nu$ is estimated on the sizes of the moves alone,
-and 261 months put it low.
+correlation is almost zero, so the degrees of freedom are estimated on the
+sizes of the moves alone, and 261 months put them low.
 """)
 
 # ---------------------------------------------------------------- 6
@@ -242,12 +242,12 @@ Forty of them per correlation, at the ETF sample size.
 """)
 keep(12)
 md(r"""
-Three quarters of them are classified asymmetric at either correlation, and at
-$-0.09$ four fifths are called sign-changing as well. The paper's rule returns
-the Gaussian for 2 percent of the first group and 25 percent of the second.
+Three quarters are classified asymmetric at either correlation, and at the
+negative one four fifths are called sign-changing as well. These pairs have no
+asymmetry at all, so the rule is reading noise as structure.
 
-These pairs have no asymmetry at all, so the rule is reading noise as
-structure. With the test first, 88 percent get a Gaussian or a Student t.
+The last column is the remedy: with the test first, 88 percent get a Gaussian
+or a Student t at both correlations.
 """)
 
 sub('s6-2', '6.2 The scale the profile is read on')
@@ -281,9 +281,9 @@ The test on SPY against each other asset.
 """)
 keep(13)
 md(r"""
-The two equity pairs are asymmetric, 0.16 and 0.11, with intervals clear of
-zero. SPY against TLT gives $-0.00$ on $[-0.24, 0.24]$ and SPY against GLD
-0.02 on $[-0.22, 0.28]$, so both are symmetric.
+The two equity pairs are asymmetric, their intervals clear of zero. SPY against
+TLT and SPY against GLD are not: both statistics sit near zero inside an
+interval about half a unit wide.
 
 Without the test, section 6.1 says those last two would have been classified
 asymmetric about three times in four.
@@ -329,9 +329,9 @@ keep(16)
 md(r"""
 The two equity pairs receive a Gumbel rotated by 180 degrees, lower-tail
 dependence: developed markets and small caps fall with U.S. large caps more
-than they rise with them. The Treasury pairs receive the Student t, sizes
-moving together with no direction, at 2.8 and 2.7 degrees of freedom. Gold
-gets a Gaussian.
+than they rise with them. The Treasury pairs receive a Student t with few
+degrees of freedom, sizes moving together with no direction. Gold gets a
+Gaussian.
 
 The deeper trees carry what is left once SPY is accounted for, most of it
 weak, with a Gumbel between the two Treasury funds given the equities.
@@ -366,13 +366,13 @@ for b in pairs:
 pd.DataFrame(rows).T.round(2)
 ''')
 md(r"""
-SPY against EFA is reproduced: 0.81, 0.60, 0.43 against the history's 0.81,
-0.62, 0.34, where the benchmark sits flat at 0.62. SPY against IWM gets its
-left side, 0.84 against 0.86, and loses its right, 0.48 against 0.81.
+SPY against EFA is reproduced across all three thresholds, where the benchmark
+sits flat. SPY against IWM gets its left side and loses its right, because the
+history is high on both sides and a Gumbel 180 has no upper tail.
 
-TLT is flat and near zero in all three. GLD's history slopes, 0.22 down to
-$-0.11$, and the C-vine does not follow: the test called that pair symmetric,
-so the BIC chose a Gaussian.
+TLT is flat and near zero in all three rows. GLD's history slopes and the
+C-vine does not follow: the test called that pair symmetric, so the BIC chose a
+Gaussian.
 """)
 
 # ---------------------------------------------------------------- 9
@@ -383,10 +383,9 @@ the benchmark and on the C-vine.
 """)
 keep(22)
 md(r"""
-The equity portfolio is recovered. Its skewness and kurtosis are the
-history's, $-0.65$ and 4.6 against $-0.62$ and 4.7, where the benchmark had a
-third less skewness. Its expected shortfall is at the history's value, 10.73
-against 10.39, the benchmark 10.20.
+The equity portfolio is recovered. Its skewness and kurtosis are the history's,
+where the benchmark had a third less skewness, and its expected shortfall is at
+the history's value rather than half a point below it.
 
 The VaR stays below the history's, and notebook 01 traced that gap to the
 sampling noise of a quantile on 13 months. What carries the recovery is the

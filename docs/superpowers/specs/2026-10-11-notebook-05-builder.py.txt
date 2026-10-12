@@ -212,14 +212,14 @@ stab = pd.DataFrame(rows).T
 stab.round(2)
 ''')
 md(r"""
-Three of the seven selected models fail it. Equity DM is just over at 1.02,
-Inflation at 1.14, and Credit at 5.87, which is not marginal at all.
+Three of the seven selected models fail it. Equity DM and Inflation are just
+over the line; Credit is nowhere near it.
 
-The cost of the stable choice is not small. Equity DM gives up 15 BIC units to
-drop from the GJR to a plain GARCH. Inflation and Credit have no GARCH that
-both passes and satisfies the condition, so they fall back to a constant
-variance, at 72 and 101 units. For those two the price of a finite kurtosis is
-the clustering itself.
+The cost of the stable choice is not small, and the last column prices it.
+Equity DM drops from the GJR to a plain GARCH. Inflation and Credit have no
+GARCH that both passes the test and satisfies the condition, so they fall back
+to a constant variance, which for those two means giving up the clustering
+itself.
 """)
 md('What the violation does, factor by factor, on each factor alone.')
 cd('''
@@ -240,15 +240,13 @@ for f in ("Equity DM", "Inflation", "Credit"):
 pd.DataFrame(rows).T.round(2)
 ''')
 md(r"""
-Credit's selected model produces a month of $-200$ percent. A return below
-$-100$ percent is not a severe scenario, it is an arithmetic impossibility, and
-its pooled kurtosis of 629 says the same thing: the recursion is running away.
-Equity DM's $-93$ percent against a sample worst of $-20$ is the same disease,
+Credit's selected model produces a month past $-100$ percent, which is not a
+severe scenario but an arithmetic impossibility, and its pooled kurtosis says
+the same thing: the recursion is running away. Equity DM has the same disease,
 milder.
 
-With the condition satisfied, the three worst months fall to $-46$, $-11$ and
-$-28$ percent, all of them severe and all of them possible. The rest of the notebook
-uses the stable set.
+With the condition satisfied every worst month is severe and possible. The rest
+of the notebook uses the stable set.
 """)
 cd('''
 STABLE = {f: stab.loc[f, "cheapest with a finite kurtosis"].lower() for f in FAC}
@@ -275,8 +273,7 @@ md(r"""
 The first tree of the error vine is not the first tree of notebook 03's return
 vine. Credit against Equity DM is a Gaussian here where the returns gave a
 Student t: once each factor's own volatility clustering is removed, what is
-left of their joint tail is thinner. Real premia, Inflation and Commodity keep
-a Student t at four to five degrees of freedom.
+left of their joint tail is thinner. Three pairs keep a Student t.
 """)
 md('Draw the errors, then shuffle each column on its own to see what the vine is doing.')
 cd('''
@@ -288,11 +285,10 @@ pd.DataFrame({"history": cv.fit_targets.corr["Equity DM"], "drawn jointly": Z.co
               "drawn one at a time": Zi.corr()["Equity DM"]}).drop("Equity DM").round(3)
 ''')
 md(r"""
-Drawn jointly, the error correlations are the history's to the third decimal:
-0.539 against 0.545 for Credit, 0.461 against 0.469 for Inflation. Shuffled,
-every one of them is zero.
+Drawn jointly, the error correlations are the history's to the third decimal.
+Shuffled, every one of them collapses to zero.
 
-That column is what filtering one factor at a time and drawing its errors
+That last column is what filtering one factor at a time and drawing its errors
 separately would give you, and it is the reason this notebook exists.
 """)
 
@@ -337,14 +333,14 @@ print("Commodity's filter: last observed volatility %.0f%%/yr, unconditional %.0
 pd.DataFrame({"target (%/yr)": V(target), "paths, pooled (%/yr)": V(pooled), "ratio": ratio}).loc[show].round(2)
 ''')
 md(r"""
-The median asset comes out at 0.96 of its target, not 1.00, and that is the
+The median asset comes out below its target rather than on it, and that is the
 construction working rather than failing. A path starts from today's state, so
 its volatility is today's, not the unconditional average.
 
-DBC is the clearest case at 1.37. It loads one-for-one on Commodity, whose
-last observed volatility is 27 percent a year against an unconditional 21, so
-a twelve-month path stays hot. If you want the unconditional number, the
-cross-section of notebook 03 is the right object; this one answers *from here*.
+DBC is the clearest case. It loads one-for-one on Commodity, whose last
+observed volatility is above its unconditional level, so a twelve-month path
+stays hot. If you want the unconditional number, the cross-section of notebook
+03 is the right object; this one answers *from here*.
 """)
 md('Then the check notebook 04 could not do alone: is the dependence still there at a year?')
 cd('''

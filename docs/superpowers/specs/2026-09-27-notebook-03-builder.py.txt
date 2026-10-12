@@ -132,12 +132,12 @@ code(r'''
 spec = MarketSpec.read(WORKBOOK)
 show_workbook(spec, max_rows=5)
 ''')
-md("""Five of the seventy asset rows hold a target: a mean on SPY, a volatility on
-TLT, a shape on GLD, and both for the two funds with no history. The drawing
-keeps each sheet's own row numbers and shows the rows that hold something. The
-other sixty-five assets are a ticker and a tag, and every moment of theirs
-comes from their history. The `tags` sheet carries the exposures of the whole
-universe: sixteen classes, a `fit` wherever the class may load on a factor.""")
+md("""Five of the seventy asset rows hold a target. The other sixty-five are a ticker
+and a tag, so every moment of theirs comes from their history.
+
+The `tags` sheet carries the exposures of the whole universe, one row per asset
+class. Each drawing keeps the sheet's own row numbers, so a filtered view
+cannot lie about where a row sits.""")
 
 sec("s4", "4. The data", "The histories behind every empty cell.")
 md(r"""
@@ -250,14 +250,14 @@ code(r'''
 fl = sim.report.loc[sim.report["flags"] != "", "flags"]; print(f"{len(fl)} flags")
 fl.to_frame()
 ''')
-md("""The factor means, volatilities and skewnesses come back to the second decimal
-and the correlations to within 0.04. Two kurtoses land above target, Equity
-EM at 3.10 against 2.98 and Small cap at 3.29 against 2.96: those are exactly
-the Johnson SU floors at their skewnesses, and no member of the family is
-flatter. On the assets the largest mean difference is 1.00 %/yr against a
-Monte Carlo error of 0.84, and the five pair correlations are within 0.005 of
-the `pairs` sheet. The seven flags are all that same floor, DBC's residual
-being the one that moved, from 2.55 to 5.11.""")
+md("""The factor means, volatilities and skewnesses come back to the second decimal.
+Two kurtoses land above target, Equity EM and Small cap, and those two values
+are exactly the Johnson SU floors at their skewnesses: no member of the family
+is flatter.
+
+On the assets the largest mean difference is inside the Monte Carlo error, and
+the five pair correlations are within half a hundredth of the sheet. The seven
+flags are all that same floor, DBC's residual being the one that moved far.""")
 
 sec("s7", "7. Scenarios out", "The three objects you take into your own module.")
 md(r"""

@@ -121,15 +121,15 @@ print(t)
 t.moments.round(3)
 """)
 md(r"""
-Equity has negative skewness and kurtosis above 4. The Treasuries have
-positive skewness. Gold is close to normal.
+Equity's skewness is negative, the Treasuries' positive, and gold is close to
+normal.
 
 And the correlations.
 """)
 cd("""
 t.corr.round(2)
 """)
-md('The two Treasury funds move together at 0.92 and are nearly uncorrelated with equity.')
+md('The two Treasury funds move almost as one, and neither is correlated with equity.')
 
 # ---------------------------------------------------------------- 5. fit
 sec('s5', '5. Fit', 'A cubic of a normal per asset, the dependence in the normals.')
@@ -173,7 +173,7 @@ md('How far the normals had to move to deliver the targets.')
 cd("""
 print("intermediate correlations of the normals minus the target correlations (max abs):", round(float((fm.intermediate_corr - t.corr).abs().values.max()), 4))
 """)
-md('Four thousandths: the polynomials are close to linear here, so the two matrices nearly coincide.')
+md('The polynomials are close to linear here, so the two matrices nearly coincide.')
 
 # ---------------------------------------------------------------- 6. check
 sec('s6', '6. Check', 'The draw against the targets.')
@@ -232,10 +232,10 @@ Both, three ways: simulated, in the sample, and under a normal.
 """)
 keep(15)
 md(r"""
-The normal gives the smallest tail, because it ignores the skewness and
-kurtosis of the assets. The synthetic data gives a larger one, since its
-marginals carry them. The history gives the largest, above the synthetic
-value, although the generator reproduced every target.
+The normal's tail is the thinnest because it ignores the assets' skewness and
+kurtosis, and the synthetic data's is fatter because its marginals carry them.
+The history's is fatter still, even though the generator reproduced every
+target.
 """)
 
 sub('s7-2', '7.2 Why the synthetic tail is short')
@@ -263,13 +263,12 @@ for name, r in [("history", rp_hist.values), ("synthetic (Fleishman)", rp_sim.va
 pd.DataFrame(rows).T.round(2)
 ''')
 md(r"""
-The mean and volatility agree, the skewness and kurtosis do not: $-0.62$ and
-4.7 against $-0.44$ and 4.2. Cornish-Fisher splits the gap in two. On the
-synthetic data it reproduces the empirical VaR, 7.30 against 7.31. On the
-history it gives 7.47 against the empirical 8.22, so the moments account for
-about 0.2 of VaR and the remaining 0.75 is the sampling noise of a quantile on
-13 months. The expected shortfall, which averages those 13 months instead of
-picking one, agrees to 0.2 as well.
+The mean and volatility agree; the skewness and kurtosis do not. Cornish-Fisher
+splits the gap in two. On the synthetic data it reproduces the empirical VaR to
+a hundredth. On the history it falls 0.75 short of it, so the portfolio's
+moments account for about 0.2 of the difference and the rest is the sampling
+noise of a quantile estimated on 13 months. The expected shortfall, which
+averages those 13 months instead of picking one, agrees to 0.2 as well.
 """)
 md(r"""
 So the real gap sits in the portfolio's third and fourth moments. Why are they
@@ -303,10 +302,10 @@ for name, D in [("history", X), ("synthetic (Fleishman)", S)]:
 pd.DataFrame(rows).T.round(2)
 ''')
 md(r"""
-In the history SPY correlates 0.81 with EFA in SPY's bad months and 0.34 in
-its good ones: diversification across markets works when it is not needed and
-fails when it is. In the synthetic data the profile is flat at the target, 0.62
-on both sides.
+In the history SPY's correlation with EFA is more than twice as high in its bad
+months as in its good ones: diversification across markets works when it is not
+needed and fails when it is. In the synthetic data the two sides are equal, at
+the target.
 
 The generator has the right correlation on average and the wrong one in the
 tail, and an equal-weight equity portfolio inherits the difference as missing
@@ -334,9 +333,8 @@ tab[["VaR 5% (%)", "ES 5% (%)"]] *= 100
 tab.round(2)
 ''')
 md(r"""
-Again the mean and volatility agree and the skewness and kurtosis do not,
-$-0.68$ and 5.0 against $-0.31$ and 3.8, so the same gap in the tail. The
-cause, though, is different.
+Again the mean and volatility agree and the skewness and kurtosis do not, so
+the same gap in the tail. The cause, though, is different.
 """)
 md(r"""
 Here there is no asymmetry to reproduce. What the history has and the
@@ -363,11 +361,12 @@ pd.DataFrame(rows).T.round(2)
 ''')
 md(r"""
 The exceedance correlation is near zero on both sides, in the history and in
-the synthetic data alike: no asymmetry here. The co-kurtosis is 1.75 in the
-history against the independent-sizes value of 1.01. Large months of equity and
-large months of Treasuries coincide, in either direction, as in 2008, 2020 and
-2022, so the portfolio's variance is not the same every month and its tail is
-fatter than its correlation says. The synthetic data has the Gaussian value.
+the synthetic data alike, so there is no asymmetry here. The co-kurtosis is the
+column that separates them: the history's sits far above the value independent
+sizes would give, and the synthetic data's sits on it. Large months of equity
+and large months of Treasuries coincide, in either direction, as in 2008, 2020
+and 2022, so the portfolio's variance is not the same every month and its tail
+is fatter than its correlation says.
 
 Two portfolios, two properties of the joint tail that moments and correlations
 do not describe. For equity markets, dependence stronger in bad months than in
@@ -405,9 +404,8 @@ portfolio volatility, which is the check.
 keep(21)
 md(r"""
 The assets' own volatilities are unchanged and the portfolio's matches the
-implied value. Its monthly volatility falls from 4.7 to 4.0 percent, 13
-percent less risk for the same assets, and the VaR and expected shortfall fall
-with it.
+implied value. The view takes 13 percent of its risk away for the same assets,
+and the VaR and expected shortfall fall with it.
 """)
 
 sub('s8-2', '8.2 The volatility of one asset')
@@ -424,9 +422,9 @@ The two sets of targets, side by side.
 """)
 keep(23)
 md(r"""
-It rises from 4.7 to 5.2 percent a month, and the simulated value matches the
-implied one. The VaR and expected shortfall rise a little more than the
-volatility, because the mean, unchanged, is subtracted from them.
+It rises by the 12 percent the formula implies, and the simulated value matches
+the implied one. The VaR and expected shortfall rise a little more, because the
+mean, unchanged, is subtracted from them.
 """)
 
 # ---------------------------------------------------------------- 9. paths and save

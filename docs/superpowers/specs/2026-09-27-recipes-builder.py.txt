@@ -194,10 +194,11 @@ print("R2 %.2f -> %.2f   residual volatility %.1f%% -> %.1f%% a year"
       % (sim.model.r2["GLD"], sim_1.model.r2["GLD"], V(sim.model.resid_vol["GLD"]), V(sim_1.model.resid_vol["GLD"])))
 '''),
        ('md', r"""
-One beta given, two regressed, three zero. Inflation goes from -0.60 to the
-0.60 asked for, Real premia falls from 1.34 to 1.20, Commodity from 0.30 to
-0.13. $R^2$ falls from 0.31 to 0.24, because the history does not support the
-view and the residual absorbs the difference.
+One beta given, two regressed, three zero. Inflation arrives at the 0.60 asked
+for, and Real premia and Commodity both fall to make room.
+
+$R^2$ falls with them, because the history does not support the view and the
+residual absorbs the difference.
 """),
        ('sec', ('s5', '5. Check', 'The beta and the correlation in the scenarios.')),
        ('md', r"""
@@ -249,11 +250,12 @@ for rho in (0.30, 0.55, 0.80):
 print("\nbound 1/sqrt(2 - R2) with R2 = %.2f: %.2f" % (sim.model.r2["GLD"], 1 / np.sqrt(2 - sim.model.r2["GLD"])))
 '''),
        ('md', r"""
-0.30 and 0.55 are both delivered, and the second is expensive: the beta that
-reaches it is 3.02, which carries GLD to a volatility of 25 percent a year.
-0.80 is refused, with the message naming 0.70 as where the betas settle. Give
-the asset a volatility in the `assets` sheet and the residual is pinned, which
-makes any correlation up to the bound reachable.
+The first two are delivered, and the second is expensive: its beta is more than
+seven times the first's, which carries GLD to a volatility half again the
+history's. The third is refused, and the message names where the betas settle.
+
+Give the asset a volatility in the `assets` sheet and the residual is pinned,
+which makes any correlation up to the bound reachable.
 """)])
 
 # ------------------------------------------------------------------ recipe 2
@@ -323,9 +325,8 @@ pd.DataFrame({"mean (%/yr)": [A(float(c["mean target"])), A(float(c["mean simula
              index=["asked", "simulated"]).round(2)
 '''),
        ('md', r"""
-Both numbers come back: 6.84 against the 7.00 percent a year asked, 9.98
-against 10.00. The shape was never given, and it is not normal either,
-skewness -0.53 and kurtosis 4.95. It comes from Equity DM and Credit through
+Both numbers come back inside a tenth of a percent a year. The shape was never
+given, and it is not normal either: it comes from Equity DM and Credit through
 the two betas, so a fund with no history is not a Gaussian fund.
 """),
        ('sec', ('s5', '5. What is refused', 'The two cells that cannot be empty.')),
@@ -412,11 +413,10 @@ pd.concat([sim_3.report.loc[show, ["mean source", "vol source", "skew source", "
                          "resid kurt": sim_3.report.loc[show, "resid kurt"].astype(float)}).round(2)], axis=1)
 '''),
        ('md', r"""
-SPY's residual is untouched at 4.03 percent a year, because a mean is absorbed
-by the alpha alone. TLT's target of 14 percent is below what its betas and its
-sample residual produce, so its residual falls from 4.78 to 4.38. GLD's
-residual carries the whole shape: skewness -0.71 and kurtosis 6.87 for an
-asset asked for -0.5 and 5.0, since the residual is two thirds of its
+SPY's residual is untouched, because a mean is absorbed by the alpha alone.
+TLT's target is below what its betas and its sample residual produce, so its
+residual shrinks. GLD's residual carries the whole shape, and carries more of
+it than the asset was asked for, since the residual is two thirds of its
 variance.
 """),
        ('sec', ('s5', '5. Check', 'The four moments in the scenarios.')),
@@ -441,9 +441,8 @@ pd.DataFrame({f"seed {sd}": [x.skew(), x.kurtosis() + 3] for sd in (5, 6, 7, 8) 
 '''),
        ('md', r"""
 The mean and the volatility land within a tenth of a percent a year. The shape
-does not: over four seeds GLD's skewness runs -0.45 to -0.53 and its kurtosis
-4.55 to 5.31, for -0.5 and 5.0 asked. Read a given shape as a target to within
-about a tenth in skewness and half a point in kurtosis.
+does not, and the spread across seeds is the measure of it: read a given shape
+as a target to within about a tenth in skewness and half a point in kurtosis.
 """),
        ('sec', ('s6', '6. What is refused', 'A volatility below the betas, a shape no residual can carry.')),
        ('md', r"""
@@ -461,11 +460,13 @@ for label, row in [("XLF at 6% a year", {"ticker": "XLF", "vol": 0.06}),
         print(label, "-> refused:", err, "\n")
 '''),
        ('md', r"""
-XLF's betas alone give 19.3 percent a year, so a target of 6 leaves the
-residual a negative variance. GLD asked to be flatter than its factors make it
-needs a residual kurtosis of 2.7, which no Johnson SU has. SPY's residual is 7
-percent of its variance, so a skewness of -2.5 would need -112 from it: the
-more of an asset the factors explain, the less of its shape you can set.
+Each message names what is infeasible and what to do about it. XLF's betas
+alone exceed the volatility asked for, so the residual would need a negative
+variance. GLD asked to be flatter than its factors make it, which needs a
+residual no Johnson SU has. SPY's residual is a fourteenth of its variance, so
+a skewness of $-2.5$ would need an absurd one from it.
+
+The more of an asset the factors explain, the less of its shape you can set.
 """)])
 
 # ------------------------------------------------------------------ recipe 4
@@ -544,9 +545,8 @@ pd.DataFrame({"correlation": [float(sim_4.pair_report["target"]), X4["SPY"].corr
              index=["asked", "simulated", "simulated without the row", "in the sample"]).round(3)
 '''),
        ('md', r"""
-The row is delivered: 0.950 simulated against 0.950 asked, where the same
-simulator without the row gives 0.850. The sample sits between the two at
-0.915.
+The row is delivered to the third decimal, where the same simulator without it
+stops at the systematic correlation. The sample sits between the two.
 """),
        ('sec', ('s6', '6. Outside the range', 'The two refusals, and what to do instead.')),
        ('md', r"""
@@ -629,10 +629,11 @@ pd.DataFrame({"beta on Equity DM": sim.model.beta["Equity DM"], "mean before (%/
               "change (%/yr)": A(m1 - m0), "beta x change in the factor": A(sim.model.beta["Equity DM"] * d_mu)}).round(2)
 '''),
        ('md', r"""
-An asset's mean moves by its beta times the change in the factor's mean, to the
-cent: XLF by -3.39 percent a year on a beta of 1.30. The four assets with no
-Equity DM exposure do not move at all. That is what a view on a factor buys:
-one number, and the universe reprices consistently.
+The last two columns agree to the cent, which is the formula of section 2
+working. The four assets with no Equity DM exposure do not move at all.
+
+That is what a view on a factor buys: one number, and the universe reprices
+consistently.
 """),
        ('sec', ('s5', '5. Check', 'The factor moments in the scenarios.')),
        ('md', r"""
@@ -647,9 +648,8 @@ pd.DataFrame({"mean asked (%/yr)": A(fac["mean target"]), "mean simulated (%/yr)
               "kurt asked": fac["kurt target"], "kurt simulated": fac["kurt simulated"]}).round(2)
 '''),
        ('md', r"""
-The generator reproduces every target to the second decimal and the largest
-correlation error is 0.0067. The assets inherit those moments through their
-betas, with nothing else to say about them.
+The generator reproduces every target to the second decimal. The assets inherit
+those moments through their betas, with nothing else to say about them.
 """),
        ('sec', ('s6', '6. A correlation between two factors', 'The factor_corr sheet.')),
        ('md', r"""
@@ -667,10 +667,9 @@ print(pd.DataFrame({"base": V(sim.check(n=20000, seed=10)["assets"]["vol simulat
                     "with the edited correlation": V(sim_5b.check(Xb)["assets"]["vol simulated"].astype(float))}).round(2).to_string())
 '''),
        ('md', r"""
-The sample has Equity DM and Real premia at +0.31, the row asks for -0.30, and
-the simulation gives -0.31. XLF is the only asset that moves much, 22.5 to
-25.3 percent a year: it is long Equity DM and short Real premia, so the two
-exposures stop cancelling.
+The sign flips as asked. XLF is the only asset that moves much, about three
+points of annual volatility: it is long Equity DM and short Real premia, so the
+two exposures stop cancelling.
 """),
        ('sec', ('s7', '7. What is refused', 'A view an asset target cannot hold.')),
        ('md', r"""
@@ -761,11 +760,10 @@ pd.DataFrame({"from the fit": sim_6.targets.corr.loc[FACTORS, "Illiquidity"],
               "given": [f in given for f in FACTORS]}).round(3)
 '''),
        ('md', r"""
-Two correlations given, four completed, and the completed column is exactly
-$\mathbf R_{US} \mathbf R_{SS}^{-1} \mathbf r_S$. Inflation ends at 0.276 and
-Real premia at 0.031, neither of them stated: the completion passes the two
-stated correlations through the existing matrix, and Inflation is close to
-Credit while Real premia is not.
+Two correlations given, four completed, and the two columns agree exactly. The
+completion passes the stated correlations through the existing matrix, so
+Inflation inherits a large one because it is close to Credit, and Real premia
+almost nothing because it is not.
 """),
        ('sec', ('s5', '5. An asset that loads on it', 'The only way the new factor reaches a portfolio.')),
        ('md', r"""
@@ -783,10 +781,9 @@ print("Private credit simulated: mean %.2f%%/yr, vol %.2f%%/yr, corr with Illiqu
       % (A(X6["Private credit"].mean()), V(X6["Private credit"].std()), X6["Private credit"].corr(f6["Illiquidity"])))
 '''),
        ('md', r"""
-The new factor arrives with the mean and volatility asked and the correlations
-stated, 0.36 and 0.45 against 0.35 and 0.45. The fund that loads 0.5 on it
-ends 0.64 correlated with it, and it is the only asset in the file that feels
-the new factor at all.
+The new factor arrives with the mean, the volatility and the two correlations
+asked for. The fund that loads on it is the only asset in the file that feels
+it at all.
 """),
        ('sec', ('s6', '6. What is refused', 'Correlations with no valid completion.')),
        ('md', r"""
