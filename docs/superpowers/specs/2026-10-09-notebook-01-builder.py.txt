@@ -97,22 +97,13 @@ keep(5)
 # ---------------------------------------------------------------- 4. targets
 sec('s4', '4. Targets', 'The numbers the synthetic data must reproduce.')
 md(r"""
-From $n$ observations $r_{i,1}, \dots, r_{i,n}$ of asset $i$, the targets are
-the sample moments
+The targets are each asset's sample mean, volatility, skewness and kurtosis,
+plus the Pearson correlation of every pair. Four numbers per asset and one per
+pair, so 39 here.
 
-$$
-\mu_i = \frac{1}{n} \sum_t r_{i,t}, \qquad
-\sigma_i^2 = \frac{1}{n-1} \sum_t (r_{i,t} - \mu_i)^2, \qquad
-\gamma_{1,i} = \frac{\frac{1}{n}\sum_t (r_{i,t} - \mu_i)^3}{\hat s_i^3}, \qquad
-\gamma_{2,i} = \frac{\frac{1}{n}\sum_t (r_{i,t} - \mu_i)^4}{\hat s_i^4},
-$$
-
-with $\hat s_i$ the biased standard deviation, and the Pearson correlation
-matrix $\Sigma^*$ with entries $\Sigma^*_{ik} = \mathrm{Corr}(r_i, r_k)$.
-
-Four numbers per asset and one per pair, so $4N + N(N-1)/2$ targets, 39 here.
-The kurtosis is raw: the normal has $\gamma_2 = 3$, a value above 3 means
-fatter tails, a negative skewness means the large moves are falls.
+The kurtosis is raw: the normal has 3, a value above 3 means fatter tails, and
+a negative skewness means the large moves are falls. The estimators are in
+`docs/methods-note`, section 1.
 """)
 md('`Targets.from_history` computes them and keeps the history for the checks below.')
 cd("""
@@ -138,29 +129,20 @@ The simplest generator with these targets is Fleishman's (1978). Each asset is
 a cubic polynomial of a standard normal,
 
 $$
-X_i = a_i + b_i Z_i + c_i Z_i^2 + d_i Z_i^3, \qquad Z_i \sim N(0, 1).
+X_i = a_i + b_i Z_i + c_i Z_i^2 + d_i Z_i^3, \qquad Z_i \sim N(0, 1),
 $$
 
-The moments of a polynomial of a normal are polynomials of its coefficients,
-so matching mean 0, variance 1 and the target skewness and kurtosis is three
-equations in $(b_i, c_i, d_i)$, with $a_i = -c_i$, solved numerically. The
-mean and volatility are applied afterwards, $r_i = \mu_i + \sigma_i X_i$. A
-solution exists when $\gamma_{2,i} - 3 \ge \gamma_{1,i}^2 - 2$, which every
-return series in practice satisfies.
+whose four coefficients are solved from the four target moments, after which
+the mean and volatility are applied by $r_i = \mu_i + \sigma_i X_i$. The solve
+and the condition for a solution to exist are in `docs/methods-note`, section 1.
 """)
 md(r"""
-The dependence goes in the normals. If $(Z_i, Z_k)$ have correlation
-$\rho_Z$, the cubics have correlation
+The dependence goes in the normals. The correlation of two cubics is a cubic
+in the correlation of the normals behind them (Vale and Maurelli, 1983), so
+for each pair an *intermediate* correlation $\rho_Z$ is solved to deliver the
+target. The normals are then drawn jointly from that matrix.
 
-$$
-\mathrm{Corr}(X_i, X_k) = \rho_Z \,(b_i b_k + 3 b_i d_k + 3 d_i b_k + 9 d_i d_k) + \rho_Z^2\, (2 c_i c_k) + \rho_Z^3\, (6 d_i d_k),
-$$
-
-(Vale and Maurelli, 1983). For each pair the *intermediate* correlation
-$\rho_Z$ is the root of that cubic which makes $\mathrm{Corr}(X_i, X_k)$ equal
-the target $\Sigma^*_{ik}$. The matrix of intermediate correlations is made
-positive definite if needed, and the normals are drawn from it by a Cholesky
-factor.
+The cubic is in `docs/methods-note`, section 2.
 
 The fitted polynomial per asset.
 """)
@@ -218,15 +200,9 @@ Equal weights in U.S. large caps, U.S. small caps and developed markets
 outside the U.S. (SPY, IWM, EFA): diversification across markets, whose value
 is decided in bad months.
 
-A portfolio is a fixed vector of weights $\mathbf w$ and its return on each
-observation is $r_p = \mathbf w' \mathbf r$. Its monthly 5 percent value at
-risk and expected shortfall are
-
-$$
-\mathrm{VaR}_{5\%} = -q_{0.05}(r_p), \qquad \mathrm{ES}_{5\%} = -\mathbb E\big[r_p \mid r_p \le q_{0.05}(r_p)\big],
-$$
-
-minus the 5 percent quantile, and minus the mean of the returns below it.
+A portfolio is a fixed vector of weights and its return is $\mathbf w' \mathbf r$.
+Its monthly 5 percent value at risk is minus the 5 percent quantile, and its
+expected shortfall minus the mean of the returns below that quantile.
 
 Both, three ways: simulated, in the sample, and under a normal.
 """)
@@ -241,15 +217,11 @@ target.
 sub('s7-2', '7.2 Why the synthetic tail is short')
 md(r"""
 The Cornish-Fisher expansion writes a quantile as a function of the first four
-moments: with $z = \Phi^{-1}(\alpha)$, skewness $\gamma_1$ and excess kurtosis
-$\kappa = \gamma_2 - 3$,
+moments (`docs/methods-note`, section 3). So if the portfolio's four moments were
+matched, its VaR would be, and a gap that survives is a gap in the moments or
+noise in the estimate.
 
-$$
-q_\alpha \approx \mu + \sigma \left[ z + \frac{z^2 - 1}{6}\gamma_1 + \frac{z^3 - 3z}{24}\kappa - \frac{2z^3 - 5z}{36}\gamma_1^2 \right].
-$$
-
-So if the portfolio's four moments were matched, its VaR would be. The
-portfolio's four moments, its empirical VaR and its Cornish-Fisher VaR.
+The portfolio's four moments, its empirical VaR and its Cornish-Fisher VaR.
 """)
 cd(_SPLIT17A := '''
 def cf_var(r, alpha=0.05):
@@ -280,15 +252,9 @@ describe it alone, and a correlation is one number per pair, an average over
 the whole distribution.
 
 The sharper question: how correlated are two equity markets when one of them
-falls? For a pair $(x, y)$ with $x$ standardized and a threshold $z$ in
-standard deviations, the exceedance correlation is
-
-$$
-\hat\rho(z) = \begin{cases} \mathrm{Corr}(x, y \mid x < z) & z < 0, \\ \mathrm{Corr}(x, y \mid x \ge z) & z \ge 0, \end{cases}
-$$
-
-the Pearson correlation on the observations where $x$ is below $z$, its bad
-months, or above it, its good ones.
+falls? The *exceedance correlation* at a threshold $z$ is the ordinary
+correlation computed only on the months where the first asset is below $z$, if
+$z$ is negative, or above it, if $z$ is positive (`docs/methods-note`, section 3).
 
 At $z = -1, 0, +1$, for SPY against EFA and IWM, with each asset's own tail beside it.
 """)
@@ -337,15 +303,10 @@ Again the mean and volatility agree and the skewness and kurtosis do not, so
 the same gap in the tail. The cause, though, is different.
 """)
 md(r"""
-Here there is no asymmetry to reproduce. What the history has and the
-synthetic data has not is the *co-kurtosis*
-
-$$
-\mathbb E[s^2 b^2], \qquad s = \frac{r_{SPY} - \mu_{SPY}}{\sigma_{SPY}},\ \ b = \frac{r_{TLT} - \mu_{TLT}}{\sigma_{TLT}},
-$$
-
-the average product of the squared standardized returns, which equals
-$1 + 2\rho^2$ when the sizes of the two moves are independent.
+Here there is no asymmetry to reproduce. What the history has and the synthetic
+data has not is the *co-kurtosis*, the average product of the two squared
+standardized returns, which equals $1 + 2\rho^2$ when the sizes of the moves
+are independent (`docs/methods-note`, section 3).
 
 The exceedance correlations, TLT's own tail, and that co-kurtosis against its
 independent-sizes value.
@@ -389,14 +350,9 @@ same means, volatilities, skewnesses and kurtoses, the same correlations with
 bonds and gold.
 
 Nothing should happen to any single asset, by construction, only to the way
-they add up. For $N$ assets with weights $w_i$,
-
-$$
-\sigma_p^2 = \sum_i w_i^2 \sigma_i^2 + \sum_{i \ne k} w_i w_k\, \rho_{ik}\, \sigma_i \sigma_k ,
-$$
-
-so lowering the three $\rho_{ik}$ from about 0.84 to 0.50 removes a third of
-the second sum.
+they add up. In the portfolio variance the correlations enter only the
+cross terms (`docs/methods-note`, section 3), so lowering these three from about
+0.84 to 0.50 removes a third of that sum.
 
 Everything below is simulated under each set of targets, except the implied
 portfolio volatility, which is the check.

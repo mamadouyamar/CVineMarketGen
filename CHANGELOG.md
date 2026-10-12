@@ -2,6 +2,18 @@
 
 ## 0.4.0 (unreleased)
 
+- The methods note becomes the course's, in four parts, and grows from seven
+  pages to eleven. Part I is the generators, moved out of notebook 01: the
+  Fleishman cubic and its feasibility condition, the Vale-Maurelli equation,
+  and the four quantities used to read a tail (value at risk and expected
+  shortfall, Cornish-Fisher, the exceedance correlation, the co-kurtosis
+  against its independent-sizes value). Part III is dynamics, moved out of
+  notebook 04: a model as an invertible filter, the Ljung-Box and ARCH-LM
+  statistics, the GARCH family and its variants, the hidden Markov model's
+  predictive mixture and Rosenblatt transform, both path recursions, and the
+  fourth-moment condition with the cost of enforcing it. Theory is now 3
+  percent of notebook 01's prose and 18 percent of notebook 04's, against 31
+  and 43 before.
 - Notebook 05 joins the cross-section of notebook 03 to the filters of notebook
   04: a filter per factor, the generalized errors drawn jointly from the vine
   rather than one factor at a time, each filter inverted from its own last

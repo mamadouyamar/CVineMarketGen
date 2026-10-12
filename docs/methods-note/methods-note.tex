@@ -18,8 +18,8 @@
 \newcommand{\bR}{\mathbf R}
 \newcommand{\br}{\mathbf r}
 
-\title{A specification layer for factor-based market simulation\\
-\large Derivations for the CVineMarketGen notebooks}
+\title{Methods behind the CVineMarketGen course\\
+\large Derivations for notebooks 01 to 05}
 \author{Mamadou Yamar Thioub}
 \date{September 2026}
 
@@ -27,8 +27,17 @@
 \maketitle
 
 \begin{abstract}
-\noindent An analyst who wants scenarios for a universe of assets rarely has a
-complete description of it. They have a history for some assets, a mean or a
+\noindent This note carries the derivations the notebooks refer to, so that a
+notebook can state a rule and show it working without arguing for it. Part I
+is the generators: four moments matched by a cubic of a normal, a dependence
+put in the normals, and the quantities used to read a tail. Part II is the
+specification layer. Part III is dynamics in time: a model as an invertible
+filter, the two filters used, the test that decides which is adequate, and a
+moment condition the test cannot see. Part IV collects what none of it does.
+
+\medskip
+\noindent Part II is the longest, and it answers this. An analyst who wants
+scenarios for a universe of assets rarely has a complete description of it. They have a history for some assets, a mean or a
 volatility for others, exposures for an asset class, a correlation they insist
 on, a view on a driver. This note states the rule that turns any such partial
 description into one simulator, and derives the boundaries of what can be
@@ -39,6 +48,121 @@ two selection questions: which copula family a pair of near-orthogonal factors
 can identify, and how the dynamics of a factor are chosen. Numbers appear only
 where one makes a statement concrete; the notebooks carry the numbers.
 \end{abstract}
+
+\part{Generators: four moments and a dependence}
+
+\section{Matching four moments}\label{sec:fleishman}
+
+A target is a number the synthetic data must reproduce. From $n$ observations
+$r_{i,1}, \dots, r_{i,n}$ of asset $i$ the targets are the sample moments
+\begin{equation}\label{eq:sample_moments}
+  \mu_i = \frac{1}{n} \sum_t r_{i,t}, \quad
+  \sigma_i^2 = \frac{1}{n-1} \sum_t (r_{i,t} - \mu_i)^2, \quad
+  \gamma_{1,i} = \frac{\frac{1}{n}\sum_t (r_{i,t} - \mu_i)^3}{\hat s_i^3}, \quad
+  \gamma_{2,i} = \frac{\frac{1}{n}\sum_t (r_{i,t} - \mu_i)^4}{\hat s_i^4},
+\end{equation}
+with $\hat s_i$ the biased standard deviation, together with the Pearson
+correlation matrix $\bSigma^*$. The kurtosis is raw, so the normal has
+$\gamma_2 = 3$. For $N$ assets that is $4N + N(N-1)/2$ numbers.
+
+Fleishman's (1978) generator writes each asset as a cubic polynomial of a
+standard normal,
+\begin{equation}\label{eq:fleishman}
+  X_i = a_i + b_i Z_i + c_i Z_i^2 + d_i Z_i^3, \qquad Z_i \sim \mathcal N(0, 1).
+\end{equation}
+The moments of a polynomial of a normal are polynomials of its coefficients,
+so requiring $\mathbb E X_i = 0$, $\Var X_i = 1$ and the target skewness and
+kurtosis is three equations in $(b_i, c_i, d_i)$ with $a_i = -c_i$, solved
+numerically; the mean and volatility are applied afterwards by
+$r_i = \mu_i + \sigma_i X_i$. A solution exists when
+\begin{equation}\label{eq:fleishman_feasible}
+  \gamma_{2,i} - 3 \;\ge\; \gamma_{1,i}^2 - 2 ,
+\end{equation}
+which every return series met in the work behind this note.
+
+\section{Dependence through the normals}\label{sec:vm}
+
+Equation~\eqref{eq:fleishman} fixes each marginal and says nothing about the
+joint law. Vale and Maurelli (1983) put the dependence in the normals: if
+$(Z_i, Z_k)$ have correlation $\rho_Z$, then
+\begin{equation}\label{eq:vm}
+  \Corr(X_i, X_k) = \rho_Z \,(b_i b_k + 3 b_i d_k + 3 d_i b_k + 9 d_i d_k)
+   + \rho_Z^2\, (2 c_i c_k) + \rho_Z^3\, (6 d_i d_k) .
+\end{equation}
+For each pair the \emph{intermediate} correlation $\rho_Z$ is the root of that
+cubic which makes $\Corr(X_i, X_k)$ equal the target $\bSigma^*_{ik}$. The
+matrix of intermediate correlations is projected onto the nearest
+positive-definite one if an edit breaks it, and the normals are drawn from it
+by a Cholesky factor.
+
+\begin{remark}
+The construction is exact on the four moments and on every pairwise
+correlation, and it is silent about everything else. Its copula is the
+Gaussian one, inherited from $\mathbf Z$ and never chosen, which is the
+starting point of \S\ref{sec:tails}.
+\end{remark}
+
+\section{Reading a tail}\label{sec:tails}
+
+Four quantities recur in the notebooks and are collected here once.
+
+\paragraph{Value at risk and expected shortfall.} For a portfolio with fixed
+weights $\mathbf w$ and return $r_p = \mathbf w' \mathbf r$,
+\begin{equation}\label{eq:var_es}
+  \mathrm{VaR}_\alpha = -q_\alpha(r_p), \qquad
+  \mathrm{ES}_\alpha = -\mathbb E\big[r_p \mid r_p \le q_\alpha(r_p)\big],
+\end{equation}
+minus the $\alpha$ quantile, and minus the mean of the returns below it.
+
+\paragraph{The quantile implied by four moments.} The Cornish-Fisher expansion
+writes a quantile as a function of the first four moments: with
+$z = \Phi^{-1}(\alpha)$ and excess kurtosis $\kappa = \gamma_2 - 3$,
+\begin{equation}\label{eq:cornish_fisher}
+  q_\alpha \approx \mu + \sigma \left[ z + \frac{z^2 - 1}{6}\gamma_1
+   + \frac{z^3 - 3z}{24}\kappa - \frac{2z^3 - 5z}{36}\gamma_1^2 \right].
+\end{equation}
+It is the tool that separates two explanations of a missing tail. If a
+portfolio's own four moments are reproduced, \eqref{eq:cornish_fisher} says
+its quantile is too, so a gap that survives is sampling noise in the
+estimated quantile rather than a defect of the generator.
+
+\paragraph{Dependence that is not an average.} A correlation is one number per
+pair, an average over the whole distribution. The exceedance correlation
+conditions on where the first variable is: for a pair $(x, y)$ with $x$
+standardised and a threshold $z$,
+\begin{equation}\label{eq:exceedance}
+  \hat\rho(z) = \begin{cases}
+    \Corr(x, y \mid x < z) & z < 0, \\
+    \Corr(x, y \mid x \ge z) & z \ge 0 .
+  \end{cases}
+\end{equation}
+A profile higher on the left than on the right is dependence concentrated in
+joint falls. Under a Gaussian copula the profile is flat at the correlation,
+whatever the marginals, and that flatness is what \S\ref{sec:identify} is
+about.
+
+\paragraph{Dependence without a direction.} Two series can have no asymmetry
+and still fail to be independent, because the \emph{sizes} of their moves
+coincide. With $s$ and $b$ the standardised returns of two assets, the
+co-kurtosis is
+\begin{equation}\label{eq:cokurtosis}
+  \mathbb E[s^2 b^2] \;=\; 1 + 2\rho^2
+  \qquad \text{when } s^2 \text{ and } b^2 \text{ are independent,}
+\end{equation}
+so the gap between the sample value and $1 + 2\rho^2$ measures co-movement of
+sizes that no correlation describes. A portfolio inherits it as kurtosis: its
+variance is then not the same every month, and its tail is fatter than its
+correlations say.
+
+\paragraph{Where a view lands.} A change to one target reaches a portfolio
+through
+\begin{equation}\label{eq:port_var}
+  \sigma_p^2 = \sum_i w_i^2 \sigma_i^2 + \sum_{i \ne k} w_i w_k\, \rho_{ik}\, \sigma_i \sigma_k ,
+\end{equation}
+which is how the consequence of a stated view can be predicted before the
+generator is refitted, and therefore how the refit can be checked.
+
+\part{The specification layer}
 
 \section{The object}
 
@@ -314,47 +438,109 @@ factors keep the joint law the vine gave them --- the attachment does not touch
 them --- and the new factor is joined to them by a Gaussian dependence, which is
 the least one can assume when only correlations were stated.
 
-\section{Why the copula layer is quiet on near-orthogonal factors}
 
-A factor model is built so that its factors are nearly uncorrelated, and a
-copula is then hard to identify. The reason is a matter of orders. Expand a
-bivariate copula density in the Hermite basis of the normal scores; for the
-Gaussian copula, Mehler's formula gives
-\begin{equation}\label{eq:mehler}
-  c_\rho(u,v) \;=\; \sum_{m \ge 0} \frac{\rho^m}{m!}\, H_m(x)\,H_m(y),
-  \qquad x = \Phi^{-1}(u),\; y = \Phi^{-1}(v).
+\part{Dynamics in time}
+
+\section{A model as a filter, and its inverse}\label{sec:filter}
+
+Everything up to here produces exchangeable observations: a draw has the right
+moments, the right correlations and the right tails, and no order in time. A
+history has order, because large moves arrive in runs.
+
+A model of the dynamics is used here not to forecast but as a change of
+variable in both directions,
+\begin{equation}\label{eq:filter}
+  r_t \;\longmapsto\; \varepsilon_t \quad \text{(the filter)}, \qquad
+  \varepsilon_t \;\longmapsto\; r_t \quad \text{(its inverse)} .
 \end{equation}
-Every one-parameter family reduces to the independence copula at zero
-dependence, and matching two families on the Pearson correlation $\rho$ forces
-their first Hermite coefficient to agree. Families therefore differ only from
-the second coefficient on: their densities differ by $O(\rho^2)$, and the
-expected log-likelihood gap per observation, a Kullback-Leibler divergence
-between two densities at distance $O(\rho^2)$, is $O(\rho^4)$.
+Forwards, the model removes what its own past implies and leaves a
+\emph{generalized error} that is i.i.d.\ over time. Backwards, given i.i.d.\
+errors and the state at the end of the sample, the same equations rebuild
+returns one period at a time.
 
-Put numbers on it. At $\rho = 0.1$ and $n = 230$ monthly observations, the
-expected gap is of order $n\rho^4 \approx 0.02$ in log-likelihood, while the BIC
-penalty for one extra parameter is $\tfrac12\log n \approx 2.7$ and the sampling
-standard deviation of the gap is larger still. No selection rule can separate
-the families there, and none should pretend to. The consequence for practice is
-not that the copula is useless but that it earns its place elsewhere: between
-asset classes, where correlations are $0.5$ and above and a Student t or a
-rotated Gumbel is chosen against a Gaussian with a clear margin, and in the
-tails of a regime model. At the premia level, a Gaussian dependence with the
-right marginals is an honest answer.
+That is the whole construction, and it is what makes the two halves of the
+course compose. The errors are exchangeable, so they can be drawn by the
+generators of Part I, including jointly across several series; the returns
+they produce are not exchangeable, because each filter puts the clustering and
+the starting state back.
 
-Whether a pair's dependence is asymmetric is a separate question, and the
-package answers it with a statistic rather than a family fit: the mean
-exceedance correlation below $-1$ standard deviation minus the mean above $+1$,
-computed on normal scores, with a bootstrap interval. A pair whose interval
-contains zero is given a symmetric family and nothing else is read into it.
+\paragraph{What has to be removed.} Two questions decide what a filter must
+take out, and both are diagnostics rather than selection rules. Is the level
+predictable from its past? The autocorrelations
+$\hat\rho_j$ of $r_t$, summarised over $m$ lags by the Ljung-Box statistic
+\begin{equation}\label{eq:ljung_box}
+  Q_m = n(n+2) \sum_{j=1}^{m} \frac{\hat\rho_j^2}{n - j},
+  \qquad Q_m \sim \chi^2_m \ \text{under independence}.
+\end{equation}
+Is the size predictable? The same statistic on $r_t^2$, and Engle's ARCH-LM
+test, the $nR^2$ of the regression of $r_t^2$ on its $m$ lags, also
+$\chi^2_m$. On monthly equity the answer is consistently that the level is
+unpredictable and the size is not, so a filter has one job.
 
-\section{Choosing the dynamics of a factor}
+\section{The GARCH family}\label{sec:garch}
 
-A one-period generator has no memory, and a factor's history has one. The
-dynamics of a factor is chosen among a grid of candidates --- a constant or an
-AR(1) mean, a constant variance, a GARCH, a GJR-GARCH or an EGARCH at orders up
-to two, a Gaussian hidden Markov model with two or three regimes --- by one rule
-in two steps.
+The return is a mean plus an innovation whose variance depends on the past:
+\begin{equation}\label{eq:garch}
+  r_t = a + \sigma_t\, \varepsilon_t, \qquad
+  \sigma_t^2 = \omega + \alpha\, e_{t-1}^2 + \beta\, \sigma_{t-1}^2, \qquad
+  e_t = r_t - a ,
+\end{equation}
+the GARCH(1,1) of Bollerslev. A large move raises tomorrow's variance through
+$\alpha$, the variance decays at $\beta$, the unconditional level is
+$\omega/(1 - \alpha - \beta)$ and the persistence $\alpha + \beta$. Three
+variants are used: an AR(1) mean $a + b\,r_{t-1}$; the GJR term
+$\gamma\, e_{t-1}^2 \mathbf 1\{e_{t-1} < 0\}$, which lets a fall raise the
+variance more than a rise; and the EGARCH, the same idea on the log variance.
+Estimation is by maximum likelihood with a Gaussian innovation, on returns
+times 100, with the log-likelihood put back on the data's scale so that
+information criteria are comparable across candidates.
+
+The generalized error is the standardised residual,
+\begin{equation}\label{eq:garch_error}
+  \varepsilon_t = \frac{r_t - a}{\sigma_t} ,
+\end{equation}
+and the filter is invertible because $\varepsilon_t$ with the state
+$(e_{t-1}, \sigma_{t-1}^2)$ returns $r_t$ exactly. From the last observed
+state the inverse runs forward as
+\begin{equation}\label{eq:garch_path}
+  \sigma_{T+h}^2 = \omega + \alpha\, e_{T+h-1}^2 + \beta\, \sigma_{T+h-1}^2,
+  \qquad r_{T+h} = a + \sigma_{T+h}\, \varepsilon_{T+h}, \qquad h = 1, 2, \dots
+\end{equation}
+
+\section{The hidden Markov model}\label{sec:hmm}
+
+The second filter says the return comes from one of $K$ regimes,
+$r_t \mid s_t = k \sim \mathcal N(\mu_k, \sigma_k^2)$, with $s_t$ a Markov
+chain of transition matrix $\mathbf Q$. Estimation is by the EM algorithm.
+
+The state is never observed. What the data give is its filtered probability
+$\eta_{t|t-1,k} = \Pr(s_t = k \mid r_1, \dots, r_{t-1})$, updated by Bayes'
+rule at each observation, so the predictive distribution of the next return is
+the mixture
+\begin{equation}\label{eq:hmm_mixture}
+  F_t(r) = \sum_{k=1}^{K} \eta_{t|t-1,k}\,
+    \Phi\!\left( \frac{r - \mu_k}{\sigma_k} \right).
+\end{equation}
+Its generalized error is a different object from the GARCH's: the Rosenblatt
+transform of the observation,
+\begin{equation}\label{eq:rosenblatt}
+  v_t = F_t(r_t), \qquad \varepsilon_t = \Phi^{-1}(v_t),
+\end{equation}
+i.i.d.\ uniform and i.i.d.\ normal under the model. It inverts the same way,
+$r_{T+h} = F_{T+h}^{-1}(\Phi(\varepsilon_{T+h}))$ by bisection on the mixture,
+with the probabilities updated after each step.
+
+So two filters, two different errors, one a standardised residual and one a
+probability transform, with the same two properties: i.i.d.\ by construction,
+and a recursion that gives the return back.
+
+\section{Choosing the dynamics of a factor}\label{sec:gof}
+
+The filters of \S\ref{sec:garch} and \S\ref{sec:hmm} are candidates, not
+conclusions. One is chosen from a grid --- a constant or an AR(1) mean, a
+constant variance, a GARCH, a GJR-GARCH or an EGARCH at orders up to two, a
+Gaussian hidden Markov model with two or three regimes --- by one rule in two
+steps.
 
 \paragraph{Step 1: goodness of fit.} Every candidate is filtered, and its
 generalized error is mapped to a uniform,
@@ -410,7 +596,79 @@ $\mathbb E[(\alpha \varepsilon^2 + \gamma \varepsilon^2 \mathbf 1\{\varepsilon <
 of freedom the fourth moment of the process is infinite whatever the
 parameters, and the check says nothing.
 
-\section{What the rule does not do}
+\section{Does the recursion have a finite kurtosis?}\label{sec:fourth}
+
+A filter can pass the test of \S\ref{sec:gof} and still be unusable, because
+the test looks at $n$ standardised errors and says nothing about a moment of
+the process. For the GARCH family with a GJR term the fourth moment of the
+recursion is finite, and so is the unconditional kurtosis, only if
+\begin{equation}\label{eq:fourth_moment}
+  \mathbb E\big[(\alpha\,\varepsilon^2
+   + \gamma\,\varepsilon^2 \mathbf 1\{\varepsilon < 0\} + \beta)^2\big] \;<\; 1 ,
+\end{equation}
+an expectation taken under the innovation's own law, so it depends on the
+error's kurtosis as well as on the variance parameters. Nothing in the
+likelihood or in the selection rule enforces it: the likelihood is finite
+either way.
+
+Above one, any pooled estimate of the kurtosis of simulated paths grows with
+the number of paths, and individual paths can leave the range a return can
+occupy at all. In the course this is not hypothetical. Of seven monthly
+factors, three selected models violate \eqref{eq:fourth_moment}, one of them
+by a factor of six, and that one produces a simulated month below
+$-100$ percent.
+
+The remedy used is a second filter on the selection: among the candidates that
+pass the goodness-of-fit test, keep the lowest BIC whose
+\eqref{eq:fourth_moment} is below one. It is not free. On those seven factors
+the stable choice costs 15 BIC units on one series and 72 and 101 on two
+others, where the only admissible alternative is a constant variance, so the
+price of a finite kurtosis is the clustering itself.
+
+\begin{remark}
+Persistence is the wrong diagnostic here. The series whose condition is 5.9
+has a persistence of 0.85, well inside the stationary region; what breaks it
+is the size of $\gamma$ interacting with a heavy-tailed error. The two
+conditions are different inequalities and only the second bounds a kurtosis.
+\end{remark}
+
+\part{What the rules do not do}
+
+\section{Why the copula layer is quiet on near-orthogonal factors}\label{sec:identify}
+
+A factor model is built so that its factors are nearly uncorrelated, and a
+copula is then hard to identify. The reason is a matter of orders. Expand a
+bivariate copula density in the Hermite basis of the normal scores; for the
+Gaussian copula, Mehler's formula gives
+\begin{equation}\label{eq:mehler}
+  c_\rho(u,v) \;=\; \sum_{m \ge 0} \frac{\rho^m}{m!}\, H_m(x)\,H_m(y),
+  \qquad x = \Phi^{-1}(u),\; y = \Phi^{-1}(v).
+\end{equation}
+Every one-parameter family reduces to the independence copula at zero
+dependence, and matching two families on the Pearson correlation $\rho$ forces
+their first Hermite coefficient to agree. Families therefore differ only from
+the second coefficient on: their densities differ by $O(\rho^2)$, and the
+expected log-likelihood gap per observation, a Kullback-Leibler divergence
+between two densities at distance $O(\rho^2)$, is $O(\rho^4)$.
+
+Put numbers on it. At $\rho = 0.1$ and $n = 230$ monthly observations, the
+expected gap is of order $n\rho^4 \approx 0.02$ in log-likelihood, while the BIC
+penalty for one extra parameter is $\tfrac12\log n \approx 2.7$ and the sampling
+standard deviation of the gap is larger still. No selection rule can separate
+the families there, and none should pretend to. The consequence for practice is
+not that the copula is useless but that it earns its place elsewhere: between
+asset classes, where correlations are $0.5$ and above and a Student t or a
+rotated Gumbel is chosen against a Gaussian with a clear margin, and in the
+tails of a regime model. At the premia level, a Gaussian dependence with the
+right marginals is an honest answer.
+
+Whether a pair's dependence is asymmetric is a separate question, and the
+package answers it with a statistic rather than a family fit: the mean
+exceedance correlation below $-1$ standard deviation minus the mean above $+1$,
+computed on normal scores, with a bootstrap interval. A pair whose interval
+contains zero is given a symmetric family and nothing else is read into it.
+
+\section{Three limits of the asset rule}
 
 Three limits are worth stating plainly. The betas are estimated by ordinary
 least squares on the factors marked as fitted, with no shrinkage and no

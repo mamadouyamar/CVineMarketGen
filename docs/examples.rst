@@ -11,8 +11,10 @@ They are written to one standard, ``docs/notebook-principles.md``: explain then
 show, one exhibit at a time; draw an input as the artifact the reader types,
 and show a modification in its context; every number in the prose comes from
 the run beside it. The derivations live in the methods note
-(:download:`methods-note.pdf <_static/methods-note.pdf>`), so that a notebook
-states a rule and shows it working instead of arguing for it.
+(:download:`methods-note.pdf <_static/methods-note.pdf>`), in four parts: the
+generators, the specification layer, dynamics in time, and what none of it
+does. A notebook states a rule, shows it working, and points there for the
+derivation.
 
 The course
 ----------
